@@ -1,4 +1,4 @@
-import { Code2, PenLine, Search, X } from "lucide-react";
+import { ArrowUpDown, Code2, PenLine, Search, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
@@ -62,7 +62,7 @@ function SearchField({ value, onCommit }: { value: string; onCommit: (value: str
   }, [text, value, onCommit]);
 
   return (
-    <div className="relative min-w-0 flex-1 sm:max-w-xs">
+    <div className="relative min-w-[8.5rem] flex-1 sm:max-w-xs">
       <Search
         className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted"
         strokeWidth={1.75}
@@ -183,23 +183,25 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         )}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <SearchField value={q} onCommit={commitQuery} />
+      <div className="mt-6 flex items-start gap-2">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+          <SearchField value={q} onCommit={commitQuery} />
 
-        <CompactSelect
-          label="作品类型"
-          value={kind ?? "all"}
-          options={[
-            { value: "all", label: "全部类型" },
-            ...PROMPT_KINDS.map((value) => ({
-              value,
-              label: KIND_META[value].label,
-            })),
-          ]}
-          onChange={(value) => update("kind", value === "all" ? null : value)}
-        />
+          <CompactSelect
+            label="作品类型"
+            value={kind ?? "all"}
+            options={[
+              { value: "all", label: "全部类型" },
+              ...PROMPT_KINDS.map((value) => ({
+                value,
+                label: KIND_META[value].label,
+              })),
+            ]}
+            onChange={(value) => update("kind", value === "all" ? null : value)}
+          />
+        </div>
 
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-1.5">
           {filtered && (
             <Button
               variant="ghost"
@@ -212,6 +214,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           )}
           <CompactSelect
             label="排序"
+            icon={<ArrowUpDown className="size-3.5" strokeWidth={1.75} />}
             value={sort}
             onChange={(value) => update("sort", value === "new" ? null : value)}
             options={[

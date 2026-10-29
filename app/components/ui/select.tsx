@@ -9,8 +9,11 @@ export const SelectValue = SelectPrimitive.Value;
 
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger> & {
+    /** Replaces the dropdown chevron; pass null to drop it. */
+    indicator?: React.ReactNode;
+  }
+>(({ className, children, indicator, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -20,9 +23,13 @@ export const SelectTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-3.5 shrink-0 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
-    </SelectPrimitive.Icon>
+    {indicator !== null && (
+      <SelectPrimitive.Icon asChild>
+        {indicator ?? (
+          <ChevronDown className="size-3.5 shrink-0 opacity-50 transition-transform duration-200 group-data-[state=open]:rotate-180 motion-reduce:transition-none" />
+        )}
+      </SelectPrimitive.Icon>
+    )}
   </SelectPrimitive.Trigger>
 ));
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;

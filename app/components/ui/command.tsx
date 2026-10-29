@@ -1,6 +1,6 @@
 import * as React from "react";
 import { Command as CommandPrimitive } from "cmdk";
-import { Search } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import { cn } from "~/lib/utils";
 
 export const Command = React.forwardRef<
@@ -20,10 +20,17 @@ Command.displayName = CommandPrimitive.displayName;
 
 export const CommandInput = React.forwardRef<
   React.ElementRef<typeof CommandPrimitive.Input>,
-  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input>
->(({ className, ...props }, ref) => (
+  React.ComponentPropsWithoutRef<typeof CommandPrimitive.Input> & {
+    /** Swaps the search glyph for a spinner while results are on their way. */
+    loading?: boolean;
+  }
+>(({ className, loading, ...props }, ref) => (
   <div className="flex items-center border-b border-border px-3" cmdk-input-wrapper="">
-    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    {loading ? (
+      <Loader2 className="mr-2 h-4 w-4 shrink-0 animate-spin opacity-50" strokeWidth={2} />
+    ) : (
+      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+    )}
     <CommandPrimitive.Input
       ref={ref}
       className={cn(

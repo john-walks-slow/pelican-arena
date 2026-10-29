@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import {
   Select,
   SelectContent,
@@ -18,20 +19,25 @@ export function CompactSelect({
   options,
   onChange,
   label,
+  icon,
   className,
 }: {
   value: string;
   options: CompactSelectOption[];
   onChange: (value: string) => void;
   label: string;
+  /** Leading glyph, e.g. a sort mark; replaces the chevron. */
+  icon?: ReactNode;
   className?: string;
 }) {
   return (
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
+        indicator={icon ? null : undefined}
         className={cn("h-8 w-auto gap-1.5 rounded-control px-2.5 text-xs text-muted", className)}
       >
+        {icon && <span className="shrink-0 opacity-60">{icon}</span>}
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end">

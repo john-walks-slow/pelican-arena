@@ -66,7 +66,10 @@ export function FilterSelect({
           />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-60 p-0" align="start">
+      <PopoverContent
+        className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] min-w-56 p-0"
+        align="start"
+      >
         <Command loop>
           {searchable && (
             <CommandInput

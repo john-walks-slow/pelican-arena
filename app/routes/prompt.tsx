@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, Columns2, Copy, Upload, X } from "lucide-react";
+import { ArrowLeft, ArrowUpDown, Check, Columns2, Copy, Upload, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { data, Link, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/prompt";
@@ -95,37 +95,39 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
   const active = ["model", "provider", "harness", "mod"].some((k) => params.get(k));
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <FilterSelect
-        label="模型"
-        value={params.get("model") ?? ""}
-        options={facets.models.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
-        onChange={(v) => set("model", v)}
-        total={total}
-      />
-      <FilterSelect
-        label="提供方"
-        value={params.get("provider") ?? ""}
-        options={facets.providers.map((p) => ({ value: p.id, label: p.name, count: p.count }))}
-        onChange={(v) => set("provider", v)}
-        total={total}
-      />
-      <FilterSelect
-        label="客户端"
-        value={params.get("harness") ?? ""}
-        options={facets.harnesses.map((h) => ({ value: h.id, label: h.name, count: h.count }))}
-        onChange={(v) => set("harness", v)}
-        total={total}
-      />
-      <FilterSelect
-        label="增强"
-        value={params.get("mod") ?? ""}
-        options={facets.mods.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
-        onChange={(v) => set("mod", v)}
-        total={total}
-      />
+    <div className="flex items-start gap-2">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        <FilterSelect
+          label="模型"
+          value={params.get("model") ?? ""}
+          options={facets.models.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
+          onChange={(v) => set("model", v)}
+          total={total}
+        />
+        <FilterSelect
+          label="提供方"
+          value={params.get("provider") ?? ""}
+          options={facets.providers.map((p) => ({ value: p.id, label: p.name, count: p.count }))}
+          onChange={(v) => set("provider", v)}
+          total={total}
+        />
+        <FilterSelect
+          label="客户端"
+          value={params.get("harness") ?? ""}
+          options={facets.harnesses.map((h) => ({ value: h.id, label: h.name, count: h.count }))}
+          onChange={(v) => set("harness", v)}
+          total={total}
+        />
+        <FilterSelect
+          label="增强"
+          value={params.get("mod") ?? ""}
+          options={facets.mods.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
+          onChange={(v) => set("mod", v)}
+          total={total}
+        />
+      </div>
 
-      <div className="ml-auto flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         {active && (
           <Button
             variant="ghost"
@@ -138,6 +140,7 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
         )}
         <CompactSelect
           label="排序"
+          icon={<ArrowUpDown className="size-3.5" strokeWidth={1.75} />}
           value={sort}
           onChange={(v) => set("sort", v === "top" ? null : v)}
           options={[

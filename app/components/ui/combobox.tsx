@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronDown, Loader2, Plus } from "lucide-react";
+import { Check, ChevronDown, Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Command,
@@ -131,6 +131,7 @@ export function Combobox({
               placeholder={searchPlaceholder}
               value={query}
               onValueChange={setQuery}
+              loading={loading}
             />
             <CommandList>
               <CommandEmpty
@@ -198,13 +199,6 @@ export function Combobox({
                   );
                 })}
               </CommandGroup>
-
-              {loading && (
-                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted">
-                  <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-                  搜索中
-                </div>
-              )}
             </CommandList>
             {kind && total > list.length && (
               <p className="border-t border-rule px-3 py-1.5 text-[11px] text-muted">
