@@ -1,0 +1,4 @@
+{"type":"session","version":3,"id":"s1","timestamp":"2026-10-01T10:00:00.000Z","cwd":"/work"}
+{"type":"model_change","provider":"cpa","modelId":"route-name"}
+{"type":"message","message":{"role":"user","content":[{"type":"text","text":"Draw a pelican"}],"timestamp":1790848800000}}
+{"type":"message","message":{"role":"assistant","content":[{"type":"thinking","thinking":"…"},{"type":"toolCall","id":"c1","name":"write"}],"api":"openai-completions","provider":"cpa","model":"route-name","responseModel":"claude-opus-4-5-20251101","usage":{"input":100,"output":50,"cacheRead":1000,"cacheWrite":200,"reasoning":10},"timestamp":1790848860000}}

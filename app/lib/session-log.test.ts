@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { LogParseError, parseSessionLog } from "./session-log";
+import { decodeSessionLog } from "./session-log-file";
 
 const fixture = (name: string) =>
   readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), "utf8");
@@ -46,6 +47,62 @@ describe("parseSessionLog", () => {
     ];
     const meta = parseSessionLog(rows.map((r) => JSON.stringify(r)).join("\n"));
     expect(meta).toMatchObject({ inputTokens: 6, cacheReadTokens: 4, outputTokens: 3 });
+  });
+
+  it("reads pi sessions, preferring the served model over the route name", () => {
+    const meta = parseSessionLog(fixture("pi.jsonl"));
+    expect(meta).toMatchObject({
+      source: "pi",
+      models: ["claude-opus-4-5-20251101"],
+      inputTokens: 100,
+      outputTokens: 50,
+      cacheReadTokens: 1000,
+      cacheWriteTokens: 200,
+      reasoningTokens: 10,
+      turns: 1,
+      toolCalls: 1,
+      durationMs: 60_000,
+    });
+  });
+
+  it("counts only real user turns in DSH sessions", () => {
+    const meta = parseSessionLog(fixture("dsh.jsonl"));
+    expect(meta).toMatchObject({
+      source: "dsh",
+      models: ["deepseek-v4-flash-0731"],
+      inputTokens: 100,
+      outputTokens: 40,
+      cacheReadTokens: 900,
+      turns: 1,
+      toolCalls: 1,
+      durationMs: 60_000,
+    });
+  });
+
+  it("reads opencode's exported JSON document", () => {
+    const meta = parseSessionLog(fixture("opencode.json"));
+    expect(meta).toMatchObject({
+      source: "opencode",
+      models: ["gpt-5.1"],
+      inputTokens: 1200,
+      outputTokens: 300,
+      cacheReadTokens: 4000,
+      reasoningTokens: 80,
+      turns: 1,
+      toolCalls: 1,
+      durationMs: 60_000,
+    });
+  });
+
+  it("unpacks DSH's zstd logs before parsing", () => {
+    const bytes = new Uint8Array(
+      readFileSync(new URL("./__fixtures__/dsh.jsonl.zstd", import.meta.url)),
+    );
+    expect(parseSessionLog(decodeSessionLog(bytes))).toMatchObject({
+      source: "dsh",
+      inputTokens: 100,
+      turns: 1,
+    });
   });
 
   it("rejects files that are not a known log format", () => {

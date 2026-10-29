@@ -29,6 +29,7 @@
 		"cmdk": "^1.1.1",
 		"drizzle-orm": "^0.45.4",
 		"fflate": "^0.8.3",
+		"fzstd": "^0.1.1",
 		"isbot": "^5.1.36",
 		"lucide-react": "^1.63.0",
 		"react": "^19.2.8",

@@ -1,5 +1,5 @@
 import { REASONING_LEVELS, type ReasoningLevel } from "~/db/schema";
-import type { LogMeta } from "./session-log";
+import { isLogSource, type LogMeta } from "./session-log";
 
 /** Form field names shared by the submit page and its action. */
 export const FIELDS = {
@@ -78,7 +78,7 @@ const count = (v: unknown) =>
 
 /** Log metadata comes from the browser, so only known numeric fields are kept. */
 function sanitizeLogMeta(raw: any): LogMeta {
-  if (raw?.source !== "claude-code" && raw?.source !== "codex") throw new Error("source");
+  if (!isLogSource(raw?.source)) throw new Error("source");
   return {
     source: raw.source,
     models: Array.isArray(raw.models)

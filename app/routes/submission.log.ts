@@ -9,10 +9,14 @@ export async function loader({ params }: Route.LoaderArgs) {
   if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
   const object = await env.FILES.get(rawLogKey(submission.id));
   if (!object) throw data("Not Found", { status: 404 });
+  const json = submission.logMeta?.source === "opencode";
+  const extension = json ? "json" : "jsonl";
   return new Response(object.body, {
     headers: {
-      "Content-Type": "application/x-ndjson; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${submission.id}.jsonl"`,
+      "Content-Type": json
+        ? "application/json; charset=utf-8"
+        : "application/x-ndjson; charset=utf-8",
+      "Content-Disposition": `attachment; filename="${submission.id}.${extension}"`,
       "X-Content-Type-Options": "nosniff",
     },
   });

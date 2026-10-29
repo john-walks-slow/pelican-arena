@@ -2,6 +2,7 @@ import { ArrowLeft, Check, FileArchive, FileCode2, FileText, Plus, Upload, X } f
 import { useMemo, useRef, useState } from "react";
 import { data, Link, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/submit";
+import { SessionLogHelp } from "~/components/session-log-help";
 import { Button } from "~/components/ui/button";
 import { Combobox } from "~/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
@@ -20,13 +21,8 @@ import { formatCount, formatDuration, REASONING_LABELS } from "~/lib/format";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { matchModel } from "~/lib/model-match";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
-import {
-  LOG_SOURCE_LABELS,
-  LogParseError,
-  parseSessionLog,
-  totalTokens,
-  type LogMeta,
-} from "~/lib/session-log";
+import { LOG_SOURCE_LABELS, LogParseError, totalTokens, type LogMeta } from "~/lib/session-log";
+import { readSessionLogFile } from "~/lib/session-log-file";
 import { FIELDS, NOTES_LIMIT, parseSubmissionMeta, RAW_LOG_LIMIT } from "~/lib/submission-input";
 import { createSubmission, readBundleEntries } from "~/lib/submissions.server";
 
@@ -282,11 +278,13 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   async function pickLog(file: File) {
     setLogError(null);
     try {
-      const meta = parseSessionLog(await file.text());
-      setLog({ file, meta });
-      const raw = meta.models[0];
+      const parsed = await readSessionLogFile(file);
+      const logMeta = parsed.meta;
+      const upload = new File([parsed.text], parsed.name, { type: "application/x-ndjson" });
+      setLog({ file: upload, meta: logMeta });
+      const raw = logMeta.models[0];
       if (raw && !model) setModel(matchModel(raw, catalog.models)?.name ?? raw);
-      const sourceHarness = LOG_SOURCE_LABELS[meta.source];
+      const sourceHarness = LOG_SOURCE_LABELS[logMeta.source];
       if (!harness && catalog.harnesses.some((h) => h.name === sourceHarness)) setHarness(sourceHarness);
     } catch (e) {
       setLog(null);
@@ -464,7 +462,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
 
         <Section
           title="Session log"
-          hint="支持 Claude Code 与 Codex CLI 的 JSONL 日志。日志在浏览器里读取，默认只上传 token 和用时等统计。"
+          hint="支持 Claude Code、Codex CLI、pi、DSH 与 opencode。日志在浏览器里读取，默认只上传 token 和用时等统计。"
         >
           {log ? (
             <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
@@ -509,7 +507,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                 选择日志文件
                 <input
                   type="file"
-                  accept=".jsonl,.json,.log,.txt"
+                  accept=".jsonl,.json,.log,.txt,.zstd,.zst"
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
@@ -521,6 +519,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
               {logError && <p className="mt-1 text-xs text-negative">{logError}</p>}
             </div>
           )}
+          <SessionLogHelp />
         </Section>
 
         {(clientError || serverError) && (
