@@ -10,7 +10,6 @@ interface HelpRow {
 interface ClientHelp {
   id: LogSource;
   rows: HelpRow[];
-  note: string;
 }
 
 const HELP: ClientHelp[] = [
@@ -23,7 +22,6 @@ const HELP: ClientHelp[] = [
         value: String.raw`(Get-ChildItem "$env:USERPROFILE\.claude\projects\*\*.jsonl" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName`,
       },
     ],
-    note: "项目目录名由工作路径生成，命令取最近修改的那个会话。",
   },
   {
     id: "codex",
@@ -34,7 +32,6 @@ const HELP: ClientHelp[] = [
         value: String.raw`(Get-ChildItem "$env:USERPROFILE\.codex\sessions\*\*\*\*.jsonl" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName`,
       },
     ],
-    note: "按日期分目录存放，命令取最近修改的那个会话。",
   },
   {
     id: "pi",
@@ -45,7 +42,6 @@ const HELP: ClientHelp[] = [
         value: String.raw`(Get-ChildItem "$env:USERPROFILE\.pi\agent\sessions\*\*.jsonl" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName`,
       },
     ],
-    note: "命令取最近修改的那个会话。",
   },
   {
     id: "dsh",
@@ -56,7 +52,6 @@ const HELP: ClientHelp[] = [
         value: String.raw`(Get-ChildItem "$env:USERPROFILE\.dsh\sessions\*\*\session*.jsonl.zstd" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName`,
       },
     ],
-    note: "",
   },
   {
     id: "opencode",
@@ -70,7 +65,6 @@ const HELP: ClientHelp[] = [
         value: String.raw`opencode export $((opencode session list --format json | ConvertFrom-Json)[0].id) | Out-File -Encoding utf8 "$env:USERPROFILE\opencode-session.json"; Write-Output "$env:USERPROFILE\opencode-session.json"`,
       },
     ],
-    note: "没有可直接上传的日志文件，命令先导出 JSON，再打印路径。",
   },
 ];
 
@@ -166,7 +160,7 @@ export function SessionLogHelp() {
       </button>
       {open && (
         <>
-          <div className="mt-2 overflow-hidden rounded-control border border-border bg-active">
+          <div className="mt-2 overflow-hidden rounded-control border border-border bg-raised">
             <div
               role="tablist"
               aria-label="客户端"
@@ -203,7 +197,6 @@ export function SessionLogHelp() {
               {help.rows.map((row) => (
                 <CopyRow key={row.label} {...row} />
               ))}
-              {help.note && <p className="pt-0.5 text-[11px] text-muted">{help.note}</p>}
             </div>
           </div>
         </>
