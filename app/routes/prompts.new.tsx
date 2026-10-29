@@ -64,6 +64,23 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
 
       <Form method="post" className="mt-6 space-y-5">
         <div>
+          <label className="block text-sm font-medium" htmlFor="title">
+            标题
+          </label>
+          <Input
+            id="title"
+            name="title"
+            className="mt-1.5"
+            maxLength={LIMITS.title}
+            defaultValue={values?.title}
+            placeholder="骑自行车的鹈鹕"
+            aria-invalid={Boolean(errors?.title)}
+            required
+          />
+          {errors?.title && <p className="mt-1 text-xs text-negative">{errors.title}</p>}
+        </div>
+
+        <div>
           <span className="block text-sm font-medium">作品类型</span>
           <input type="hidden" name="kind" value={kind} />
           <div className="mt-1.5 grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label="作品类型">
@@ -91,23 +108,6 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
               );
             })}
           </div>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium" htmlFor="title">
-            标题
-          </label>
-          <Input
-            id="title"
-            name="title"
-            className="mt-1.5"
-            maxLength={LIMITS.title}
-            defaultValue={values?.title}
-            placeholder="骑自行车的鹈鹕"
-            aria-invalid={Boolean(errors?.title)}
-            required
-          />
-          {errors?.title && <p className="mt-1 text-xs text-negative">{errors.title}</p>}
         </div>
 
         <div>

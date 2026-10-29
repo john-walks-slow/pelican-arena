@@ -17,8 +17,8 @@ export interface FilterOption {
 }
 
 /**
- * A filter control with a searchable list. Value "" means "all".
- * Used where the catalog can grow past what a native select can show.
+ * A filter control with a list. Value "" means "all"; long catalogs keep the
+ * search field while short ones (like work type) hide it.
  */
 export function FilterSelect({
   label,
@@ -26,6 +26,7 @@ export function FilterSelect({
   options,
   onChange,
   total,
+  searchable = true,
   searchPlaceholder,
   className,
 }: {
@@ -34,6 +35,7 @@ export function FilterSelect({
   options: FilterOption[];
   onChange: (value: string) => void;
   total?: number;
+  searchable?: boolean;
   searchPlaceholder?: string;
   className?: string;
 }) {
@@ -48,7 +50,7 @@ export function FilterSelect({
           type="button"
           aria-label={label}
           className={cn(
-            "inline-flex h-8 items-center gap-1.5 rounded-control border px-2.5 text-xs transition-colors",
+            "inline-flex h-8 items-center gap-1.5 rounded-control border px-2.5 text-xs shadow-2xs transition-colors",
             value
               ? "border-ink/25 bg-raised font-medium text-ink"
               : "border-control bg-surface text-muted hover:bg-raised hover:text-ink",
@@ -56,17 +58,19 @@ export function FilterSelect({
           )}
         >
           <span className="max-w-40 truncate">{current?.label ?? label}</span>
-          <ChevronDown className="size-3 shrink-0 opacity-50" />
+          <ChevronDown className="size-3.5 shrink-0 opacity-50" />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-0" align="start">
         <Command loop>
-          <CommandInput
-            placeholder={searchPlaceholder ?? `搜索${label}`}
-            value={query}
-            onValueChange={setQuery}
-            className="h-9"
-          />
+          {searchable && (
+            <CommandInput
+              placeholder={searchPlaceholder ?? `搜索${label}`}
+              value={query}
+              onValueChange={setQuery}
+              className="h-9"
+            />
+          )}
           <CommandList className="max-h-64">
             <CommandEmpty className="py-4 text-center text-xs text-muted">没有匹配项</CommandEmpty>
             <CommandItem

@@ -10,7 +10,7 @@ import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
 import { FilterSelect } from "~/components/ui/filter-select";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { SortSelect } from "~/components/ui/sort-select";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
 import { KIND_META } from "~/lib/kinds";
@@ -136,15 +136,14 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
             清除
           </Button>
         )}
-        <Select value={sort} onValueChange={(v) => set("sort", v === "top" ? null : v)}>
-          <SelectTrigger className="h-8 w-auto gap-1.5 px-2.5 text-xs text-muted">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="top">评分最高</SelectItem>
-            <SelectItem value="new">最新</SelectItem>
-          </SelectContent>
-        </Select>
+        <SortSelect
+          value={sort}
+          onChange={(v) => set("sort", v === "top" ? null : v)}
+          options={[
+            { value: "top", label: "评分最高" },
+            { value: "new", label: "最新" },
+          ]}
+        />
       </div>
     </div>
   );

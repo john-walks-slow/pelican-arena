@@ -8,7 +8,7 @@ import { SubmissionPreview } from "~/components/submission-preview";
 import { Button } from "~/components/ui/button";
 import { FilterSelect } from "~/components/ui/filter-select";
 import { Input } from "~/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { SortSelect } from "~/components/ui/sort-select";
 import { formatRelative } from "~/lib/format";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
@@ -195,6 +195,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             label: KIND_META[value].label,
           }))}
           onChange={(value) => update("kind", value || null)}
+          searchable={false}
         />
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -208,16 +209,15 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               清除
             </Button>
           )}
-          <Select value={sort} onValueChange={(value) => update("sort", value === "new" ? null : value)}>
-            <SelectTrigger className="h-8 w-auto gap-1.5 px-2.5 text-xs text-muted">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="new">最新</SelectItem>
-              <SelectItem value="answers">最多答案</SelectItem>
-              <SelectItem value="top">评分最高</SelectItem>
-            </SelectContent>
-          </Select>
+          <SortSelect
+            value={sort}
+            onChange={(value) => update("sort", value === "new" ? null : value)}
+            options={[
+              { value: "new", label: "最新" },
+              { value: "answers", label: "最多答案" },
+              { value: "top", label: "评分最高" },
+            ]}
+          />
         </div>
       </div>
 
