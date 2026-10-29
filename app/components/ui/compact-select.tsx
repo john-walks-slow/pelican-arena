@@ -26,7 +26,7 @@ export function CompactSelect({
   options: CompactSelectOption[];
   onChange: (value: string) => void;
   label: string;
-  /** Leading glyph, e.g. a sort mark; replaces the chevron. */
+  /** Leading glyph naming the dimension being filtered. */
   icon?: ReactNode;
   className?: string;
 }) {
@@ -34,7 +34,6 @@ export function CompactSelect({
     <Select value={value} onValueChange={onChange}>
       <SelectTrigger
         aria-label={label}
-        indicator={icon ? null : undefined}
         className={cn("h-8 w-auto gap-1.5 rounded-control px-2.5 text-xs text-muted", className)}
       >
         {icon && <span className="shrink-0 opacity-60">{icon}</span>}

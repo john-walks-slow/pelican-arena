@@ -4,19 +4,21 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "~/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 select-none",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed select-none",
   {
     variants: {
       variant: {
-        default: "bg-ink text-white hover:bg-black",
-        primary: "bg-ink text-white hover:bg-black",
-        destructive: "bg-negative text-white hover:bg-[#a61c22]",
+        default: "bg-ink text-white hover:bg-black disabled:bg-raised disabled:text-muted",
+        primary: "bg-ink text-white hover:bg-black disabled:bg-raised disabled:text-muted",
+        destructive:
+          "bg-negative text-white hover:bg-[#a61c22] disabled:bg-raised disabled:text-muted",
         outline:
-          "border border-control bg-surface text-ink hover:border-ink/30 hover:bg-raised",
-        secondary: "bg-raised text-ink hover:bg-active",
-        ghost: "text-muted hover:bg-raised hover:text-ink",
-        link: "h-auto p-0 text-accent underline-offset-4 hover:underline",
-        linuxdo: "bg-[#1c1c1e] text-white hover:bg-black",
+          "border border-control bg-surface text-ink hover:border-ink/30 hover:bg-raised disabled:border-border disabled:bg-surface disabled:text-muted",
+        secondary:
+          "bg-raised text-ink hover:bg-active disabled:bg-surface disabled:text-muted",
+        ghost: "text-muted hover:bg-raised hover:text-ink disabled:text-muted/60",
+        link: "h-auto p-0 text-accent underline-offset-4 hover:underline disabled:text-muted",
+        linuxdo: "bg-[#1c1c1e] text-white hover:bg-black disabled:bg-raised disabled:text-muted",
       },
       size: {
         default: "h-8 px-3 text-sm",

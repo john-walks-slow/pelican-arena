@@ -1,3 +1,4 @@
+import { ShieldCheck } from "lucide-react";
 import { Form, redirect } from "react-router";
 import type { Route } from "./+types/auth.login";
 import { Button } from "~/components/ui/button";
@@ -87,7 +88,10 @@ export default function DevLogin({ loaderData }: Route.ComponentProps) {
               </label>
               <Select name="trustLevel" defaultValue="2">
                 <SelectTrigger id="trustLevel">
-                  <SelectValue placeholder="选择信任等级" />
+                  <div className="flex min-w-0 items-center gap-2">
+                    <ShieldCheck className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
+                    <SelectValue placeholder="选择信任等级" />
+                  </div>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="0">TL0</SelectItem>

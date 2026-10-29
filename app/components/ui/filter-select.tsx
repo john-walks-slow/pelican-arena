@@ -1,5 +1,5 @@
 import { Check, ChevronDown } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import {
   Command,
   CommandEmpty,
@@ -28,6 +28,7 @@ export function FilterSelect({
   total,
   searchable = true,
   searchPlaceholder,
+  icon,
   className,
 }: {
   label: string;
@@ -37,6 +38,8 @@ export function FilterSelect({
   total?: number;
   searchable?: boolean;
   searchPlaceholder?: string;
+  /** Leading glyph naming the dimension being filtered. */
+  icon?: ReactNode;
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -57,6 +60,7 @@ export function FilterSelect({
             className,
           )}
         >
+          {icon && <span className="shrink-0 opacity-60">{icon}</span>}
           <span className="max-w-40 truncate">{current?.label ?? label}</span>
           <ChevronDown
             className={cn(

@@ -1,7 +1,8 @@
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/compare";
 import { Markdown } from "~/components/markdown";
+import { PageHeader } from "~/components/page-header";
 import { LiveFrame } from "~/components/page-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
@@ -40,19 +41,13 @@ const COLS: Record<number, string> = {
 export default function Compare({ loaderData }: Route.ComponentProps) {
   const { prompt, submissions, usercontentOrigin } = loaderData;
   return (
-    <div className="space-y-5">
-      <div>
-        <Link
-          to={`/p/${prompt.id}`}
-          className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
-        >
-          <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-          {prompt.title}
-        </Link>
-        <h1 className="mt-1 text-title font-bold tracking-tight">并排对比</h1>
-      </div>
+    <div>
+      <PageHeader
+        back={{ to: `/p/${prompt.id}`, label: prompt.title }}
+        title="并排对比"
+      />
 
-      <div className={`grid gap-4 ${COLS[submissions.length]}`}>
+      <div className={`mt-2.5 grid gap-4 ${COLS[submissions.length]}`}>
         {submissions.map((s) => (
           <section
             key={s.id}

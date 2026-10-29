@@ -30,6 +30,10 @@ interface ComboboxProps {
   emptyText?: string;
   hint?: React.ReactNode;
   required?: boolean;
+  /** Leading glyph naming the catalog being picked from. */
+  icon?: React.ReactNode;
+  /** field: full-width form control. chip: inline pill that sits with other tags. */
+  trigger?: "field" | "chip";
   className?: string;
 }
 
@@ -45,6 +49,8 @@ export function Combobox({
   emptyText = "未找到匹配项",
   hint,
   required,
+  icon,
+  trigger = "field",
   className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
@@ -93,13 +99,18 @@ export function Combobox({
   const selectedEntry = list.find((o) => o.name.toLowerCase() === value.toLowerCase());
   const displayLabel = value || placeholder;
   const showSelected = Boolean(value && !selectedEntry);
+  const isChip = trigger === "chip";
   const isCustomNew =
     query.trim().length > 0 &&
     !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      {label && <label className="block text-sm font-medium">{label}</label>}
+      {label && (
+        <label className={cn("block text-xs font-medium text-muted", isChip && "sr-only")}>
+          {label}
+        </label>
+      )}
 
       {/* Hidden input to ensure FormData gets the chosen/typed value */}
       <input type="hidden" name={name} value={value} required={required} />
@@ -108,24 +119,38 @@ export function Combobox({
         <PopoverTrigger asChild>
           <Button
             type="button"
-            variant="outline"
+            variant={isChip ? "ghost" : "outline"}
             role="combobox"
             aria-expanded={open}
             className={cn(
-              "w-full justify-between bg-surface px-2.5 font-normal text-sm",
-              !value && "text-muted/70",
+              isChip
+                ? "h-7 gap-1 rounded-full border border-dashed border-control px-2.5 text-xs font-normal text-muted hover:border-ink/25 hover:bg-raised hover:text-ink"
+                : "w-full justify-between bg-surface px-2.5 font-normal text-sm",
+              !isChip && !value && "text-muted/70",
             )}
           >
-            <span className="truncate">{displayLabel}</span>
-            <ChevronDown
-              className={cn(
-                "ml-2 size-3.5 shrink-0 opacity-50 transition-transform duration-200 motion-reduce:transition-none",
-                open && "rotate-180",
-              )}
-            />
+            {isChip ? (
+              icon ?? <Plus className="size-3.5 shrink-0" strokeWidth={1.75} />
+            ) : (
+              icon && <span className="shrink-0 opacity-60">{icon}</span>
+            )}
+            <span className={cn("truncate", !isChip && "min-w-0 flex-1 text-left")}>
+              {displayLabel}
+            </span>
+            {!isChip && (
+              <ChevronDown
+                className={cn(
+                  "ml-2 size-3.5 shrink-0 opacity-50 transition-transform duration-200 motion-reduce:transition-none",
+                  open && "rotate-180",
+                )}
+              />
+            )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+        <PopoverContent
+          className="w-[var(--radix-popover-trigger-width)] min-w-56 p-0"
+          align="start"
+        >
           <Command loop shouldFilter={!kind}>
             <CommandInput
               placeholder={searchPlaceholder}

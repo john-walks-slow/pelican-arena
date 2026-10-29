@@ -1,9 +1,10 @@
-import { ArrowUpDown, Code2, PenLine, Search, X } from "lucide-react";
+import { ArrowUpDown, Code2, PenLine, Search, Shapes, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Link, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
 import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
+import { PageHeader } from "~/components/page-header";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -33,6 +34,8 @@ export const meta: Route.MetaFunction = () => [
     content: "同一道提示词，不同模型、不同提供方各交一份作品，直接对比。",
   },
 ];
+
+const DEFAULT_SORT: PromptSort = "latest";
 
 function readQuery(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -114,7 +117,7 @@ interface MorePrompts {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { prompts, nextPage, total, q, kind, sort, stats, usercontentOrigin } = loaderData;
-  const [params, setParams] = useSearchParams();
+  const [, setParams] = useSearchParams();
   const user = useOptionalUser();
   const fetcher = useFetcher<MorePrompts>();
 
@@ -159,41 +162,44 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     const query = new URLSearchParams();
     if (q) query.set("q", q);
     if (kind) query.set("kind", kind);
-    if (sort !== DEFAULT_PROMPT_SORT) query.set("sort", sort);
+    if (sort !== DEFAULT_SORT) query.set("sort", sort);
     query.set("page", String(next));
     fetcher.load(`/api/prompts?${query}`);
   }, [next, fetcher, q, kind, sort]);
 
-  const filtered = Boolean(q || kind || sort !== DEFAULT_PROMPT_SORT);
+  const filtered = Boolean(q || kind || sort !== DEFAULT_SORT);
   const loading = fetcher.state !== "idle";
 
   return (
     <div className="mx-auto max-w-[1240px]">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-title font-bold tracking-tight">题目</h1>
-          <p className="mt-1 text-sm text-muted">
+      <PageHeader
+        title="题目"
+        subtitle={
+          <>
             <span className="num">{stats.prompts}</span> 道题 ·{" "}
             <span className="num">{stats.submissions}</span> 份答案 ·{" "}
             <span className="num">{stats.ratings}</span> 次打分
-          </p>
-        </div>
-        {can(user, "createPrompt") && (
-          <Button asChild variant="primary" className="gap-1.5">
-            <Link to="/prompts/new">
-              <PenLine className="size-4" strokeWidth={1.75} />
-              出题
-            </Link>
-          </Button>
-        )}
-      </div>
+          </>
+        }
+        actions={
+          can(user, "createPrompt") ? (
+            <Button asChild variant="primary" className="gap-1.5">
+              <Link to="/prompts/new">
+                <PenLine className="size-4" strokeWidth={1.75} />
+                出题
+              </Link>
+            </Button>
+          ) : undefined
+        }
+      />
 
-      <div className="mt-6 flex items-start gap-2">
+      <div className="mt-3 flex items-start gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <SearchField value={q} onCommit={commitQuery} />
 
           <CompactSelect
             label="作品类型"
+            icon={<Shapes className="size-3.5" strokeWidth={1.75} />}
             value={kind ?? "all"}
             options={[
               { value: "all", label: "全部类型" },
@@ -207,21 +213,11 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
-          {filtered && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted"
-              onClick={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
-            >
-              清除
-            </Button>
-          )}
           <CompactSelect
             label="排序"
             icon={<ArrowUpDown className="size-3.5" strokeWidth={1.75} />}
             value={sort}
-            onChange={(value) => update("sort", value === DEFAULT_PROMPT_SORT ? null : value)}
+            onChange={(value) => update("sort", value === DEFAULT_SORT ? null : value)}
             options={[
               { value: "latest", label: "最近更新" },
               { value: "new", label: "最近发布" },
@@ -248,7 +244,10 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <>
                 还没有题目。
                 {can(user, "createPrompt") && (
-                  <Link to="/prompts/new" className="ml-1 font-medium text-accent hover:underline">
+                  <Link
+                    to="/prompts/new"
+                    className="ml-1 font-medium text-accent hover:underline"
+                  >
                     出第一道题
                   </Link>
                 )}

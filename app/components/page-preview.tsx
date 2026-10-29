@@ -63,7 +63,7 @@ export function LiveFrame({ src, title, className }: { src: string; title: strin
       title={title}
       sandbox={SANDBOX}
       referrerPolicy="no-referrer"
-      allow="fullscreen; autoplay"
+      allow="fullscreen; autoplay; clipboard-write"
       className={`block border-0 bg-white ${className ?? ""}`}
     />
   );

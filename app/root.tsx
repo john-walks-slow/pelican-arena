@@ -8,10 +8,10 @@ import {
   ScrollRestoration,
 } from "react-router";
 
-import { useEffect } from "react";
+import { useEffect, useRef, ViewTransition } from "react";
 import { useLocation } from "react-router";
 import type { Route } from "./+types/root";
-import { AppShell } from "./components/app-shell";
+import { AppShell, baseScreenKey } from "./components/app-shell";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
@@ -79,13 +79,64 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
   return null;
 }
 
-/** Keyed by pathname so filter changes inside a page do not replay the entrance. */
+type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up";
+
+function screenRank(key: string): { depth: number; slot: number } {
+  if (key === "/") return { depth: 0, slot: 0 };
+  if (key === "/prompts/new") return { depth: 0, slot: 1 };
+  if (key.startsWith("/me")) return { depth: 0, slot: 2 };
+  if (key.startsWith("/auth")) return { depth: 0, slot: 3 };
+  if (/^\/p\/[^/]+\/edit$/.test(key)) return { depth: 2, slot: 0 };
+  if (key.startsWith("/p/")) return { depth: 1, slot: 0 };
+  if (key.startsWith("/s/") || key.startsWith("/compare")) return { depth: 2, slot: 0 };
+  return { depth: 1, slot: 0 };
+}
+
+function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
+  if (prevKey === nextKey) return "steady";
+  const prev = screenRank(prevKey);
+  const next = screenRank(nextKey);
+  if (next.depth > prev.depth) return "forward";
+  if (next.depth < prev.depth) return "back";
+  if (next.depth === 0 && prev.depth === 0) {
+    return next.slot >= prev.slot ? "lateral-down" : "lateral-up";
+  }
+  return "forward";
+}
+
 function RouteTransition({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  const screenKey = baseScreenKey(pathname);
+  const stateRef = useRef<{ key: string; motion: RouteMotion }>({
+    key: screenKey,
+    motion: "steady",
+  });
+
+  if (stateRef.current.key !== screenKey) {
+    const motion = resolveMotion(stateRef.current.key, screenKey);
+    stateRef.current = { key: screenKey, motion };
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.navDir = motion;
+    }
+  }
+
+  const motion = stateRef.current.motion;
+
   return (
-    <div key={pathname} className="route-enter">
-      {children}
-    </div>
+    <ViewTransition
+      key={screenKey}
+      enter="vt-screen"
+      exit="vt-screen"
+      update="none"
+      default="none"
+      onEnter={() => {
+        document.documentElement.dataset.navDir = motion;
+      }}
+    >
+      <div data-motion={motion} className="route-stage">
+        {children}
+      </div>
+    </ViewTransition>
   );
 }
 
