@@ -49,6 +49,13 @@ html {
   scrollbar-gutter: stable;
 }
 
+/* Radix overlays (select, menu, dialog) lock the page by removing its scrollbar
+   and compensating with a body margin. The gutter above already holds that
+   space, so the compensation would narrow the page by one scrollbar. */
+html body[data-scroll-locked] {
+  margin-right: 0 !important;
+}
+
 body {
   font-size: 14px;
   line-height: 20px;
