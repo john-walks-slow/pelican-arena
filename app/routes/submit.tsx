@@ -495,7 +495,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
 
         <Section
           title="Session log"
-          hint="支持 Claude Code、Codex CLI、pi、DSH 与 opencode。日志在浏览器里读取，默认只上传 token 和用时等统计。"
+          hint="从日志中解析 token 和用时等统计信息。原始日志仅在浏览器读取，不会上传。支持 Claude Code、Codex CLI、pi、DSH 与 opencode。"
         >
           {log ? (
             <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
