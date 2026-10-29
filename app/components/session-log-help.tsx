@@ -160,11 +160,11 @@ export function SessionLogHelp() {
       </button>
       {open && (
         <>
-          <div className="mt-2 overflow-hidden rounded-control border border-border bg-raised">
+          <div className="mt-2 overflow-hidden rounded-control border border-border bg-surface">
             <div
               role="tablist"
               aria-label="客户端"
-              className="flex flex-wrap gap-0.5 border-b border-border bg-raised/60 px-1.5 py-1.5"
+              className="flex flex-wrap gap-0.5 border-b border-border bg-raised px-1.5 py-1.5"
             >
               {HELP.map((client) => {
                 const selected = client.id === active;
