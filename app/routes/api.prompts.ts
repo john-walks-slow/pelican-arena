@@ -10,7 +10,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
   const sortParam = params.get("sort");
   const sort: PromptSort =
-    sortParam === "answers" || sortParam === "top" ? sortParam : "new";
+    sortParam === "answers" || sortParam === "hardest" ? sortParam : "new";
   const requested = Number(params.get("page") ?? 1);
   const page = Number.isFinite(requested) ? Math.max(1, Math.floor(requested)) : 1;
 

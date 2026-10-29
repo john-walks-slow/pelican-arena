@@ -35,7 +35,7 @@ function readQuery(request: Request) {
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
   const sortParam = params.get("sort");
   const sort: PromptSort =
-    sortParam === "answers" || sortParam === "top" ? sortParam : "new";
+    sortParam === "answers" || sortParam === "hardest" ? sortParam : "new";
   return { q, kind, sort };
 }
 
@@ -220,7 +220,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             options={[
               { value: "new", label: "最新" },
               { value: "answers", label: "最多答案" },
-              { value: "top", label: "评分最高" },
+              { value: "hardest", label: "最困难" },
             ]}
           />
         </div>

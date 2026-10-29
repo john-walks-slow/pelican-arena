@@ -146,7 +146,7 @@ const author = {
   avatarTemplate: users.avatarTemplate,
 };
 
-export type PromptSort = "new" | "answers" | "top";
+export type PromptSort = "new" | "answers" | "hardest";
 
 export interface PromptQuery {
   q?: string;
@@ -199,8 +199,8 @@ export async function listPrompts(query: PromptQuery = {}) {
   const order =
     query.sort === "answers"
       ? [desc(answerCount), desc(prompts.createdAt)]
-      : query.sort === "top"
-        ? [desc(promptScore), desc(prompts.createdAt)]
+      : query.sort === "hardest"
+        ? [asc(promptScore), desc(prompts.createdAt)]
         : [desc(prompts.createdAt)];
 
   const [rows, [total]] = await Promise.all([
