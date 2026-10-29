@@ -146,7 +146,11 @@ const author = {
   avatarTemplate: users.avatarTemplate,
 };
 
-export type PromptSort = "new" | "answers" | "hardest";
+export const PROMPT_SORTS = ["latest", "new", "answers", "hardest"] as const;
+export type PromptSort = (typeof PROMPT_SORTS)[number];
+export const DEFAULT_PROMPT_SORT: PromptSort = "latest";
+export const isPromptSort = (value: unknown): value is PromptSort =>
+  typeof value === "string" && (PROMPT_SORTS as readonly string[]).includes(value);
 
 export interface PromptQuery {
   q?: string;
@@ -195,13 +199,18 @@ export async function listPrompts(query: PromptQuery = {}) {
     inner join ${ratings} r on r.submission_id = s.id
     where s.prompt_id = ${prompts.id} and s.status = 'active')`;
   const promptScore = sql<number>`(${promptStars} + ${priorStars}) * 1.0 / (${promptVotes} + ${priorVotes})`;
+  const lastActivityAt = sql<number>`coalesce((
+    select max(s.created_at) from ${submissions} s
+    where s.prompt_id = ${prompts.id} and s.status = 'active'), ${prompts.createdAt})`;
 
   const order =
     query.sort === "answers"
       ? [desc(answerCount), desc(prompts.createdAt)]
       : query.sort === "hardest"
         ? [asc(promptScore), desc(prompts.createdAt)]
-        : [desc(prompts.createdAt)];
+        : query.sort === "new"
+          ? [desc(prompts.createdAt)]
+          : [desc(lastActivityAt), desc(prompts.createdAt)];
 
   const [rows, [total]] = await Promise.all([
     db()
@@ -211,6 +220,7 @@ export async function listPrompts(query: PromptQuery = {}) {
         body: prompts.body,
         kind: prompts.kind,
         createdAt: prompts.createdAt,
+        lastActivityAt,
         author,
         submissions: answerCount,
         coverSubmissionId: coverId,

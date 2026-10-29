@@ -12,7 +12,13 @@ import { formatRelative } from "~/lib/format";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
 import { can } from "~/lib/permissions";
-import { listPrompts, siteStats, type PromptSort } from "~/lib/queries.server";
+import {
+  DEFAULT_PROMPT_SORT,
+  isPromptSort,
+  listPrompts,
+  siteStats,
+  type PromptSort,
+} from "~/lib/queries.server";
 import { useOptionalUser } from "~/lib/use-user";
 
 export const meta: Route.MetaFunction = () => [
@@ -34,8 +40,7 @@ function readQuery(request: Request) {
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
   const sortParam = params.get("sort");
-  const sort: PromptSort =
-    sortParam === "answers" || sortParam === "hardest" ? sortParam : "new";
+  const sort: PromptSort = isPromptSort(sortParam) ? sortParam : DEFAULT_PROMPT_SORT;
   return { q, kind, sort };
 }
 
@@ -154,12 +159,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     const query = new URLSearchParams();
     if (q) query.set("q", q);
     if (kind) query.set("kind", kind);
-    if (sort !== "new") query.set("sort", sort);
+    if (sort !== DEFAULT_PROMPT_SORT) query.set("sort", sort);
     query.set("page", String(next));
     fetcher.load(`/api/prompts?${query}`);
   }, [next, fetcher, q, kind, sort]);
 
-  const filtered = Boolean(q || kind || sort !== "new");
+  const filtered = Boolean(q || kind || sort !== DEFAULT_PROMPT_SORT);
   const loading = fetcher.state !== "idle";
 
   return (
@@ -216,11 +221,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             label="排序"
             icon={<ArrowUpDown className="size-3.5" strokeWidth={1.75} />}
             value={sort}
-            onChange={(value) => update("sort", value === "new" ? null : value)}
+            onChange={(value) => update("sort", value === DEFAULT_PROMPT_SORT ? null : value)}
             options={[
-              { value: "new", label: "最新" },
+              { value: "latest", label: "最近更新" },
+              { value: "new", label: "最近发布" },
               { value: "answers", label: "最多答案" },
-              { value: "hardest", label: "最困难" },
+              { value: "hardest", label: "难度最高" },
             ]}
           />
         </div>
@@ -288,7 +294,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       />
                       <span className="truncate">{p.author.username}</span>
                       <span className="shrink-0">·</span>
-                      <span className="shrink-0">{formatRelative(p.createdAt)}</span>
+                      <span className="shrink-0">
+                        {formatRelative(sort === "new" ? p.createdAt : p.lastActivityAt)}
+                      </span>
                       <span className="num ml-auto shrink-0">
                         {p.submissions === 0 ? "暂无答案" : `${p.submissions} 份答案`}
                       </span>

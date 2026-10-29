@@ -1,6 +1,11 @@
 import type { Route } from "./+types/api.prompts";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
-import { listPrompts, type PromptSort } from "~/lib/queries.server";
+import {
+  DEFAULT_PROMPT_SORT,
+  isPromptSort,
+  listPrompts,
+  type PromptSort,
+} from "~/lib/queries.server";
 
 /** Continuation page for the prompt gallery. */
 export async function loader({ request }: Route.LoaderArgs) {
@@ -9,8 +14,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
   const sortParam = params.get("sort");
-  const sort: PromptSort =
-    sortParam === "answers" || sortParam === "hardest" ? sortParam : "new";
+  const sort: PromptSort = isPromptSort(sortParam) ? sortParam : DEFAULT_PROMPT_SORT;
   const requested = Number(params.get("page") ?? 1);
   const page = Number.isFinite(requested) ? Math.max(1, Math.floor(requested)) : 1;
 
