@@ -8,7 +8,6 @@ export default [
   route("s/:submissionId", "routes/submission.tsx"),
   route("s/:submissionId/log", "routes/submission.log.ts"),
   route("compare", "routes/compare.tsx"),
-  route("leaderboard", "routes/leaderboard.tsx"),
   route("auth/login", "routes/auth.login.tsx"),
   route("auth/callback", "routes/auth.callback.tsx"),
   route("auth/logout", "routes/auth.logout.tsx"),

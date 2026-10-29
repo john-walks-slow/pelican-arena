@@ -11,6 +11,7 @@ INSERT OR IGNORE INTO `models` (`id`, `name`) VALUES
   ('qwen3-coder', 'Qwen3 Coder'),
   ('minimax-m2', 'MiniMax M2'),
   ('grok-4', 'Grok 4');
+
 INSERT OR IGNORE INTO `providers` (`id`, `name`) VALUES
   ('官方-api', '官方 API'),
   ('官方网页版', '官方网页版'),
@@ -19,6 +20,7 @@ INSERT OR IGNORE INTO `providers` (`id`, `name`) VALUES
   ('火山引擎', '火山引擎'),
   ('阿里云百炼', '阿里云百炼'),
   ('github-copilot', 'GitHub Copilot');
+
 INSERT OR IGNORE INTO `harnesses` (`id`, `name`) VALUES
   ('裸-api', '裸 API'),
   ('官方网页版', '官方网页版'),
@@ -29,6 +31,7 @@ INSERT OR IGNORE INTO `harnesses` (`id`, `name`) VALUES
   ('cline', 'Cline'),
   ('opencode', 'opencode'),
   ('cherry-studio', 'Cherry Studio');
+
 INSERT OR IGNORE INTO `mods` (`id`, `name`) VALUES
   ('联网搜索', '联网搜索'),
   ('mcp', 'MCP'),

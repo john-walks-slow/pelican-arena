@@ -8,10 +8,22 @@ const requestHandler = createRequestHandler(
 
 export default {
   async fetch(request, env) {
-    const host = new URL(request.url).host;
-    if (host === new URL(env.USERCONTENT_ORIGIN).host) {
+    const url = new URL(request.url);
+    const usercontentHost = new URL(env.USERCONTENT_ORIGIN).host;
+    const appHost = new URL(env.APP_ORIGIN).host;
+
+    // Production / dual-host: match by host header
+    if (url.host === usercontentHost && usercontentHost !== appHost) {
       return serveUsercontent(request, env.FILES);
     }
+
+    // Single-host dev / tunnel / frp: match by path prefix
+    if (url.pathname.startsWith("/__usercontent/")) {
+      const rewritten = new URL(request.url);
+      rewritten.pathname = url.pathname.replace(/^\/__usercontent/, "");
+      return serveUsercontent(new Request(rewritten, request), env.FILES);
+    }
+
     return requestHandler(request);
   },
 } satisfies ExportedHandler<Env>;

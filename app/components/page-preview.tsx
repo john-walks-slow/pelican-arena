@@ -21,7 +21,7 @@ export function PagePreview({ src, title }: { src: string; title: string }) {
       setScale(entry.contentRect.width / VIEWPORT_WIDTH);
     });
     const intersect = new IntersectionObserver(([entry]) => setVisible(entry.isIntersecting), {
-      rootMargin: "200px",
+      rootMargin: "480px",
     });
     resize.observe(box);
     intersect.observe(box);

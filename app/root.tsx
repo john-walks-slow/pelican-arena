@@ -9,6 +9,7 @@ import {
 
 import type { Route } from "./+types/root";
 import { AppShell } from "./components/app-shell";
+import { Button } from "./components/ui/button";
 import { getUser } from "./lib/session.server";
 import "./app.css";
 
@@ -84,14 +85,14 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-24">
-      <h1 className="text-title font-bold">{title}</h1>
-      <p className="mt-2 text-[15px] text-muted">{details}</p>
-      <a href="/" className="btn-outline mt-6">
-        返回题目列表
-      </a>
+    <main className="mx-auto max-w-lg px-6 py-24 text-center">
+      <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
+      <p className="mt-2 text-sm text-muted">{details}</p>
+      <Button asChild variant="outline" className="mt-6">
+        <a href="/">返回题目列表</a>
+      </Button>
       {stack && (
-        <pre className="mt-8 overflow-x-auto rounded-card bg-raised p-4 font-mono text-xs">
+        <pre className="mt-8 overflow-x-auto rounded-card bg-raised p-4 text-left font-mono text-xs">
           {stack}
         </pre>
       )}

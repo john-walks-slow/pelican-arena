@@ -1,5 +1,10 @@
 import { Form, redirect } from "react-router";
 import type { Route } from "./+types/auth.login";
+import { Button } from "~/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { LinuxDoIcon } from "~/components/ui/linuxdo-icon";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { authorizeUrl, isOAuthConfigured } from "~/lib/linuxdo.server";
 import { commitSession, getSession } from "~/lib/session.server";
 import { upsertUser } from "~/lib/users.server";
@@ -51,27 +56,55 @@ export async function action({ request }: Route.ActionArgs) {
 
 export default function DevLogin({ loaderData }: Route.ComponentProps) {
   return (
-    <div className="mx-auto max-w-sm py-16">
-      <h1 className="text-title font-bold">开发登录</h1>
-      <p className="mt-1 text-muted">
-        本地未配置 Linux DO Connect，可直接以任意用户名登录。
-      </p>
-      <Form method="post" className="panel mt-6 space-y-4 p-5">
-        <input type="hidden" name="returnTo" value={loaderData.returnTo} />
-        <div>
-          <label className="label" htmlFor="username">用户名</label>
-          <input id="username" name="username" defaultValue="pelican" className="field" />
-        </div>
-        <div>
-          <label className="label" htmlFor="trustLevel">信任等级</label>
-          <select id="trustLevel" name="trustLevel" defaultValue="2" className="field">
-            {[0, 1, 2, 3, 4].map((n) => (
-              <option key={n} value={n}>TL{n}</option>
-            ))}
-          </select>
-        </div>
-        <button type="submit" className="btn-primary w-full">登录</button>
-      </Form>
+    <div className="mx-auto flex min-h-[65vh] max-w-sm flex-col justify-center px-4">
+      <Card>
+        <CardHeader className="items-center text-center">
+          <LinuxDoIcon size={40} />
+          <CardTitle className="pt-1 text-base">Linux DO 登录</CardTitle>
+          <CardDescription className="text-xs">
+            本地未配置 OAuth，可以任意身份登录。
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form method="post" action="/auth/login" className="space-y-4">
+            <input type="hidden" name="returnTo" value={loaderData.returnTo} />
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium" htmlFor="username">
+                用户名
+              </label>
+              <Input
+                id="username"
+                name="username"
+                defaultValue="pelican"
+                placeholder="例如: neo, 666"
+                required
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium" htmlFor="trustLevel">
+                信任等级
+              </label>
+              <Select name="trustLevel" defaultValue="2">
+                <SelectTrigger id="trustLevel">
+                  <SelectValue placeholder="选择信任等级" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">TL0</SelectItem>
+                  <SelectItem value="1">TL1</SelectItem>
+                  <SelectItem value="2">TL2</SelectItem>
+                  <SelectItem value="3">TL3</SelectItem>
+                  <SelectItem value="4">TL4</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" variant="linuxdo" className="mt-1 w-full justify-center gap-2">
+              <LinuxDoIcon size={16} />
+              登录
+            </Button>
+          </Form>
+        </CardContent>
+      </Card>
     </div>
   );
 }

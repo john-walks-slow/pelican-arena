@@ -1,5 +1,9 @@
-import { data, Form, redirect, useNavigation } from "react-router";
+import { ArrowLeft } from "lucide-react";
+import { data, Form, Link, redirect, useNavigation } from "react-router";
 import type { Route } from "./+types/prompts.new";
+import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
+import { Textarea } from "~/components/ui/textarea";
 import { db } from "~/db/client.server";
 import { prompts } from "~/db/schema";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
@@ -42,19 +46,25 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
   const values = actionData?.values;
 
   return (
-    <div className="mx-auto max-w-[720px]">
-      <h1 className="text-title font-bold tracking-tight">出题</h1>
-      <p className="mt-1 text-[15px] text-muted">
+    <div className="mx-auto max-w-[680px]">
+      <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
+        题目
+      </Link>
+      <h1 className="mt-2 text-title font-bold tracking-tight">出题</h1>
+      <p className="mt-1 text-sm text-muted">
         写一段能让模型生成网页的提示词。有人提交答案后，题目内容不能再修改。
       </p>
 
-      <Form method="post" className="panel mt-6 space-y-5 p-5 sm:p-6">
+      <Form method="post" className="mt-6 space-y-5">
         <div>
-          <label className="label" htmlFor="title">标题</label>
-          <input
+          <label className="block text-sm font-medium" htmlFor="title">
+            标题
+          </label>
+          <Input
             id="title"
             name="title"
-            className="field"
+            className="mt-1.5"
             maxLength={LIMITS.title}
             defaultValue={values?.title}
             placeholder="骑自行车的鹈鹕"
@@ -63,13 +73,16 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
           />
           {errors?.title && <p className="mt-1 text-xs text-negative">{errors.title}</p>}
         </div>
+
         <div>
-          <label className="label" htmlFor="body">提示词</label>
-          <textarea
+          <label className="block text-sm font-medium" htmlFor="body">
+            提示词
+          </label>
+          <Textarea
             id="body"
             name="body"
             rows={10}
-            className="field h-auto py-2 leading-6"
+            className="mt-1.5 leading-6"
             maxLength={LIMITS.body}
             defaultValue={values?.body}
             placeholder="Generate an SVG of a pelican riding a bicycle, as a single HTML page."
@@ -79,14 +92,21 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
           {errors?.body ? (
             <p className="mt-1 text-xs text-negative">{errors.body}</p>
           ) : (
-            <p className="hint">答题者会原样复制这段文字发给模型。写明输出要求，比如“单个 HTML 文件”。</p>
+            <p className="mt-1 text-xs text-muted">
+              答题者会原样复制这段文字发给模型。写明输出要求，比如「单个 HTML 文件」。
+            </p>
           )}
         </div>
+
         {errors?.form && <p className="text-sm text-negative">{errors.form}</p>}
-        <div className="flex justify-end">
-          <button type="submit" className="btn-primary" disabled={navigation.state !== "idle"}>
+
+        <div className="flex justify-end gap-1.5 border-t border-border pt-5">
+          <Button asChild variant="outline">
+            <Link to="/">取消</Link>
+          </Button>
+          <Button type="submit" variant="primary" disabled={navigation.state !== "idle"}>
             {navigation.state === "submitting" ? "发布中…" : "发布题目"}
-          </button>
+          </Button>
         </div>
       </Form>
     </div>

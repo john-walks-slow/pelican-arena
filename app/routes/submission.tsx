@@ -1,4 +1,12 @@
-import { ArrowLeft, Download, ExternalLink, FileText, Maximize2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Code2,
+  Download,
+  ExternalLink,
+  Eye,
+  FileText,
+  Maximize2,
+} from "lucide-react";
 import { useState } from "react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/submission";
@@ -7,14 +15,15 @@ import { LiveFrame } from "~/components/page-preview";
 import { SourceViewer } from "~/components/source-viewer";
 import { StarRating } from "~/components/star-rating";
 import { StarScore } from "~/components/stars";
-import { AttemptTag, ModTags } from "~/components/submission-tags";
+import { ModTags } from "~/components/submission-tags";
+import { Button } from "~/components/ui/button";
 import { formatBytes } from "~/lib/bundle";
 import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~/lib/format";
+import { requirePermission } from "~/lib/guards.server";
 import { origins } from "~/lib/origins.server";
 import { can, denyReason } from "~/lib/permissions";
 import { clearRating, getPrompt, getSubmission, getUserRating, setRating } from "~/lib/queries.server";
 import { usercontentUrl } from "~/lib/sandbox";
-import { requirePermission } from "~/lib/guards.server";
 import { getUser } from "~/lib/session.server";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
 import { useOptionalUser } from "~/lib/use-user";
@@ -60,10 +69,19 @@ export async function action({ params, request }: Route.ActionArgs) {
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
+    <div className="flex items-baseline justify-between gap-4 py-1.5">
       <dt className="shrink-0 text-muted">{label}</dt>
       <dd className="num min-w-0 text-right">{children}</dd>
     </div>
+  );
+}
+
+function SideSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section>
+      <h2 className="mb-1.5 text-sm font-semibold">{title}</h2>
+      <div className="rounded-card border border-border bg-surface px-3.5 py-3 text-sm">{children}</div>
+    </section>
   );
 }
 
@@ -87,7 +105,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const log = s.logMeta;
 
   const ratingBlock = !user
-    ? "登录后可以打分"
+    ? "登录后可打分"
     : user.id === s.author.id
       ? "这是你提交的答案"
       : !can(user, "rate")
@@ -96,66 +114,81 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <Link to={`/p/${prompt.id}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" strokeWidth={1.75} />
+      <Link
+        to={`/p/${prompt.id}`}
+        className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
+      >
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         {prompt.title}
       </Link>
 
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-4">
+      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-title font-bold tracking-tight">{s.model.name}</h1>
-          <p className="mt-1 text-[15px] text-muted">
+          <p className="mt-1 text-sm text-muted">
             {s.provider.name}
             {s.harness && ` · ${s.harness.name}`}
           </p>
         </div>
-        <div className="flex gap-2">
-          <a href={pageUrl} target="_blank" rel="noreferrer" className="btn-outline">
+        <Button asChild variant="outline" className="gap-1.5">
+          <a href={pageUrl} target="_blank" rel="noreferrer">
             <ExternalLink className="size-4" strokeWidth={1.75} />
             新标签页打开
           </a>
-        </div>
+        </Button>
       </div>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <section className="panel min-w-0 overflow-hidden">
-          <div className="flex h-11 items-center gap-1 border-b border-border px-2">
-            {(["preview", "source"] as const).map((t) => (
+      <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface">
+          <div className="flex h-10 items-center border-b border-border px-1.5">
+            {(
+              [
+                ["preview", <Eye key="e" className="size-3.5" strokeWidth={1.75} />, "预览"],
+                ["source", <Code2 key="c" className="size-3.5" strokeWidth={1.75} />, `源码 ${s.files.length}`],
+              ] as const
+            ).map(([value, icon, label]) => (
               <button
-                key={t}
+                key={value}
                 type="button"
-                onClick={() => setTab(t)}
-                className={`h-11 border-b-2 px-3 text-sm ${
-                  tab === t ? "border-accent font-medium text-ink" : "border-transparent text-muted hover:text-ink"
+                onClick={() => setTab(value)}
+                className={`-mb-px flex h-10 items-center gap-1.5 border-b-2 px-3 text-xs transition-colors ${
+                  tab === value
+                    ? "border-accent font-medium text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
-                {t === "preview" ? "预览" : `源码 · ${s.files.length} 个文件`}
+                {icon}
+                {label}
               </button>
             ))}
-            {tab === "preview" && (
-              <button
-                type="button"
-                className="btn-ghost ml-auto size-8 px-0"
-                aria-label="全屏"
-                title="全屏"
-                onClick={() => document.getElementById("live-frame")?.requestFullscreen()}
-              >
-                <Maximize2 className="size-4" strokeWidth={1.75} />
-              </button>
-            )}
-            {tab === "source" && (
-              <button
-                type="button"
-                className="btn-ghost ml-auto"
-                onClick={() => downloadZip(pageUrl, s.files.map((f) => f.path), s.id)}
-              >
-                <Download className="size-4" strokeWidth={1.75} />
-                下载 zip
-              </button>
-            )}
+            <div className="ml-auto flex items-center gap-0.5 pr-1">
+              {tab === "preview" ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="全屏"
+                  title="全屏"
+                  onClick={() => document.getElementById("live-frame")?.requestFullscreen()}
+                >
+                  <Maximize2 className="size-3.5" strokeWidth={1.75} />
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={() => downloadZip(pageUrl, s.files.map((f) => f.path), s.id)}
+                >
+                  <Download className="size-3.5" strokeWidth={1.75} />
+                  下载 zip
+                </Button>
+              )}
+            </div>
           </div>
           {tab === "preview" ? (
-            <div id="live-frame" className="h-[min(72vh,820px)] bg-white">
+            <div id="live-frame" className="h-[min(74vh,860px)] bg-white">
               <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />
             </div>
           ) : (
@@ -163,18 +196,16 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
           )}
         </section>
 
-        <aside className="space-y-6">
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">评分</h2>
-            <div className="panel space-y-3 p-4">
+        <aside className="space-y-5">
+          <SideSection title="评分">
+            <div className="mb-2.5">
               <StarScore starSum={s.starSum} votes={s.votes} />
-              <StarRating current={myRating} disabledReason={ratingBlock} />
             </div>
-          </section>
+            <StarRating current={myRating} disabledReason={ratingBlock} />
+          </SideSection>
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">生成方式</h2>
-            <dl className="panel divide-y divide-rule px-4 text-sm">
+          <SideSection title="生成信息">
+            <dl className="divide-y divide-rule text-[13px]">
               <MetaRow label="模型">{s.model.name}</MetaRow>
               <MetaRow label="提供方">{s.provider.name}</MetaRow>
               <MetaRow label="客户端">{s.harness?.name ?? "—"}</MetaRow>
@@ -184,20 +215,13 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                   <ModTags mods={s.mods} />
                 </span>
               </MetaRow>
-              <MetaRow label="生成次数">
-                {s.attempt === "first" ? "第一次生成" : <AttemptTag attempt={s.attempt} count={s.attemptCount} />}
-              </MetaRow>
               <MetaRow label="大小">{formatBytes(s.totalBytes)}</MetaRow>
             </dl>
-          </section>
+          </SideSection>
 
           {log && (
-            <section>
-              <h2 className="mb-2 text-sm font-semibold">
-                Session log
-                <span className="ml-1.5 font-normal text-muted">{LOG_SOURCE_LABELS[log.source]}</span>
-              </h2>
-              <dl className="panel divide-y divide-rule px-4 text-sm">
+            <SideSection title={`Session log · ${LOG_SOURCE_LABELS[log.source]}`}>
+              <dl className="divide-y divide-rule text-[13px]">
                 <MetaRow label="日志中的模型">{log.models.join("、") || "—"}</MetaRow>
                 <MetaRow label="总 token">{formatCount(totalTokens(log))}</MetaRow>
                 <MetaRow label="输入 / 输出">
@@ -212,27 +236,32 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                 </MetaRow>
               </dl>
               {s.hasRawLog && (
-                <a href={`/s/${s.id}/log`} className="btn-ghost mt-2" download>
-                  <FileText className="size-4" strokeWidth={1.75} />
+                <a
+                  href={`/s/${s.id}/log`}
+                  download
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink"
+                >
+                  <FileText className="size-3.5" strokeWidth={1.75} />
                   下载原始日志
                 </a>
               )}
-            </section>
+            </SideSection>
           )}
 
-          <section>
-            <h2 className="mb-2 text-sm font-semibold">提交者</h2>
-            <div className="panel space-y-3 p-4">
-              <div className="flex items-center gap-2.5 text-sm">
-                <Avatar template={s.author.avatarTemplate} username={s.author.username} size={28} />
-                <div>
-                  <div className="font-medium">{s.author.username}</div>
-                  <div className="text-xs text-muted">{formatRelative(s.createdAt)}</div>
-                </div>
+          <SideSection title="提交者">
+            <div className="flex items-center gap-2.5">
+              <Avatar template={s.author.avatarTemplate} username={s.author.username} size={24} />
+              <div className="min-w-0">
+                <div className="truncate text-xs font-medium">{s.author.username}</div>
+                <div className="text-[11px] text-muted">{formatRelative(s.createdAt)}</div>
               </div>
-              {s.notes && <p className="text-sm whitespace-pre-wrap">{s.notes}</p>}
             </div>
-          </section>
+            {s.notes && (
+              <p className="mt-2.5 border-t border-rule pt-2.5 text-xs whitespace-pre-wrap text-muted">
+                {s.notes}
+              </p>
+            )}
+          </SideSection>
         </aside>
       </div>
     </div>

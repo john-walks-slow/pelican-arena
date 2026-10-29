@@ -60,8 +60,6 @@ CREATE TABLE `submissions` (
 	`provider_id` text NOT NULL,
 	`harness_id` text,
 	`reasoning` text,
-	`attempt` text NOT NULL,
-	`attempt_count` integer,
 	`files` text NOT NULL,
 	`total_bytes` integer NOT NULL,
 	`notes` text,

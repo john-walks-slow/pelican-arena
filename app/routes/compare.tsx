@@ -1,4 +1,4 @@
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/compare";
 import { LiveFrame } from "~/components/page-preview";
@@ -9,7 +9,7 @@ import { getPrompt, getSubmission } from "~/lib/queries.server";
 import { usercontentUrl } from "~/lib/sandbox";
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [
-  { title: `对比 · ${loaderData?.prompt.title ?? ""} · Pelican Arena` },
+  { title: `并排对比 · ${loaderData?.prompt.title ?? ""} · Pelican Arena` },
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -39,27 +39,44 @@ const COLS: Record<number, string> = {
 export default function Compare({ loaderData }: Route.ComponentProps) {
   const { prompt, submissions, usercontentOrigin } = loaderData;
   return (
-    <div>
-      <Link to={`/p/${prompt.id}`} className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
-        <ArrowLeft className="size-4" strokeWidth={1.75} />
-        {prompt.title}
-      </Link>
-      <h1 className="mt-1 text-title font-bold tracking-tight">并排对比</h1>
+    <div className="space-y-5">
+      <div>
+        <Link
+          to={`/p/${prompt.id}`}
+          className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
+        >
+          <ArrowLeft className="size-3.5" strokeWidth={1.75} />
+          {prompt.title}
+        </Link>
+        <h1 className="mt-1 text-title font-bold tracking-tight">并排对比</h1>
+      </div>
 
-      <div className={`mt-6 grid gap-4 ${COLS[submissions.length]}`}>
+      <div className={`grid gap-4 ${COLS[submissions.length]}`}>
         {submissions.map((s) => (
-          <section key={s.id} className="panel min-w-0 overflow-hidden">
-            <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
-              <Link to={`/s/${s.id}`} className="min-w-0 hover:text-accent-ink">
-                <h2 className="truncate text-[15px] font-semibold">{s.model.name}</h2>
-                <p className="truncate text-sm text-muted">
+          <section
+            key={s.id}
+            className="flex flex-col overflow-hidden rounded-card border border-border bg-surface"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-border px-3.5 py-2.5">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-sm font-semibold">{s.model.name}</h2>
+                  <Link
+                    to={`/s/${s.id}`}
+                    className="text-muted hover:text-accent transition-colors shrink-0"
+                    title="查看详情"
+                  >
+                    <ArrowUpRight className="size-3.5" />
+                  </Link>
+                </div>
+                <p className="truncate text-[11px] text-muted mt-0.5">
                   {s.provider.name}
                   {s.harness && ` · ${s.harness.name}`}
                 </p>
-              </Link>
-              <div className="flex shrink-0 flex-col items-end gap-1.5">
+              </div>
+              <div className="flex shrink-0 flex-col items-end gap-1">
                 <StarScore starSum={s.starSum} votes={s.votes} />
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1 justify-end">
                   <ModTags mods={s.mods} />
                 </div>
               </div>
@@ -67,7 +84,7 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
             <LiveFrame
               src={usercontentUrl(usercontentOrigin, s.id)}
               title={s.model.name}
-              className="h-[70vh] w-full"
+              className="h-[68vh] w-full bg-white"
             />
           </section>
         ))}

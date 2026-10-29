@@ -9,8 +9,6 @@ export const FIELDS = {
   harness: "harness",
   mods: "mods",
   reasoning: "reasoning",
-  attempt: "attempt",
-  attemptCount: "attemptCount",
   notes: "notes",
   logMeta: "logMeta",
   rawLog: "rawLog",
@@ -25,8 +23,6 @@ export interface SubmissionMeta {
   harness: string | null;
   mods: string[];
   reasoning: ReasoningLevel | null;
-  attempt: "first" | "picked";
-  attemptCount: number | null;
   notes: string | null;
   logMeta: LogMeta | null;
 }
@@ -40,8 +36,6 @@ export function parseSubmissionMeta(form: FormData): { meta?: SubmissionMeta; er
   if (!provider) return { error: "请填写提供方" };
 
   const reasoning = text(form, FIELDS.reasoning);
-  const attempt = text(form, FIELDS.attempt) === "picked" ? "picked" : "first";
-  const count = Number(text(form, FIELDS.attemptCount));
   const notes = text(form, FIELDS.notes);
   if (notes.length > NOTES_LIMIT) return { error: `备注最多 ${NOTES_LIMIT} 字` };
 
@@ -73,9 +67,6 @@ export function parseSubmissionMeta(form: FormData): { meta?: SubmissionMeta; er
       reasoning: (REASONING_LEVELS as readonly string[]).includes(reasoning)
         ? (reasoning as ReasoningLevel)
         : null,
-      attempt,
-      attemptCount:
-        attempt === "picked" && Number.isInteger(count) && count >= 2 && count <= 1000 ? count : null,
       notes: notes || null,
       logMeta,
     },

@@ -79,9 +79,6 @@ export const submissions = sqliteTable(
       .references(() => providers.id),
     harnessId: text("harness_id").references(() => harnesses.id),
     reasoning: text("reasoning", { enum: REASONING_LEVELS }),
-    /** "first": submitted as generated; "picked": best of several runs. */
-    attempt: text("attempt", { enum: ["first", "picked"] }).notNull(),
-    attemptCount: integer("attempt_count"),
     files: text("files", { mode: "json" }).$type<BundleFile[]>().notNull(),
     totalBytes: integer("total_bytes").notNull(),
     notes: text("notes"),

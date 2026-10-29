@@ -1,8 +1,11 @@
-import { FileArchive, FileCode2, FileText, Upload, X } from "lucide-react";
+import { ArrowLeft, Check, FileArchive, FileCode2, FileText, Plus, Upload, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { data, Link, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/submit";
-import { CatalogInput } from "~/components/combobox";
+import { Button } from "~/components/ui/button";
+import { Combobox } from "~/components/ui/combobox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Textarea } from "~/components/ui/textarea";
 import { REASONING_LEVELS } from "~/db/schema";
 import {
   buildBundle,
@@ -86,9 +89,7 @@ function useBundleSource() {
       if (!isZip && file.size > BUNDLE_LIMITS.htmlBytes) {
         throw new BundleError(`HTML 文件超过 ${formatBytes(BUNDLE_LIMITS.htmlBytes)}`);
       }
-      const entries = buildBundle(
-        isZip ? unzipBundle(bytes) : [{ path: ENTRY_FILE, data: bytes }],
-      );
+      const entries = buildBundle(isZip ? unzipBundle(bytes) : [{ path: ENTRY_FILE, data: bytes }]);
       setSource({ kind: "file", name: file.name, entries });
     } catch (e) {
       setSource(null);
@@ -116,23 +117,29 @@ function BundlePicker({
     const total = source.entries.reduce((s, e) => s + e.data.byteLength, 0);
     const Icon = source.entries.length > 1 ? FileArchive : FileCode2;
     return (
-      <div className="rounded-card border border-border bg-raised p-3">
-        <div className="flex items-center gap-3">
-          <Icon className="size-5 shrink-0 text-muted" strokeWidth={1.75} />
+      <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
+        <div className="flex items-center gap-2.5">
+          <Icon className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{source.name}</div>
             <div className="num text-xs text-muted">
               {source.entries.length} 个文件 · {formatBytes(total)}
             </div>
           </div>
-          <button type="button" className="btn-ghost size-8 px-0" aria-label="移除" onClick={() => setSource(null)}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label="移除"
+            onClick={() => setSource(null)}
+          >
             <X className="size-4" strokeWidth={1.75} />
-          </button>
+          </Button>
         </div>
         {source.entries.length > 1 && (
-          <ul className="mt-3 max-h-40 overflow-y-auto border-t border-border pt-2 text-xs text-muted">
+          <ul className="mt-2 max-h-36 space-y-0.5 overflow-y-auto scroll-thin border-t border-border pt-2 font-mono text-xs text-muted">
             {source.entries.map((e) => (
-              <li key={e.path} className="flex justify-between gap-4 py-0.5">
+              <li key={e.path} className="flex justify-between gap-4">
                 <span className="truncate">{e.path}</span>
                 <span className="num shrink-0">{formatBytes(e.data.byteLength)}</span>
               </li>
@@ -146,16 +153,16 @@ function BundlePicker({
   if (source?.kind === "paste") {
     return (
       <div>
-        <textarea
+        <Textarea
           value={html}
           onChange={(e) => setHtml(e.target.value)}
-          rows={12}
-          className="field h-auto py-2 font-mono text-xs leading-5"
+          rows={10}
+          className="font-mono text-xs leading-relaxed"
           placeholder="<!DOCTYPE html>…"
           spellCheck={false}
           autoFocus
         />
-        <div className="mt-1 flex justify-between text-xs text-muted">
+        <div className="mt-1 flex items-center justify-between text-xs text-muted">
           <button type="button" className="hover:text-ink" onClick={() => setSource(null)}>
             改为上传文件
           </button>
@@ -183,12 +190,12 @@ function BundlePicker({
           const file = e.dataTransfer.files[0];
           if (file) pickFile(file);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-card border border-dashed px-6 py-8 text-center transition-colors ${
-          dragging ? "border-accent bg-accent-soft" : "border-control bg-surface hover:bg-raised"
+        className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-control border border-dashed px-6 py-8 text-center transition-colors ${
+          dragging ? "border-accent bg-accent-soft" : "border-control hover:bg-raised/60"
         }`}
       >
-        <Upload className="size-5 text-muted" strokeWidth={1.75} />
-        <div className="text-sm font-medium">拖入或选择 HTML / zip 文件</div>
+        <Upload className="size-4 text-muted" strokeWidth={1.75} />
+        <div className="text-sm font-medium">拖入或选择 HTML / zip</div>
         <div className="text-xs text-muted">
           zip 需包含 index.html，解压后不超过 {formatBytes(BUNDLE_LIMITS.totalBytes)}
         </div>
@@ -206,7 +213,7 @@ function BundlePicker({
       </div>
       <button
         type="button"
-        className="mt-2 text-xs text-muted hover:text-ink"
+        className="mt-1.5 text-xs text-muted hover:text-ink"
         onClick={() => setSource({ kind: "paste" })}
       >
         或者直接粘贴 HTML 源码
@@ -227,7 +234,7 @@ function LogSummary({ meta }: { meta: LogMeta }) {
     ["轮数 / 工具调用", `${meta.turns} / ${meta.toolCalls}`],
   ];
   return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+    <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-xs">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="text-muted">{k}</dt>
@@ -235,6 +242,16 @@ function LogSummary({ meta }: { meta: LogMeta }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <section className="border-t border-border pt-5 first:border-0 first:pt-0">
+      <h2 className="text-sm font-semibold">{title}</h2>
+      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+      <div className="mt-3">{children}</div>
+    </section>
   );
 }
 
@@ -246,9 +263,9 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   const [model, setModel] = useState("");
   const [provider, setProvider] = useState("");
   const [harness, setHarness] = useState("");
+  const [reasoning, setReasoning] = useState("");
   const [mods, setMods] = useState<string[]>([]);
   const [customMod, setCustomMod] = useState("");
-  const [attempt, setAttempt] = useState<"first" | "picked">("first");
   const [log, setLog] = useState<{ file: File; meta: LogMeta } | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
   const [publishLog, setPublishLog] = useState(false);
@@ -256,10 +273,10 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
 
   const submitting = fetcher.state !== "idle";
   const serverError = fetcher.data && "error" in fetcher.data ? fetcher.data.error : null;
+
   const logModelHint = useMemo(() => {
     const raw = log?.meta.models[0];
-    if (!raw) return null;
-    return { raw, match: matchModel(raw, catalog.models) };
+    return raw ? { raw, match: matchModel(raw, catalog.models) } : null;
   }, [log, catalog.models]);
 
   async function pickLog(file: File) {
@@ -277,8 +294,10 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
     }
   }
 
-  function toggleMod(name: string) {
-    setMods((cur) => (cur.includes(name) ? cur.filter((m) => m !== name) : [...cur, name]));
+  function addMod(name: string) {
+    const clean = name.trim();
+    if (clean && !mods.includes(clean)) setMods([...mods, clean]);
+    setCustomMod("");
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -312,35 +331,34 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   const modOptions = [...new Set([...catalog.mods.map((m) => m.name), ...mods])];
 
   return (
-    <div className="mx-auto max-w-[720px]">
-      <Link to={`/p/${prompt.id}`} className="text-sm text-muted hover:text-ink">
+    <div className="mx-auto max-w-[680px]">
+      <Link to={`/p/${prompt.id}`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
+        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
         {prompt.title}
       </Link>
-      <h1 className="mt-1 text-title font-bold tracking-tight">交答案</h1>
+      <h1 className="mt-2 text-title font-bold tracking-tight">交答案</h1>
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-6">
-        <section className="panel space-y-3 p-5 sm:p-6">
-          <h2 className="text-section font-semibold">结果网页</h2>
+      <form onSubmit={onSubmit} className="mt-6 space-y-8">
+        <Section title="结果网页">
           <BundlePicker bundle={bundle} html={html} setHtml={setHtml} />
-        </section>
+        </Section>
 
-        <section className="panel space-y-5 p-5 sm:p-6">
-          <h2 className="text-section font-semibold">生成方式</h2>
-          <div className="grid gap-5 sm:grid-cols-2">
-            <CatalogInput
+        <Section title="生成信息">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Combobox
               name={FIELDS.model}
               label="模型"
               options={catalog.models}
               value={model}
               onChange={setModel}
-              placeholder="Claude Opus 4.5"
+              placeholder="选择或输入模型"
               required
               hint={
                 logModelHint &&
-                (logModelHint.match ? `日志记录：${logModelHint.raw}` : `日志记录：${logModelHint.raw}，目录中暂无对应模型`)
+                (logModelHint.match ? `日志记录：${logModelHint.raw}` : `日志记录：${logModelHint.raw}`)
               }
             />
-            <CatalogInput
+            <Combobox
               name={FIELDS.provider}
               label="提供方"
               options={catalog.providers}
@@ -349,7 +367,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
               placeholder="官方 API、OpenRouter、某中转站…"
               required
             />
-            <CatalogInput
+            <Combobox
               name={FIELDS.harness}
               label="客户端"
               options={catalog.harnesses}
@@ -357,24 +375,30 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
               onChange={setHarness}
               placeholder="Claude Code、Cherry Studio…"
             />
-            <div>
-              <label className="label" htmlFor="reasoning">
-                思考强度<span className="ml-1 font-normal text-muted">可选</span>
+            <div className="space-y-1.5">
+              <label className="block text-sm font-medium" htmlFor="reasoning">
+                思考强度
               </label>
-              <select id="reasoning" name={FIELDS.reasoning} className="field" defaultValue="">
-                <option value="">未知</option>
-                {REASONING_LEVELS.map((r) => (
-                  <option key={r} value={r}>
-                    {REASONING_LABELS[r]}
-                  </option>
-                ))}
-              </select>
+              <input type="hidden" name={FIELDS.reasoning} value={reasoning} />
+              <Select value={reasoning || "unknown"} onValueChange={(v) => setReasoning(v === "unknown" ? "" : v)}>
+                <SelectTrigger id="reasoning">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unknown">未知</SelectItem>
+                  {REASONING_LEVELS.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {REASONING_LABELS[r]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          <fieldset>
-            <legend className="label">增强</legend>
-            <div className="flex flex-wrap gap-2">
+          <div className="mt-4">
+            <label className="block text-sm font-medium">增强</label>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {modOptions.map((name) => {
                 const on = mods.includes(name);
                 return (
@@ -382,108 +406,75 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                     key={name}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => toggleMod(name)}
-                    className={`btn h-7 rounded-full border px-3 text-[13px] ${
-                      on ? "border-accent bg-accent-soft text-accent-ink" : "border-control bg-surface text-ink hover:bg-raised"
+                    onClick={() => (on ? setMods(mods.filter((m) => m !== name)) : setMods([...mods, name]))}
+                    className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs transition-colors ${
+                      on
+                        ? "border-accent/30 bg-accent-soft font-medium text-accent-ink"
+                        : "border-control text-muted hover:bg-raised hover:text-ink"
                     }`}
                   >
                     {name}
                   </button>
                 );
               })}
-              <input
-                value={customMod}
-                onChange={(e) => setCustomMod(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    const name = customMod.trim();
-                    if (name && !mods.includes(name)) setMods([...mods, name]);
-                    setCustomMod("");
-                  }
-                }}
-                placeholder="其他，回车添加"
-                maxLength={30}
-                className="field h-7 w-36 rounded-full text-[13px]"
-              />
-            </div>
-            <p className="hint">{mods.length === 0 ? "不选即为 vanilla：只用了模型本身。" : `已选 ${mods.length} 项`}</p>
-          </fieldset>
-
-          <fieldset>
-            <legend className="label">这份结果是</legend>
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-6">
-              <label className="flex items-center gap-2 text-sm">
+              <div className="inline-flex items-center gap-1">
                 <input
-                  type="radio"
-                  name={FIELDS.attempt}
-                  value="first"
-                  checked={attempt === "first"}
-                  onChange={() => setAttempt("first")}
-                  className="accent-accent"
+                  value={customMod}
+                  onChange={(e) => setCustomMod(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      addMod(customMod);
+                    }
+                  }}
+                  placeholder="其他"
+                  maxLength={30}
+                  className="h-7 w-20 rounded-full border border-control px-2.5 text-xs placeholder:text-muted/60 focus:border-accent focus:outline-none"
                 />
-                第一次生成的
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="radio"
-                  name={FIELDS.attempt}
-                  value="picked"
-                  checked={attempt === "picked"}
-                  onChange={() => setAttempt("picked")}
-                  className="accent-accent"
-                />
-                跑了几次挑出来的
-              </label>
-              {attempt === "picked" && (
-                <label className="flex items-center gap-2 text-sm text-muted">
-                  共跑了
-                  <input
-                    type="number"
-                    name={FIELDS.attemptCount}
-                    min={2}
-                    max={1000}
-                    className="field num h-8 w-20"
-                  />
-                  次
-                </label>
-              )}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="添加增强"
+                  onClick={() => addMod(customMod)}
+                >
+                  <Plus className="size-3.5" strokeWidth={2} />
+                </Button>
+              </div>
             </div>
-            <p className="hint">榜单默认只统计第一次生成的结果。</p>
-          </fieldset>
+            <p className="mt-1 text-xs text-muted">
+              {mods.length === 0 ? "不选即为 vanilla。" : `已选 ${mods.length} 项`}
+            </p>
+          </div>
 
-          <div>
-            <label className="label" htmlFor="notes">
-              备注<span className="ml-1 font-normal text-muted">可选</span>
+          <div className="mt-4">
+            <label className="block text-sm font-medium" htmlFor="notes">
+              备注
             </label>
-            <textarea
+            <Textarea
               id="notes"
               name={FIELDS.notes}
-              rows={3}
+              rows={2}
               maxLength={NOTES_LIMIT}
-              className="field h-auto py-2"
+              className="mt-1.5"
               placeholder="温度、系统提示词、遇到的问题…"
             />
           </div>
-        </section>
+        </Section>
 
-        <section className="panel space-y-3 p-5 sm:p-6">
-          <div>
-            <h2 className="text-section font-semibold">
-              Session log<span className="ml-1.5 text-sm font-normal text-muted">可选</span>
-            </h2>
-            <p className="mt-1 text-sm text-muted">
-              支持 Claude Code 与 Codex CLI 的 JSONL 日志。日志在你的浏览器里读取，默认只上传 token 和用时等统计。
-            </p>
-          </div>
+        <Section
+          title="Session log"
+          hint="支持 Claude Code 与 Codex CLI 的 JSONL 日志。日志在浏览器里读取，默认只上传 token 和用时等统计。"
+        >
           {log ? (
-            <div className="rounded-card border border-border bg-raised p-4">
-              <div className="mb-3 flex items-center gap-3">
-                <FileText className="size-5 shrink-0 text-muted" strokeWidth={1.75} />
+            <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
+              <div className="flex items-center gap-2.5">
+                <FileText className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
                 <div className="min-w-0 flex-1 truncate text-sm font-medium">{log.file.name}</div>
-                <button
+                <Button
                   type="button"
-                  className="btn-ghost size-8 px-0"
+                  variant="ghost"
+                  size="icon-sm"
                   aria-label="移除日志"
                   onClick={() => {
                     setLog(null);
@@ -491,10 +482,12 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                   }}
                 >
                   <X className="size-4" strokeWidth={1.75} />
-                </button>
+                </Button>
               </div>
-              <LogSummary meta={log.meta} />
-              <label className="mt-4 flex items-start gap-2 border-t border-border pt-3 text-sm">
+              <div className="mt-2.5 border-t border-border pt-2.5">
+                <LogSummary meta={log.meta} />
+              </div>
+              <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-border pt-2.5 text-xs">
                 <input
                   type="checkbox"
                   checked={publishLog}
@@ -502,17 +495,17 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                   className="mt-0.5 accent-accent"
                 />
                 <span>
-                  同时公开原始日志
-                  <span className="block text-xs text-muted">
-                    任何人都能下载。日志里可能有本机路径、文件内容和密钥，请先自行检查。
+                  公开原始日志
+                  <span className="block text-muted">
+                    任何人可下载。日志里可能有本机路径和密钥，请先检查。
                   </span>
                 </span>
               </label>
             </div>
           ) : (
             <div>
-              <label className="btn-outline cursor-pointer">
-                <FileText className="size-4" strokeWidth={1.75} />
+              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-control bg-surface px-2.5 py-1.5 text-xs font-medium hover:bg-raised">
+                <FileText className="size-3.5 text-muted" strokeWidth={1.75} />
                 选择日志文件
                 <input
                   type="file"
@@ -528,20 +521,21 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
               {logError && <p className="mt-1 text-xs text-negative">{logError}</p>}
             </div>
           )}
-        </section>
+        </Section>
 
         {(clientError || serverError) && (
           <p className="text-sm text-negative" role="alert">
             {clientError || serverError}
           </p>
         )}
-        <div className="flex justify-end gap-2">
-          <Link to={`/p/${prompt.id}`} className="btn-outline">
-            取消
-          </Link>
-          <button type="submit" className="btn-primary" disabled={submitting}>
-            {submitting ? "上传中…" : "提交"}
-          </button>
+
+        <div className="flex justify-end gap-1.5">
+          <Button asChild variant="outline">
+            <Link to={`/p/${prompt.id}`}>取消</Link>
+          </Button>
+          <Button type="submit" variant="primary" disabled={submitting}>
+            {submitting ? "提交中…" : "提交"}
+          </Button>
         </div>
       </form>
     </div>

@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "35a7802a-8f51-4a67-bf38-8f4b8d70dbe1",
+  "id": "25b19cc0-eb93-4104-af56-2b5e9ffdb5b9",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "harnesses": {
@@ -396,20 +396,6 @@
         "reasoning": {
           "name": "reasoning",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        },
-        "attempt": {
-          "name": "attempt",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempt_count": {
-          "name": "attempt_count",
-          "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false

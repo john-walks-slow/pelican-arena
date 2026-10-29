@@ -13,9 +13,9 @@ import {
 } from "~/db/schema";
 import type { Catalog, CatalogEntry, CatalogKind } from "./catalog";
 import { slugify } from "./ids";
-import { PRIOR_VOTES } from "./leaderboard";
 
 /** Gallery order shrinks stars toward a neutral 3 so one vote does not top the list. */
+const PRIOR_VOTES = 3;
 const SORT_PRIOR = 3;
 const priorStars = sql.raw(String(SORT_PRIOR * PRIOR_VOTES));
 const priorVotes = sql.raw(String(PRIOR_VOTES));
@@ -106,8 +106,8 @@ export interface SubmissionFilters {
   model?: string;
   provider?: string;
   harness?: string;
+  mod?: string;
   vanilla?: boolean;
-  firstOnly?: boolean;
 }
 
 export type SubmissionSort = "top" | "new";
@@ -115,8 +115,6 @@ export type SubmissionSort = "top" | "new";
 const submissionColumns = {
   id: submissions.id,
   promptId: submissions.promptId,
-  attempt: submissions.attempt,
-  attemptCount: submissions.attemptCount,
   reasoning: submissions.reasoning,
   createdAt: submissions.createdAt,
   totalBytes: submissions.totalBytes,
@@ -163,7 +161,11 @@ export async function listSubmissions(
   if (filters.model) conditions.push(eq(submissions.modelId, filters.model));
   if (filters.provider) conditions.push(eq(submissions.providerId, filters.provider));
   if (filters.harness) conditions.push(eq(submissions.harnessId, filters.harness));
-  if (filters.firstOnly) conditions.push(eq(submissions.attempt, "first"));
+  if (filters.mod) {
+    conditions.push(
+      sql`exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id} and sm.mod_id = ${filters.mod})`,
+    );
+  }
   if (filters.vanilla) {
     conditions.push(
       sql`not exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id})`,
@@ -215,40 +217,6 @@ export async function clearRating(userId: number, submissionId: string) {
   await db()
     .delete(ratings)
     .where(and(eq(ratings.userId, userId), eq(ratings.submissionId, submissionId)));
-}
-
-export interface LeaderboardScope {
-  vanillaOnly: boolean;
-  firstOnly: boolean;
-}
-
-/** Raw per-submission rating totals for the leaderboard computation. */
-export async function leaderboardInputs(scope: LeaderboardScope) {
-  const conditions = [eq(submissions.status, "active"), eq(prompts.status, "active")];
-  if (scope.firstOnly) conditions.push(eq(submissions.attempt, "first"));
-  if (scope.vanillaOnly) {
-    conditions.push(
-      sql`not exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id})`,
-    );
-  }
-  return db()
-    .select({
-      submissionId: submissions.id,
-      promptId: submissions.promptId,
-      modelId: models.id,
-      modelName: models.name,
-      providerId: providers.id,
-      providerName: providers.name,
-      votes: sql<number>`count(${ratings.stars})`,
-      starSum: sql<number>`coalesce(sum(${ratings.stars}), 0)`,
-    })
-    .from(submissions)
-    .innerJoin(prompts, eq(prompts.id, submissions.promptId))
-    .innerJoin(models, eq(models.id, submissions.modelId))
-    .innerJoin(providers, eq(providers.id, submissions.providerId))
-    .leftJoin(ratings, eq(ratings.submissionId, submissions.id))
-    .where(and(...conditions))
-    .groupBy(submissions.id);
 }
 
 export async function siteStats() {

@@ -1,8 +1,10 @@
-import { LayoutGrid, LogIn, LogOut, Menu, PenLine, Trophy, X } from "lucide-react";
+import { LayoutGrid, LogOut, Menu, PenLine, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Form, Link, NavLink, useLocation } from "react-router";
 import { Avatar } from "./avatar";
 import { PelicanMark } from "./pelican-mark";
+import { Button } from "./ui/button";
+import { LinuxDoIcon } from "./ui/linuxdo-icon";
 
 export interface ShellUser {
   id: number;
@@ -15,22 +17,21 @@ export interface ShellUser {
 
 const NAV = [
   { to: "/", label: "题目", icon: LayoutGrid, end: true },
-  { to: "/leaderboard", label: "榜单", icon: Trophy, end: false },
   { to: "/prompts/new", label: "出题", icon: PenLine, end: false },
 ];
 
 function Brand() {
   return (
-    <Link to="/" className="flex items-center gap-2 px-2 font-semibold text-ink">
+    <Link to="/" className="flex items-center gap-2 px-1.5">
       <PelicanMark className="size-6 text-accent" />
-      <span className="text-[15px] tracking-tight">Pelican Arena</span>
+      <span className="text-[15px] font-semibold tracking-tight">Pelican Arena</span>
     </Link>
   );
 }
 
 function NavItems({ onNavigate }: { onNavigate?: () => void }) {
   return (
-    <nav className="flex flex-col gap-0.5">
+    <nav className="flex flex-col gap-1">
       {NAV.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
@@ -39,16 +40,14 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
           onClick={onNavigate}
           className={({ isActive }) =>
             `flex h-8 items-center gap-2.5 rounded-control px-2.5 text-sm transition-colors ${
-              isActive
-                ? "bg-accent-soft font-medium text-accent-ink"
-                : "text-muted hover:bg-raised hover:text-ink"
+              isActive ? "bg-raised font-medium text-ink" : "text-muted hover:bg-raised hover:text-ink"
             }`
           }
         >
           {({ isActive }) => (
             <>
               <Icon className={`size-4 ${isActive ? "text-accent" : ""}`} strokeWidth={1.75} />
-              {label}
+              <span>{label}</span>
             </>
           )}
         </NavLink>
@@ -58,29 +57,40 @@ function NavItems({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 function Account({ user }: { user: ShellUser | null }) {
-  const location = useLocation();
+  const { pathname } = useLocation();
   if (!user) {
-    const returnTo = encodeURIComponent(location.pathname + location.search);
     return (
-      <a href={`/auth/login?returnTo=${returnTo}`} className="btn-outline w-full">
-        <LogIn className="size-4" strokeWidth={1.75} />
-        使用 Linux DO 登录
-      </a>
+      <Button asChild variant="linuxdo" className="w-full justify-center gap-2">
+        <a href={`/auth/login?returnTo=${encodeURIComponent(pathname)}`}>
+          <LinuxDoIcon size={16} />
+          <span>Linux DO 登录</span>
+        </a>
+      </Button>
     );
   }
   return (
-    <div className="flex items-center gap-2.5 px-2">
-      <Avatar template={user.avatarTemplate} username={user.username} size={28} />
+    <div className="flex items-center gap-2.5 px-1.5 py-1">
+      <Avatar template={user.avatarTemplate} username={user.username} size={32} />
       <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-medium">{user.name || user.username}</div>
-        <div className="text-xs text-muted">
-          @{user.username} · TL{user.trustLevel}
+        <div className="truncate text-sm font-medium leading-tight">
+          {user.name || user.username}
+        </div>
+        <div className="flex items-center gap-1.5 mt-0.5">
+          <span className="truncate text-xs text-muted">@{user.username}</span>
+          <span className="num text-[11px] text-muted">TL{user.trustLevel}</span>
         </div>
       </div>
       <Form method="post" action="/auth/logout">
-        <button type="submit" className="btn-ghost size-8 px-0" aria-label="退出登录" title="退出登录">
+        <Button
+          type="submit"
+          variant="ghost"
+          size="icon-sm"
+          className="text-muted hover:text-negative"
+          title="退出登录"
+          aria-label="退出登录"
+        >
           <LogOut className="size-4" strokeWidth={1.75} />
-        </button>
+        </Button>
       </Form>
     </div>
   );
@@ -92,42 +102,48 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
   useEffect(() => setMenuOpen(false), [location.pathname]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
-      <aside className="sticky top-0 hidden h-dvh flex-col gap-6 self-start px-3 py-5 lg:flex">
-        <Brand />
-        <NavItems />
-        <div className="mt-auto">
+    <div className="min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]">
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
+        <div className="space-y-5">
+          <Brand />
+          <NavItems />
+        </div>
+        <div>
           <Account user={user} />
         </div>
       </aside>
 
       <header className="sticky top-0 z-30 flex h-12 items-center justify-between border-b border-border bg-ground px-2 lg:hidden">
         <Brand />
-        <button
+        <Button
           type="button"
-          className="btn-ghost size-10 px-0"
+          variant="ghost"
+          size="icon"
           aria-label="打开菜单"
           onClick={() => setMenuOpen(true)}
         >
-          <Menu className="size-5" strokeWidth={1.75} />
-        </button>
+          <Menu className="size-5" />
+        </Button>
       </header>
 
       {menuOpen && (
-        <div className="fixed inset-0 z-40 flex flex-col gap-6 bg-ground px-3 py-2 lg:hidden">
-          <div className="flex h-10 items-center justify-between">
-            <Brand />
-            <button
-              type="button"
-              className="btn-ghost size-10 px-0"
-              aria-label="关闭菜单"
-              onClick={() => setMenuOpen(false)}
-            >
-              <X className="size-5" strokeWidth={1.75} />
-            </button>
+        <div className="fixed inset-0 z-40 flex flex-col justify-between bg-ground px-3 py-2 lg:hidden">
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <Brand />
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="关闭菜单"
+                onClick={() => setMenuOpen(false)}
+              >
+                <X className="size-5" />
+              </Button>
+            </div>
+            <NavItems onNavigate={() => setMenuOpen(false)} />
           </div>
-          <NavItems onNavigate={() => setMenuOpen(false)} />
-          <div className="mt-auto pb-4">
+          <div className="border-t border-border py-3">
             <Account user={user} />
           </div>
         </div>

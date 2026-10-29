@@ -7,5 +7,5 @@ export const SANDBOX =
   "allow-scripts allow-forms allow-modals allow-pointer-lock allow-popups allow-downloads";
 
 export function usercontentUrl(origin: string, submissionId: string, path = "") {
-  return `${origin}/${submissionId}/${path}`;
+  return `${origin.replace(/\/+$/, "")}/${submissionId}/${path}`;
 }

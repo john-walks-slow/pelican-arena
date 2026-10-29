@@ -63,8 +63,6 @@ export async function createSubmission(input: {
     providerId,
     harnessId,
     reasoning: meta.reasoning,
-    attempt: meta.attempt,
-    attemptCount: meta.attemptCount,
     files: manifest,
     totalBytes: manifest.reduce((s, f) => s + f.size, 0),
     notes: meta.notes,

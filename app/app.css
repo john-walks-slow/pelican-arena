@@ -4,27 +4,30 @@
   --font-sans: "DM Sans", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
-  --color-ground: #f9fafb;
+  --color-ground: #f8f9fb;
   --color-surface: #ffffff;
-  --color-raised: #f3f4f6;
-  --color-active: #ececee;
-  --color-border: #e5e7eb;
-  --color-rule: #f0f1f3;
-  --color-control: #d1d5db;
-  --color-ink: #111827;
-  --color-muted: #5f6672;
-  --color-primary: #1d1f20;
+  --color-raised: #f2f3f5;
+  --color-active: #e8eaee;
+  --color-border: #e6e8ec;
+  --color-rule: #f0f1f4;
+  --color-control: #d4d8de;
+  --color-ink: #101318;
+  --color-muted: #626874;
+  --color-primary: #1a1d21;
 
   --color-accent: #c2410c;
-  --color-accent-soft: #fff4ed;
-  --color-accent-track: #fde3d1;
+  --color-accent-soft: #fff5ee;
+  --color-accent-track: #fbe0cf;
   --color-accent-ink: #7c2d12;
 
-  --color-positive: #247b50;
-  --color-negative: #c4242a;
-  --color-pill-positive: #dcfce7;
-  --color-pill-positive-ink: #14532d;
-  --color-pill-warning: #fffbeb;
+  --color-positive: #1f7a4d;
+  --color-negative: #bf2329;
+  --color-warning: #92400e;
+  --color-pill-positive: #e6f8ee;
+  --color-pill-positive-ink: #12502c;
+  --color-pill-negative: #fdecec;
+  --color-pill-negative-ink: #7f1d1d;
+  --color-pill-warning: #fffaeb;
   --color-pill-warning-ink: #92400e;
 
   --radius-card: 8px;
@@ -32,12 +35,27 @@
 
   --text-title: 28px;
   --text-title--line-height: 36px;
+  --text-title--letter-spacing: -0.02em;
   --text-section: 18px;
   --text-section--line-height: 26px;
+
+  --animate-in: enter 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 html {
   @apply bg-ground text-ink antialiased;
+  -webkit-tap-highlight-color: transparent;
 }
 
 body {
@@ -49,60 +67,28 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-@utility btn {
-  @apply inline-flex h-8 items-center justify-center gap-1.5 rounded-control px-3 text-sm font-medium whitespace-nowrap transition-colors duration-150 select-none disabled:pointer-events-none disabled:opacity-50;
-}
-
-@utility btn-primary {
-  @apply btn bg-primary text-white hover:bg-black active:bg-black/85;
-}
-
-@utility btn-outline {
-  @apply btn border border-control bg-surface text-ink hover:bg-raised active:bg-active;
-}
-
-@utility btn-ghost {
-  @apply btn text-muted hover:bg-raised hover:text-ink;
-}
-
-@utility field {
-  @apply h-8 w-full rounded-control border border-control bg-surface px-2.5 text-sm text-ink placeholder:text-[#6b6b6b] focus:border-accent focus:ring-2 focus:ring-accent/20 focus:outline-none;
-}
-
-@utility label {
-  @apply mb-1.5 block text-sm font-medium text-ink;
-}
-
-@utility hint {
-  @apply mt-1 text-xs text-muted;
-}
-
-@utility panel {
-  @apply rounded-card border border-border bg-surface;
-}
-
-@utility pill {
-  @apply inline-flex h-5 items-center rounded px-1.5 text-xs font-medium whitespace-nowrap;
-}
-
-@utility pill-neutral {
-  @apply pill bg-raised text-[#374151];
-}
-
-@utility pill-accent {
-  @apply pill bg-accent-soft text-accent-ink;
-}
-
-@utility pill-warning {
-  @apply pill bg-pill-warning text-pill-warning-ink;
-}
-
 @utility prose-prompt {
-  @apply text-[15px] leading-6 whitespace-pre-wrap break-words;
+  @apply text-[13px] leading-relaxed whitespace-pre-wrap break-words;
 }
 
-
-:focus-visible {
+:where(a, button, [role="button"]):focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
+}
+
+:where(input, textarea, [cmdk-input]):focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--color-accent-track);
+  color: var(--color-accent-ink);
+}
+
+/* thin, neutral scrollbars inside panels */
+@supports (scrollbar-width: thin) {
+  .scroll-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-control) transparent;
+  }
 }
