@@ -1,6 +1,7 @@
 import { Star } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
+import { toast } from "~/components/ui/toaster";
 
 const LABELS = ["", "很差", "较差", "一般", "不错", "惊艳"];
 
@@ -11,8 +12,15 @@ export function StarRating({
   current: number | null;
   disabledReason?: string;
 }) {
-  const fetcher = useFetcher();
+  const fetcher = useFetcher<{ stars: number }>();
   const [hover, setHover] = useState(0);
+
+  useEffect(() => {
+    if (!fetcher.data) return;
+    if (fetcher.data.stars) toast.success(`已评 ${fetcher.data.stars} 星`);
+    else toast("评分已取消");
+  }, [fetcher.data]);
+
   const pending = fetcher.formData ? Number(fetcher.formData.get("stars")) : null;
   const value = pending ?? current ?? 0;
   const shown = hover || value;

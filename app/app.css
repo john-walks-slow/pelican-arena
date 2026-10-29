@@ -1,4 +1,5 @@
 @import "tailwindcss" source(".");
+@import "tw-animate-css";
 
 @theme {
   --font-sans: "DM Sans", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
@@ -39,23 +40,13 @@
   --text-section: 18px;
   --text-section--line-height: 26px;
 
-  --animate-in: enter 150ms cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-@keyframes enter {
-  from {
-    opacity: 0;
-    transform: translateY(4px) scale(0.99);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
 }
 
 html {
   @apply bg-ground text-ink antialiased;
   -webkit-tap-highlight-color: transparent;
+  /* reserve the scrollbar track so locking scroll never shifts the layout */
+  scrollbar-gutter: stable;
 }
 
 body {
@@ -67,8 +58,29 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-@utility prose-prompt {
-  @apply text-[13px] leading-relaxed whitespace-pre-wrap break-words;
+/* Smooth SPA & UI micro-interactions */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.route-enter {
+  animation: fade-in 180ms ease-out both;
+}
+
+.panel-fade {
+  animation: fade-in 150ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-enter,
+  .panel-fade {
+    animation: none;
+  }
 }
 
 :where(a, button, [role="button"]):focus-visible {
@@ -92,3 +104,131 @@ body {
     scrollbar-color: var(--color-control) transparent;
   }
 }
+
+/* Markdown rendering for prompts and text submissions. */
+.markdown {
+  color: var(--color-ink);
+  font-size: 14px;
+  line-height: 1.75;
+  word-break: break-word;
+}
+
+.markdown > :first-child { margin-top: 0; }
+.markdown > :last-child { margin-bottom: 0; }
+
+.markdown h1,
+.markdown h2,
+.markdown h3,
+.markdown h4 {
+  margin: 1.4em 0 0.6em;
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.markdown h1 { font-size: 1.6em; }
+.markdown h2 { font-size: 1.3em; }
+.markdown h3 { font-size: 1.1em; }
+.markdown h4 { font-size: 1em; }
+
+.markdown p,
+.markdown ul,
+.markdown ol,
+.markdown blockquote,
+.markdown pre,
+.markdown table {
+  margin: 0.8em 0;
+}
+
+.markdown ul { padding-left: 1.4em; list-style: disc; }
+.markdown ol { padding-left: 1.4em; list-style: decimal; }
+.markdown li { margin: 0.25em 0; }
+.markdown li > p { margin: 0; }
+
+.markdown a {
+  color: var(--color-accent-ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.markdown strong { font-weight: 600; }
+
+.markdown code {
+  padding: 0.12em 0.35em;
+  border-radius: 4px;
+  background: var(--color-raised);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+.markdown pre {
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--color-raised);
+  padding: 12px 14px;
+}
+.markdown pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.markdown blockquote {
+  border-left: 3px solid var(--color-control);
+  padding-left: 12px;
+  color: var(--color-muted);
+}
+
+.markdown img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.markdown th,
+.markdown td {
+  border: 1px solid var(--color-border);
+  padding: 6px 10px;
+  text-align: left;
+}
+.markdown th {
+  background: var(--color-raised);
+  font-weight: 600;
+}
+
+.markdown hr {
+  margin: 1.4em 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.markdown input[type="checkbox"] {
+  margin-right: 0.35em;
+}
+
+/* Thumbnail-sized Markdown: keep it dense and clipped by the card. */
+.markdown-card {
+  max-height: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.markdown-card h1 { font-size: 1.35em; }
+.markdown-card h2 { font-size: 1.2em; }
+.markdown-card h3,
+.markdown-card h4 { font-size: 1.05em; }
+.markdown-card h1,
+.markdown-card h2,
+.markdown-card h3,
+.markdown-card h4 { margin: 0.7em 0 0.35em; }
+.markdown-card p,
+.markdown-card ul,
+.markdown-card ol,
+.markdown-card blockquote,
+.markdown-card pre,
+.markdown-card table { margin: 0.5em 0; }
+.markdown-card pre { padding: 8px 10px; }
+.markdown-card table { font-size: 11px; }

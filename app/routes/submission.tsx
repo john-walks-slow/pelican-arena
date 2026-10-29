@@ -11,6 +11,7 @@ import { useState } from "react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
+import { Markdown } from "~/components/markdown";
 import { LiveFrame } from "~/components/page-preview";
 import { SourceViewer } from "~/components/source-viewer";
 import { StarRating } from "~/components/star-rating";
@@ -18,12 +19,13 @@ import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
 import { formatBytes } from "~/lib/bundle";
+import { KIND_META } from "~/lib/kinds";
 import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~/lib/format";
 import { requirePermission } from "~/lib/guards.server";
 import { origins } from "~/lib/origins.server";
 import { can, denyReason } from "~/lib/permissions";
 import { clearRating, getPrompt, getSubmission, getUserRating, setRating } from "~/lib/queries.server";
-import { usercontentUrl } from "~/lib/sandbox";
+import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
 import { getUser } from "~/lib/session.server";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
 import { useOptionalUser } from "~/lib/use-user";
@@ -47,7 +49,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const myRating = user ? await getUserRating(user.id, submission.id) : null;
   return {
     submission,
-    prompt: { id: prompt.id, title: prompt.title, body: prompt.body },
+    prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
     myRating,
     usercontentOrigin: origins(request).usercontent,
   };
@@ -64,7 +66,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (stars === 0) await clearRating(user.id, submission.id);
   else if (Number.isInteger(stars) && stars >= 1 && stars <= 5) await setRating(user.id, submission.id, stars);
   else throw data("Invalid rating", { status: 400 });
-  return { ok: true };
+  return { stars };
 }
 
 function MetaRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -101,7 +103,9 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const { submission: s, prompt, myRating, usercontentOrigin } = loaderData;
   const user = useOptionalUser();
   const [tab, setTab] = useState<"preview" | "source">("preview");
-  const pageUrl = usercontentUrl(usercontentOrigin, s.id);
+  const kind = prompt.kind;
+  const pageUrl = submissionUrl(usercontentOrigin, s.id, kind);
+  const baseUrl = usercontentUrl(usercontentOrigin, s.id);
   const log = s.logMeta;
 
   const ratingBlock = !user
@@ -144,7 +148,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             {(
               [
                 ["preview", <Eye key="e" className="size-3.5" strokeWidth={1.75} />, "预览"],
-                ["source", <Code2 key="c" className="size-3.5" strokeWidth={1.75} />, `源码 ${s.files.length}`],
+                [
+                  "source",
+                  <Code2 key="c" className="size-3.5" strokeWidth={1.75} />,
+                  s.files.length > 1 ? `源码 ${s.files.length}` : "源码",
+                ],
               ] as const
             ).map(([value, icon, label]) => (
               <button
@@ -169,30 +177,53 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                   size="icon-sm"
                   aria-label="全屏"
                   title="全屏"
-                  onClick={() => document.getElementById("live-frame")?.requestFullscreen()}
+                  onClick={() => document.getElementById("work-panel")?.requestFullscreen()}
                 >
                   <Maximize2 className="size-3.5" strokeWidth={1.75} />
                 </Button>
-              ) : (
+              ) : kind === "web" ? (
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
                   className="gap-1.5"
-                  onClick={() => downloadZip(pageUrl, s.files.map((f) => f.path), s.id)}
+                  onClick={() => downloadZip(baseUrl, s.files.map((f) => f.path), s.id)}
                 >
                   <Download className="size-3.5" strokeWidth={1.75} />
                   下载 zip
+                </Button>
+              ) : (
+                <Button asChild variant="ghost" size="sm" className="gap-1.5">
+                  <a href={`/s/${s.id}/download`}>
+                    <Download className="size-3.5" strokeWidth={1.75} />
+                    下载 .{KIND_META[kind].extension}
+                  </a>
                 </Button>
               )}
             </div>
           </div>
           {tab === "preview" ? (
-            <div id="live-frame" className="h-[min(74vh,860px)] bg-white">
-              <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />
+            <div id="work-panel" className="h-[min(74vh,860px)] bg-white panel-fade">
+              {kind === "web" ? (
+                <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />
+              ) : kind === "svg" ? (
+                <div className="flex size-full items-center justify-center p-4">
+                  <img
+                    src={pageUrl}
+                    alt={`${s.model.name} 的答案`}
+                    className="max-h-full max-w-full object-contain"
+                  />
+                </div>
+              ) : (
+                <div className="size-full overflow-y-auto scroll-thin px-6 py-6">
+                  <Markdown>{s.content ?? ""}</Markdown>
+                </div>
+              )}
             </div>
           ) : (
-            <SourceViewer files={s.files} baseUrl={pageUrl} />
+            <div className="panel-fade">
+              <SourceViewer files={s.files} baseUrl={baseUrl} />
+            </div>
           )}
         </section>
 
@@ -206,6 +237,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
 
           <SideSection title="生成信息">
             <dl className="divide-y divide-rule text-[13px]">
+              <MetaRow label="类型">{KIND_META[kind].label}</MetaRow>
               <MetaRow label="模型">{s.model.name}</MetaRow>
               <MetaRow label="提供方">{s.provider.name}</MetaRow>
               <MetaRow label="客户端">{s.harness?.name ?? "—"}</MetaRow>

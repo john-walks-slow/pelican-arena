@@ -4,10 +4,17 @@ import { createCookieSessionStorage, redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { users, type User } from "~/db/schema";
 
+export interface FlashToast {
+  id: number;
+  message: string;
+  kind: "success" | "error";
+}
+
 interface SessionData {
   userId: number;
   oauthState: string;
   returnTo: string;
+  toast: FlashToast;
 }
 
 let storage: ReturnType<typeof createCookieSessionStorage<SessionData>> | undefined;
@@ -49,4 +56,15 @@ export async function requireUser(request: Request): Promise<User> {
     throw redirect(`/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
   }
   return user;
+}
+
+/** Queues a toast that survives the next redirect and is consumed by the root loader. */
+export async function flashToast(
+  request: Request,
+  message: string,
+  kind: FlashToast["kind"] = "success",
+) {
+  const session = await getSession(request);
+  session.set("toast", { id: Date.now(), message, kind });
+  return commitSession(session);
 }

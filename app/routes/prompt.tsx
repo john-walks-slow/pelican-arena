@@ -1,27 +1,35 @@
 import { ArrowLeft, Check, Columns2, Copy, Upload, X } from "lucide-react";
-import { useState } from "react";
-import { data, Link, useSearchParams } from "react-router";
+import { useCallback, useEffect, useState } from "react";
+import { data, Link, useFetcher, useSearchParams } from "react-router";
 import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
-import { PagePreview } from "~/components/page-preview";
+import { LoadMore } from "~/components/load-more";
+import { Markdown } from "~/components/markdown";
+import { SubmissionPreview } from "~/components/submission-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
 import { FilterSelect } from "~/components/ui/filter-select";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
+import { KIND_META } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
 import { can } from "~/lib/permissions";
-import { getCatalog, getPrompt, listSubmissions, type SubmissionSort } from "~/lib/queries.server";
-import { usercontentUrl } from "~/lib/sandbox";
+import {
+  getPrompt,
+  getPromptFacets,
+  listSubmissions,
+  type SubmissionSort,
+} from "~/lib/queries.server";
 import { useOptionalUser } from "~/lib/use-user";
 
 const MAX_COMPARE = 4;
 
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "找不到题目 · Pelican Arena" }];
-  const { prompt, submissions } = loaderData;
-  const description = `${submissions.length} 份答案。${prompt.body.slice(0, 120)}`;
+  const { prompt, total } = loaderData;
+  const description = `${total} 份答案。${prompt.body.slice(0, 120)}`;
   return [
     { title: `${prompt.title} · Pelican Arena` },
     { name: "description", content: description },
@@ -41,19 +49,35 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     provider: q.get("provider") || undefined,
     harness: q.get("harness") || undefined,
     mod: q.get("mod") || undefined,
-    vanilla: q.get("vanilla") === "1",
   };
-  const [submissions, catalog] = await Promise.all([
+  const [gallery, facets] = await Promise.all([
     listSubmissions(prompt.id, filters, sort),
-    getCatalog(),
+    getPromptFacets(prompt.id),
   ]);
-  return { prompt, submissions, catalog, usercontentOrigin: origins(request).usercontent };
+  const key = [sort, filters.model, filters.provider, filters.harness, filters.mod].join("|");
+  return {
+    prompt,
+    ...gallery,
+    facets,
+    sort,
+    key,
+    usercontentOrigin: origins(request).usercontent,
+  };
 }
 
-function FilterBar({ catalog }: { catalog: Route.ComponentProps["loaderData"]["catalog"] }) {
+type Facets = Route.ComponentProps["loaderData"]["facets"];
+type SubmissionItem = Route.ComponentProps["loaderData"]["submissions"][number];
+interface MoreSubmissions {
+  submissions: SubmissionItem[];
+  total: number;
+  page: number;
+  nextPage: number | null;
+  key: string;
+}
+
+function FilterBar({ facets, total }: { facets: Facets; total: number }) {
   const [params, setParams] = useSearchParams();
   const sort = params.get("sort") ?? "top";
-  const vanilla = params.get("vanilla") === "1";
 
   const set = (key: string, value: string | null) => {
     setParams(
@@ -61,52 +85,45 @@ function FilterBar({ catalog }: { catalog: Route.ComponentProps["loaderData"]["c
         const next = new URLSearchParams(prev);
         if (!value) next.delete(key);
         else next.set(key, value);
+        next.delete("page");
         return next;
       },
       { replace: true, preventScrollReset: true },
     );
   };
 
-  const active = ["model", "provider", "harness", "mod"].some((k) => params.get(k)) || vanilla;
+  const active = ["model", "provider", "harness", "mod"].some((k) => params.get(k));
 
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <FilterSelect
         label="模型"
         value={params.get("model") ?? ""}
-        options={catalog.models.map((m) => ({ value: m.id, label: m.name }))}
+        options={facets.models.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
         onChange={(v) => set("model", v)}
+        total={total}
       />
       <FilterSelect
         label="提供方"
         value={params.get("provider") ?? ""}
-        options={catalog.providers.map((p) => ({ value: p.id, label: p.name }))}
+        options={facets.providers.map((p) => ({ value: p.id, label: p.name, count: p.count }))}
         onChange={(v) => set("provider", v)}
+        total={total}
       />
       <FilterSelect
         label="客户端"
         value={params.get("harness") ?? ""}
-        options={catalog.harnesses.map((h) => ({ value: h.id, label: h.name }))}
+        options={facets.harnesses.map((h) => ({ value: h.id, label: h.name, count: h.count }))}
         onChange={(v) => set("harness", v)}
+        total={total}
       />
       <FilterSelect
         label="增强"
         value={params.get("mod") ?? ""}
-        options={catalog.mods.map((m) => ({ value: m.id, label: m.name }))}
+        options={facets.mods.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
         onChange={(v) => set("mod", v)}
+        total={total}
       />
-      <button
-        type="button"
-        onClick={() => set("vanilla", vanilla ? null : "1")}
-        aria-pressed={vanilla}
-        className={`inline-flex h-8 items-center rounded-control border px-2.5 text-xs transition-colors ${
-          vanilla
-            ? "border-ink/25 bg-raised font-medium text-ink"
-            : "border-control bg-surface text-muted hover:bg-raised hover:text-ink"
-        }`}
-      >
-        仅 vanilla
-      </button>
 
       <div className="ml-auto flex items-center gap-1.5">
         {active && (
@@ -134,10 +151,42 @@ function FilterBar({ catalog }: { catalog: Route.ComponentProps["loaderData"]["c
 }
 
 export default function PromptPage({ loaderData }: Route.ComponentProps) {
-  const { prompt, submissions, catalog, usercontentOrigin } = loaderData;
+  const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin } = loaderData;
   const user = useOptionalUser();
+  const [params] = useSearchParams();
+  const fetcher = useFetcher<MoreSubmissions>();
+
+  const [items, setItems] = useState(submissions);
+  const [next, setNext] = useState(nextPage);
   const [selected, setSelected] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setItems(submissions);
+    setNext(nextPage);
+  }, [submissions, nextPage]);
+
+  const more = fetcher.data;
+  useEffect(() => {
+    if (!more || more.key !== key || more.page !== next) return;
+    setItems((current) => {
+      const seen = new Set(current.map((s) => s.id));
+      return [...current, ...more.submissions.filter((s) => !seen.has(s.id))];
+    });
+    setNext(more.nextPage);
+  }, [more, key, next]);
+
+  const loadMore = useCallback(() => {
+    if (!next || fetcher.state !== "idle") return;
+    const query = new URLSearchParams();
+    for (const name of ["model", "provider", "harness", "mod"]) {
+      const value = params.get(name);
+      if (value) query.set(name, value);
+    }
+    if (sort === "new") query.set("sort", "new");
+    query.set("page", String(next));
+    fetcher.load(`/p/${prompt.id}/submissions?${query}`);
+  }, [next, fetcher, params, prompt.id, sort]);
 
   const toggle = (id: string) =>
     setSelected((cur) =>
@@ -145,9 +194,14 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
     );
 
   const copy = async () => {
-    await navigator.clipboard.writeText(prompt.body);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    try {
+      await navigator.clipboard.writeText(prompt.body);
+      setCopied(true);
+      toast.success("提示词已复制");
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      toast.error("复制失败，请手动选择文本");
+    }
   };
 
   return (
@@ -161,6 +215,8 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         <div className="min-w-0">
           <h1 className="text-title font-bold tracking-tight">{prompt.title}</h1>
           <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+            <span>{KIND_META[prompt.kind].label}</span>
+            <span>·</span>
             <Avatar template={prompt.author.avatarTemplate} username={prompt.author.username} size={18} />
             <span>{prompt.author.username}</span>
             <span>·</span>
@@ -168,9 +224,14 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
         <div className="flex gap-1.5">
-          <Button variant="outline" onClick={copy} className="gap-1.5">
+          <Button
+            variant="outline"
+            onClick={copy}
+            className={`gap-1.5 ${copied ? "border-positive/40 text-positive" : ""}`}
+            aria-live="polite"
+          >
             {copied ? (
-              <Check className="size-4 text-positive" strokeWidth={2} />
+              <Check className="size-4" strokeWidth={2} />
             ) : (
               <Copy className="size-4 text-muted" strokeWidth={1.75} />
             )}
@@ -186,72 +247,89 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
       </div>
 
       <section className="mt-5 rounded-card border border-border bg-surface px-4 py-3.5">
-        <p className="prose-prompt max-h-64 overflow-y-auto scroll-thin text-[15px] leading-6">
-          {prompt.body}
-        </p>
+        <div className="max-h-64 overflow-y-auto scroll-thin">
+          <Markdown>{prompt.body}</Markdown>
+        </div>
       </section>
 
       <section className="mt-8">
         <div className="flex items-baseline gap-2">
           <h2 className="text-section font-semibold">答案</h2>
-          <span className="num text-sm text-muted">{submissions.length}</span>
+          <span className="num text-sm text-muted">{total}</span>
         </div>
 
         <div className="mt-3">
-          <FilterBar catalog={catalog} />
+          <FilterBar facets={facets} total={facets.models.reduce((sum, f) => sum + f.count, 0)} />
         </div>
 
-        {submissions.length === 0 ? (
+        {items.length === 0 ? (
           <div className="mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center text-sm text-muted">
             没有符合条件的答案。
           </div>
         ) : (
-          <ul className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {submissions.map((s) => {
-              const isSelected = selected.includes(s.id);
-              return (
-                <li
-                  key={s.id}
-                  className={`overflow-hidden rounded-card border bg-surface transition-colors ${
-                    isSelected ? "border-accent" : "border-border hover:border-control"
-                  }`}
-                >
-                  <Link to={`/s/${s.id}`} aria-label={`${s.model.name} · ${s.provider.name}`}>
-                    <PagePreview src={usercontentUrl(usercontentOrigin, s.id)} title={s.model.name} />
-                  </Link>
-                  <div className="px-3.5 pt-3 pb-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <Link to={`/s/${s.id}`} className="min-w-0 hover:text-accent-ink">
-                        <div className="truncate text-sm font-semibold">{s.model.name}</div>
-                        <div className="truncate text-[13px] text-muted">
-                          {s.provider.name}
-                          {s.harness && ` · ${s.harness.name}`}
-                        </div>
-                      </Link>
-                      <StarScore starSum={s.starSum} votes={s.votes} />
-                    </div>
-                    <div className="mt-2.5 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 flex-wrap items-center gap-1">
-                        <ModTags mods={s.mods} />
+          <>
+            <ul className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {items.map((s) => {
+                const isSelected = selected.includes(s.id);
+                return (
+                  <li
+                    key={s.id}
+                    className={`overflow-hidden rounded-card border bg-surface transition-colors ${
+                      isSelected ? "border-accent" : "border-border hover:border-control"
+                    }`}
+                  >
+                    <Link to={`/s/${s.id}`} aria-label={`${s.model.name} · ${s.provider.name}`}>
+                      <SubmissionPreview
+                        kind={prompt.kind}
+                        submissionId={s.id}
+                        origin={usercontentOrigin}
+                        title={s.model.name}
+                        excerpt={s.excerpt}
+                      />
+                    </Link>
+                    <div className="px-3.5 pt-3 pb-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <Link to={`/s/${s.id}`} className="min-w-0 hover:text-accent-ink">
+                          <div className="truncate text-sm font-semibold">{s.model.name}</div>
+                          <div className="truncate text-[13px] text-muted">
+                            {s.provider.name}
+                            {s.harness && ` · ${s.harness.name}`}
+                          </div>
+                        </Link>
+                        <StarScore starSum={s.starSum} votes={s.votes} />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => toggle(s.id)}
-                        aria-pressed={isSelected}
-                        disabled={!isSelected && selected.length >= MAX_COMPARE}
-                        className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors ${
-                          isSelected ? "text-accent-ink" : "text-muted hover:text-ink"
-                        }`}
-                      >
-                        <Columns2 className="size-3.5" strokeWidth={1.75} />
-                        {isSelected ? "已选" : "对比"}
-                      </button>
+                      <div className="mt-2.5 flex items-center justify-between gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1">
+                          <ModTags mods={s.mods} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => toggle(s.id)}
+                          aria-pressed={isSelected}
+                          disabled={!isSelected && selected.length >= MAX_COMPARE}
+                          className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors ${
+                            isSelected ? "text-accent-ink" : "text-muted hover:text-ink"
+                          }`}
+                        >
+                          <Columns2 className="size-3.5" strokeWidth={1.75} />
+                          {isSelected ? "已选" : "对比"}
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <LoadMore
+              hasMore={Boolean(next)}
+              loading={fetcher.state !== "idle"}
+              onLoad={loadMore}
+              shown={items.length}
+              total={total}
+              noun="份答案"
+            />
+          </>
         )}
       </section>
 

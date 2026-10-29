@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronsUpDown, Plus } from "lucide-react";
+import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Command,
@@ -14,15 +14,17 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import type { CatalogEntry } from "~/lib/catalog";
+import type { CatalogEntry, CatalogKind } from "~/lib/catalog";
 import { cn } from "~/lib/utils";
 
 interface ComboboxProps {
-  name: string;
+  name?: string;
   label?: string;
   options: CatalogEntry[];
   value: string;
   onChange: (value: string) => void;
+  /** When set, the list is searched remotely instead of shipping the whole catalog. */
+  kind?: CatalogKind;
   placeholder?: string;
   searchPlaceholder?: string;
   emptyText?: string;
@@ -37,6 +39,7 @@ export function Combobox({
   options,
   value,
   onChange,
+  kind,
   placeholder = "请选择或输入...",
   searchPlaceholder = "搜索或输入新名称...",
   emptyText = "未找到匹配项",
@@ -46,15 +49,53 @@ export function Combobox({
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
+  const [list, setList] = React.useState<CatalogEntry[]>(options);
+  const [total, setTotal] = React.useState(options.length);
+  const [loading, setLoading] = React.useState(false);
 
-  const selectedEntry = options.find(
-    (o) => o.name.toLowerCase() === value.toLowerCase(),
-  );
+  React.useEffect(() => {
+    if (open) return;
+    setList(options);
+    setTotal(options.length);
+    setQuery("");
+  }, [open, options]);
 
+  React.useEffect(() => {
+    if (!open || !kind) return;
+    const controller = new AbortController();
+    const timer = setTimeout(
+      () => {
+        setLoading(true);
+        fetch(`/api/catalog?kind=${kind}&q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((raw: unknown) => {
+            const data = raw as { items?: CatalogEntry[]; total?: number } | null;
+            if (!data || controller.signal.aborted) return;
+            if (Array.isArray(data?.items)) setList(data.items.map(({ id, name }) => ({ id, name })));
+            if (typeof data?.total === "number") setTotal(data.total);
+          })
+          .catch(() => {})
+          .finally(() => {
+            if (!controller.signal.aborted) setLoading(false);
+          });
+      },
+      query ? 200 : 0,
+    );
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+      setLoading(false);
+    };
+  }, [open, kind, query]);
+
+  const selectedEntry = list.find((o) => o.name.toLowerCase() === value.toLowerCase());
   const displayLabel = value || placeholder;
+  const showSelected = Boolean(value && !selectedEntry);
   const isCustomNew =
     query.trim().length > 0 &&
-    !options.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
+    !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
 
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -80,27 +121,49 @@ export function Combobox({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-          <Command loop>
+          <Command loop shouldFilter={!kind}>
             <CommandInput
               placeholder={searchPlaceholder}
               value={query}
               onValueChange={setQuery}
             />
             <CommandList>
-              <CommandEmpty className="py-3 px-3 text-sm text-center text-muted">
-                {emptyText}
+              <CommandEmpty className="px-3 py-3 text-center text-sm text-muted">
+                {loading ? "搜索中…" : emptyText}
               </CommandEmpty>
+
+              {loading && (
+                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted">
+                  <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                  搜索中
+                </div>
+              )}
+
+              {showSelected && (
+                <CommandGroup heading="当前">
+                  <CommandItem
+                    value={`__selected_${value}`}
+                    onSelect={() => {
+                      setOpen(false);
+                      setQuery("");
+                    }}
+                  >
+                    <Check className="mr-2 h-4 w-4 text-accent" />
+                    <span className="truncate">{value}</span>
+                  </CommandItem>
+                </CommandGroup>
+              )}
 
               {isCustomNew && (
                 <CommandGroup heading="自定义">
                   <CommandItem
-                    value={query}
+                    value={`__custom_${query.trim()}`}
                     onSelect={() => {
                       onChange(query.trim());
                       setOpen(false);
                       setQuery("");
                     }}
-                    className="flex items-center gap-2 text-accent font-medium"
+                    className="flex items-center gap-2 font-medium text-accent"
                   >
                     <Plus className="h-4 w-4 shrink-0" />
                     <span>使用 &ldquo;{query.trim()}&rdquo;</span>
@@ -108,16 +171,15 @@ export function Combobox({
                 </CommandGroup>
               )}
 
-              <CommandGroup heading="推荐列表">
-                {options.map((option) => {
-                  const isSelected =
-                    value.toLowerCase() === option.name.toLowerCase();
+              <CommandGroup heading="目录">
+                {list.map((option) => {
+                  const isSelected = value.toLowerCase() === option.name.toLowerCase();
                   return (
                     <CommandItem
                       key={option.id}
-                      value={option.name}
-                      onSelect={(currentValue) => {
-                        onChange(currentValue);
+                      value={kind ? `${option.name}__${option.id}` : option.name}
+                      onSelect={() => {
+                        onChange(option.name);
                         setOpen(false);
                         setQuery("");
                       }}
@@ -125,7 +187,7 @@ export function Combobox({
                       <Check
                         className={cn(
                           "mr-2 h-4 w-4",
-                          isSelected ? "opacity-100 text-accent" : "opacity-0",
+                          isSelected ? "text-accent opacity-100" : "opacity-0",
                         )}
                       />
                       <span className="truncate">{option.name}</span>
@@ -134,6 +196,11 @@ export function Combobox({
                 })}
               </CommandGroup>
             </CommandList>
+            {kind && total > list.length && (
+              <p className="border-t border-rule px-3 py-1.5 text-[11px] text-muted">
+                共 {total} 项，继续输入以搜索
+              </p>
+            )}
           </Command>
         </PopoverContent>
       </Popover>

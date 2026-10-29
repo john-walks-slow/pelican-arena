@@ -1,4 +1,5 @@
 import {
+  data,
   isRouteErrorResponse,
   Links,
   Meta,
@@ -7,10 +8,13 @@ import {
   ScrollRestoration,
 } from "react-router";
 
+import { useEffect } from "react";
+import { useLocation } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell } from "./components/app-shell";
 import { Button } from "./components/ui/button";
-import { getUser } from "./lib/session.server";
+import { toast, Toaster } from "./components/ui/toaster";
+import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -24,18 +28,28 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
-  const user = await getUser(request);
-  return {
-    user: user && {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      avatarTemplate: user.avatarTemplate,
-      trustLevel: user.trustLevel,
-      silenced: user.silenced,
-      role: user.role,
+  const [user, session] = await Promise.all([getUser(request), getSession(request)]);
+  const flash = session.get("toast") ?? null;
+  const headers = new Headers();
+  if (flash) {
+    session.unset("toast");
+    headers.set("Set-Cookie", await commitSession(session));
+  }
+  return data(
+    {
+      toast: flash,
+      user: user && {
+        id: user.id,
+        username: user.username,
+        name: user.name,
+        avatarTemplate: user.avatarTemplate,
+        trustLevel: user.trustLevel,
+        silenced: user.silenced,
+        role: user.role,
+      },
     },
-  };
+    { headers },
+  );
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -49,6 +63,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        <Toaster />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -56,11 +71,34 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function FlashToasts({ flash }: { flash: FlashToast | null }) {
+  useEffect(() => {
+    if (!flash) return;
+    toast[flash.kind](flash.message);
+  }, [flash]);
+  return null;
+}
+
+/** Keyed by pathname so filter changes inside a page do not replay the entrance. */
+function RouteTransition({ children }: { children: React.ReactNode }) {
+  const { pathname } = useLocation();
+  return (
+    <div key={pathname} className="route-enter">
+      {children}
+    </div>
+  );
+}
+
 export default function App({ loaderData }: Route.ComponentProps) {
   return (
-    <AppShell user={loaderData.user}>
-      <Outlet />
-    </AppShell>
+    <>
+      <FlashToasts flash={loaderData.toast} />
+      <AppShell user={loaderData.user}>
+        <RouteTransition>
+          <Outlet />
+        </RouteTransition>
+      </AppShell>
+    </>
   );
 }
 
