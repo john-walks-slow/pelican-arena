@@ -1,0 +1,36 @@
+/**
+ * Pelican Arena. One Worker serves both the main site and, on a separate
+ * registrable domain, the user-submitted pages (see workers/app.ts).
+ * https://developers.cloudflare.com/workers/wrangler/configuration/
+ */
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "pelican-arena",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": ["nodejs_compat"],
+	"main": "./workers/app.ts",
+	"vars": {
+		"APP_ORIGIN": "http://localhost:5173",
+		"USERCONTENT_ORIGIN": "http://127.0.0.1:5173",
+		"LINUXDO_CLIENT_ID": "",
+		"ADMIN_USERNAMES": ""
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "pelican-arena",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "drizzle"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "FILES",
+			"bucket_name": "pelican-arena-files"
+		}
+	],
+	"observability": {
+		"enabled": true
+	},
+	"upload_source_maps": true
+}

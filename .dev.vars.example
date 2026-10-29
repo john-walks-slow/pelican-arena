@@ -1,0 +1,2 @@
+SESSION_SECRET=dev-session-secret
+LINUXDO_CLIENT_SECRET=
