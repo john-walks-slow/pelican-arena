@@ -1,12 +1,13 @@
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/compare";
+import { Markdown } from "~/components/markdown";
 import { LiveFrame } from "~/components/page-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { origins } from "~/lib/origins.server";
 import { getPrompt, getSubmission } from "~/lib/queries.server";
-import { usercontentUrl } from "~/lib/sandbox";
+import { submissionUrl } from "~/lib/sandbox";
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [
   { title: `并排对比 · ${loaderData?.prompt.title ?? ""} · Pelican Arena` },
@@ -24,7 +25,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const prompt = await getPrompt(submissions[0].promptId);
   if (!prompt) throw data("Not Found", { status: 404 });
   return {
-    prompt: { id: prompt.id, title: prompt.title },
+    prompt: { id: prompt.id, title: prompt.title, kind: prompt.kind },
     submissions: submissions.filter((s) => s.promptId === prompt.id),
     usercontentOrigin: origins(request).usercontent,
   };
@@ -81,11 +82,25 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
                 </div>
               </div>
             </div>
-            <LiveFrame
-              src={usercontentUrl(usercontentOrigin, s.id)}
-              title={s.model.name}
-              className="h-[68vh] w-full bg-white"
-            />
+            {prompt.kind === "web" ? (
+              <LiveFrame
+                src={submissionUrl(usercontentOrigin, s.id, prompt.kind)}
+                title={s.model.name}
+                className="h-[68vh] w-full bg-white"
+              />
+            ) : prompt.kind === "svg" ? (
+              <div className="flex h-[68vh] items-center justify-center bg-white p-6">
+                <img
+                  src={submissionUrl(usercontentOrigin, s.id, prompt.kind)}
+                  alt={s.model.name}
+                  className="max-h-full max-w-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="h-[68vh] overflow-y-auto scroll-thin bg-white px-6 py-6">
+                <Markdown>{s.content ?? ""}</Markdown>
+              </div>
+            )}
           </section>
         ))}
       </div>

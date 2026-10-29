@@ -13,6 +13,7 @@ import { cn } from "~/lib/utils";
 export interface FilterOption {
   value: string;
   label: string;
+  count?: number;
 }
 
 /**
@@ -24,6 +25,7 @@ export function FilterSelect({
   value,
   options,
   onChange,
+  total,
   searchPlaceholder,
   className,
 }: {
@@ -31,6 +33,7 @@ export function FilterSelect({
   value: string;
   options: FilterOption[];
   onChange: (value: string) => void;
+  total?: number;
   searchPlaceholder?: string;
   className?: string;
 }) {
@@ -56,7 +59,7 @@ export function FilterSelect({
           <ChevronDown className="size-3 shrink-0 opacity-50" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-56 p-0" align="start">
+      <PopoverContent className="w-60 p-0" align="start">
         <Command loop>
           <CommandInput
             placeholder={searchPlaceholder ?? `搜索${label}`}
@@ -79,7 +82,8 @@ export function FilterSelect({
                 className={cn("mr-2 size-3.5", value ? "opacity-0" : "text-accent")}
                 strokeWidth={2.5}
               />
-              全部{label}
+              <span>全部{label}</span>
+              {total != null && <span className="num ml-auto pl-2 text-[11px] text-muted">{total}</span>}
             </CommandItem>
             {options.map((option) => (
               <CommandItem
@@ -100,6 +104,9 @@ export function FilterSelect({
                   strokeWidth={2.5}
                 />
                 <span className="truncate">{option.label}</span>
+                {option.count != null && (
+                  <span className="num ml-auto pl-2 text-[11px] text-muted">{option.count}</span>
+                )}
               </CommandItem>
             ))}
           </CommandList>

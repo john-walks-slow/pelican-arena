@@ -7,6 +7,7 @@ import {
   text,
 } from "drizzle-orm/sqlite-core";
 import type { BundleFile } from "~/lib/bundle";
+import { PROMPT_KINDS } from "../lib/kinds";
 import type { LogMeta } from "~/lib/session-log";
 
 const createdAt = () =>
@@ -37,12 +38,16 @@ export const prompts = sqliteTable(
       .references(() => users.id),
     title: text("title").notNull(),
     body: text("body").notNull(),
+    kind: text("kind", { enum: PROMPT_KINDS }).notNull().default("web"),
     status: text("status", { enum: ["active", "hidden"] })
       .notNull()
       .default("active"),
     createdAt: createdAt(),
   },
-  (t) => [index("prompts_created_idx").on(t.createdAt)],
+  (t) => [
+    index("prompts_created_idx").on(t.createdAt),
+    index("prompts_kind_created_idx").on(t.kind, t.createdAt),
+  ],
 );
 
 /** Catalog tables share one shape: a slug id derived from the display name. */
@@ -82,6 +87,8 @@ export const submissions = sqliteTable(
     files: text("files", { mode: "json" }).$type<BundleFile[]>().notNull(),
     totalBytes: integer("total_bytes").notNull(),
     notes: text("notes"),
+    /** Full Markdown source, kept in D1 so galleries and detail pages render without R2 reads. */
+    content: text("content"),
     logMeta: text("log_meta", { mode: "json" }).$type<LogMeta>(),
     hasRawLog: integer("has_raw_log", { mode: "boolean" })
       .notNull()
@@ -94,6 +101,9 @@ export const submissions = sqliteTable(
   (t) => [
     index("submissions_prompt_idx").on(t.promptId),
     index("submissions_author_idx").on(t.authorId, t.createdAt),
+    index("submissions_model_idx").on(t.modelId),
+    index("submissions_provider_idx").on(t.providerId),
+    index("submissions_harness_idx").on(t.harnessId),
   ],
 );
 
@@ -107,7 +117,10 @@ export const submissionMods = sqliteTable(
       .notNull()
       .references(() => mods.id),
   },
-  (t) => [primaryKey({ columns: [t.submissionId, t.modId] })],
+  (t) => [
+    primaryKey({ columns: [t.submissionId, t.modId] }),
+    index("submission_mods_mod_idx").on(t.modId),
+  ],
 );
 
 export const ratings = sqliteTable(

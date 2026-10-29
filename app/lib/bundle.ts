@@ -1,4 +1,5 @@
 import { unzipSync } from "fflate";
+import { KIND_META, type PromptKind } from "./kinds";
 
 export interface BundleFile {
   path: string;
@@ -16,7 +17,14 @@ export const BUNDLE_LIMITS = {
   totalBytes: 10 * 1024 * 1024,
   maxFiles: 200,
   zipBytes: 10 * 1024 * 1024,
+  markdownBytes: 300 * 1024,
+  svgBytes: 2 * 1024 * 1024,
 };
+
+export function singleFileLimit(kind: PromptKind) {
+  if (kind === "markdown") return BUNDLE_LIMITS.markdownBytes;
+  return BUNDLE_LIMITS.htmlBytes;
+}
 
 export const ENTRY_FILE = "index.html";
 
@@ -28,7 +36,7 @@ const CONTENT_TYPES: Record<string, string> = {
   mjs: "text/javascript; charset=utf-8",
   json: "application/json; charset=utf-8",
   txt: "text/plain; charset=utf-8",
-  md: "text/plain; charset=utf-8",
+  md: "text/markdown; charset=utf-8",
   csv: "text/csv; charset=utf-8",
   xml: "application/xml; charset=utf-8",
   svg: "image/svg+xml",
@@ -94,7 +102,7 @@ export class BundleError extends Error {}
  * Validates and normalizes bundle entries. Runs in the browser before upload
  * and again on the server, so both sides agree on what a valid bundle is.
  */
-export function buildBundle(entries: BundleEntry[]): BundleEntry[] {
+export function buildBundle(entries: BundleEntry[], kind: PromptKind = "web"): BundleEntry[] {
   const paths = new Map<string, Uint8Array>();
   for (const entry of entries) {
     const path = normalizePath(entry.path);
@@ -110,15 +118,25 @@ export function buildBundle(entries: BundleEntry[]): BundleEntry[] {
     data,
   }));
 
-  if (!files.some((f) => f.path === ENTRY_FILE)) {
-    throw new BundleError("缺少入口文件 index.html");
+  const entry = KIND_META[kind].entry;
+  if (!files.some((f) => f.path === entry)) {
+    throw new BundleError(`缺少入口文件 ${entry}`);
   }
-  if (files.length > BUNDLE_LIMITS.maxFiles) {
-    throw new BundleError(`文件数超过 ${BUNDLE_LIMITS.maxFiles} 个`);
-  }
-  const total = files.reduce((sum, f) => sum + f.data.byteLength, 0);
-  if (total > BUNDLE_LIMITS.totalBytes) {
-    throw new BundleError(`总大小超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`);
+  if (kind === "web") {
+    if (files.length > BUNDLE_LIMITS.maxFiles) {
+      throw new BundleError(`文件数超过 ${BUNDLE_LIMITS.maxFiles} 个`);
+    }
+    const total = files.reduce((sum, f) => sum + f.data.byteLength, 0);
+    if (total > BUNDLE_LIMITS.totalBytes) {
+      throw new BundleError(`总大小超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`);
+    }
+  } else {
+    if (files.length !== 1) {
+      throw new BundleError(`${KIND_META[kind].label} 只支持单个文件`);
+    }
+    if (files[0].data.byteLength > singleFileLimit(kind)) {
+      throw new BundleError(`文件超过 ${formatBytes(singleFileLimit(kind))}`);
+    }
   }
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
@@ -142,6 +160,21 @@ export function unzipBundle(zip: Uint8Array): BundleEntry[] {
     },
   });
   return Object.entries(unzipped).map(([path, data]) => ({ path, data }));
+}
+
+/** Reads a text-based work, rejecting invalid UTF-8 and empty or non-SVG bodies. */
+export function readTextBundle(kind: PromptKind, data: Uint8Array): string {
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(data);
+  } catch {
+    throw new BundleError("文件不是有效的 UTF-8 文本");
+  }
+  if (!text.trim()) throw new BundleError("文件内容为空");
+  if (kind === "svg" && !/<svg[\s>]/i.test(text)) {
+    throw new BundleError("文件里没有找到 <svg> 根元素");
+  }
+  return text;
 }
 
 export function describeBundle(files: BundleEntry[]): BundleFile[] {

@@ -1,6 +1,5 @@
 import { Check, Copy } from "lucide-react";
-import { useState } from "react";
-import { toast } from "~/components/ui/toaster";
+import { useRef, useState } from "react";
 import { LOG_SOURCE_LABELS, type LogSource } from "~/lib/session-log";
 
 interface HelpRow {
@@ -78,21 +77,34 @@ function CodeValue({ value }: { value: string }) {
 
 function CopyRow({ label, value }: HelpRow) {
   const [copied, setCopied] = useState(false);
+  const [status, setStatus] = useState("");
+  const codeRef = useRef<HTMLElement>(null);
 
   async function copy() {
     try {
       await navigator.clipboard.writeText(value);
       setCopied(true);
+      setStatus("已复制");
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      toast.error("复制失败，请手动选择文本");
+      const range = document.createRange();
+      if (codeRef.current) {
+        range.selectNodeContents(codeRef.current);
+        const selection = window.getSelection();
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
+      setStatus("复制失败，已选中文本");
     }
   }
 
   return (
     <div className="flex items-start gap-2">
       <span className="w-14 shrink-0 pt-px text-[11px] text-muted">{label}</span>
-      <code className="min-w-0 flex-1 font-mono text-[11px] leading-relaxed break-words select-all">
+      <code
+        ref={codeRef}
+        className="min-w-0 flex-1 font-mono text-[11px] leading-relaxed break-words select-all"
+      >
         <CodeValue value={value} />
       </code>
       <button
@@ -107,6 +119,9 @@ function CopyRow({ label, value }: HelpRow) {
           <Copy className="size-3.5" strokeWidth={1.75} />
         )}
       </button>
+      <span role="status" className="sr-only">
+        {status}
+      </span>
     </div>
   );
 }

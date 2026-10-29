@@ -1,4 +1,4 @@
-import { ArrowLeft, Check, FileArchive, FileCode2, FileText, Plus, Upload, X } from "lucide-react";
+import { ArrowLeft, FileArchive, FileCode2, FileText, Upload, X } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { data, Link, redirect, useFetcher } from "react-router";
 import type { Route } from "./+types/submit";
@@ -12,13 +12,17 @@ import {
   buildBundle,
   BundleError,
   BUNDLE_LIMITS,
-  ENTRY_FILE,
   formatBytes,
+  readTextBundle,
+  singleFileLimit,
   unzipBundle,
   type BundleEntry,
 } from "~/lib/bundle";
+import type { CatalogEntry } from "~/lib/catalog";
 import { formatCount, formatDuration, REASONING_LABELS } from "~/lib/format";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
+import { KIND_META, type PromptKind } from "~/lib/kinds";
+import { flashToast } from "~/lib/session.server";
 import { matchModel } from "~/lib/model-match";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
 import { LOG_SOURCE_LABELS, LogParseError, totalTokens, type LogMeta } from "~/lib/session-log";
@@ -34,7 +38,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   await requirePermission(request, "submit");
   const prompt = await getPrompt(params.promptId);
   if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
-  return { prompt: { id: prompt.id, title: prompt.title }, catalog: await getCatalog() };
+  return {
+    prompt: { id: prompt.id, title: prompt.title, kind: prompt.kind },
+    catalog: await getCatalog(),
+  };
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -60,11 +67,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     const id = await createSubmission({
       promptId: prompt.id,
       authorId: user.id,
+      kind: prompt.kind,
       entries,
       meta,
       rawLog: rawLogFile,
     });
-    return redirect(`/s/${id}`);
+    return redirect(`/s/${id}`, {
+      headers: { "Set-Cookie": await flashToast(request, "已提交，感谢你的参与") },
+    });
   } catch (e) {
     if (e instanceof BundleError) return data({ error: e.message }, { status: 400 });
     throw e;
@@ -73,7 +83,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
 type Source = { kind: "file"; name: string; entries: BundleEntry[] } | { kind: "paste" };
 
-function useBundleSource() {
+function useBundleSource(kind: PromptKind) {
   const [source, setSource] = useState<Source | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -81,15 +91,22 @@ function useBundleSource() {
     setError(null);
     try {
       const bytes = new Uint8Array(await file.arrayBuffer());
-      const isZip = file.name.toLowerCase().endsWith(".zip");
-      if (!isZip && file.size > BUNDLE_LIMITS.htmlBytes) {
-        throw new BundleError(`HTML 文件超过 ${formatBytes(BUNDLE_LIMITS.htmlBytes)}`);
+      const isZip = kind === "web" && file.name.toLowerCase().endsWith(".zip");
+      if (!isZip && file.size > singleFileLimit(kind)) {
+        throw new BundleError(`文件超过 ${formatBytes(singleFileLimit(kind))}`);
       }
-      const entries = buildBundle(isZip ? unzipBundle(bytes) : [{ path: ENTRY_FILE, data: bytes }]);
+      let entries: BundleEntry[];
+      if (isZip) {
+        entries = buildBundle(unzipBundle(bytes), kind);
+      } else {
+        const entry = KIND_META[kind].entry;
+        if (kind !== "web") readTextBundle(kind, bytes);
+        entries = buildBundle([{ path: entry, data: bytes }], kind);
+      }
       setSource({ kind: "file", name: file.name, entries });
     } catch (e) {
       setSource(null);
-      setError(e instanceof BundleError ? e.message : "无法读取文件，请确认是 HTML 或 zip");
+      setError(e instanceof BundleError ? e.message : "无法读取文件，请确认格式");
     }
   }
 
@@ -98,20 +115,23 @@ function useBundleSource() {
 
 function BundlePicker({
   bundle,
-  html,
-  setHtml,
+  kind,
+  text,
+  setText,
 }: {
   bundle: ReturnType<typeof useBundleSource>;
-  html: string;
-  setHtml: (v: string) => void;
+  kind: PromptKind;
+  text: string;
+  setText: (v: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const { source, setSource, error, pickFile } = bundle;
+  const meta = KIND_META[kind];
 
   if (source?.kind === "file") {
     const total = source.entries.reduce((s, e) => s + e.data.byteLength, 0);
-    const Icon = source.entries.length > 1 ? FileArchive : FileCode2;
+    const Icon = kind !== "web" ? FileText : source.entries.length > 1 ? FileArchive : FileCode2;
     return (
       <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
@@ -150,11 +170,11 @@ function BundlePicker({
     return (
       <div>
         <Textarea
-          value={html}
-          onChange={(e) => setHtml(e.target.value)}
-          rows={10}
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={12}
           className="font-mono text-xs leading-relaxed"
-          placeholder="<!DOCTYPE html>…"
+          placeholder={meta.placeholder}
           spellCheck={false}
           autoFocus
         />
@@ -162,11 +182,15 @@ function BundlePicker({
           <button type="button" className="hover:text-ink" onClick={() => setSource(null)}>
             改为上传文件
           </button>
-          <span className="num">{formatBytes(new Blob([html]).size)}</span>
+          <span className="num">{formatBytes(new Blob([text]).size)}</span>
         </div>
       </div>
     );
   }
+
+  const pasteLabel =
+    kind === "markdown" ? "Markdown" : kind === "svg" ? "SVG 源码" : "HTML 源码";
+  const uploadLabel = kind === "web" ? "HTML / zip" : `.${meta.extension}`;
 
   return (
     <div>
@@ -191,14 +215,16 @@ function BundlePicker({
         }`}
       >
         <Upload className="size-4 text-muted" strokeWidth={1.75} />
-        <div className="text-sm font-medium">拖入或选择 HTML / zip</div>
+        <div className="text-sm font-medium">拖入或选择 {uploadLabel}</div>
         <div className="text-xs text-muted">
-          zip 需包含 index.html，解压后不超过 {formatBytes(BUNDLE_LIMITS.totalBytes)}
+          {kind === "web"
+            ? `zip 需包含 index.html，解压后不超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`
+            : `单个文件，不超过 ${formatBytes(singleFileLimit(kind))}`}
         </div>
         <input
           ref={inputRef}
           type="file"
-          accept=".html,.htm,.zip,text/html,application/zip"
+          accept={meta.accept}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -212,7 +238,7 @@ function BundlePicker({
         className="mt-1.5 text-xs text-muted hover:text-ink"
         onClick={() => setSource({ kind: "paste" })}
       >
-        或者直接粘贴 HTML 源码
+        或者直接粘贴 {pasteLabel}
       </button>
       {error && <p className="mt-1 text-xs text-negative">{error}</p>}
     </div>
@@ -251,17 +277,29 @@ function Section({ title, hint, children }: { title: string; hint?: string; chil
   );
 }
 
+async function resolveModelName(raw: string): Promise<CatalogEntry | null> {
+  try {
+    const res = await fetch(`/api/catalog?kind=models&resolve=${encodeURIComponent(raw)}`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as { match: CatalogEntry | null };
+    return data.match;
+  } catch {
+    return null;
+  }
+}
+
 export default function Submit({ loaderData }: Route.ComponentProps) {
   const { prompt, catalog } = loaderData;
-  const fetcher = useFetcher<typeof action>();
-  const bundle = useBundleSource();
-  const [html, setHtml] = useState("");
+  const kind = prompt.kind;
+  const meta = KIND_META[kind];
+  const fetcher = useFetcher<{ error: string }>();
+  const bundle = useBundleSource(kind);
+  const [text, setText] = useState("");
   const [model, setModel] = useState("");
   const [provider, setProvider] = useState("");
   const [harness, setHarness] = useState("");
   const [reasoning, setReasoning] = useState("");
   const [mods, setMods] = useState<string[]>([]);
-  const [customMod, setCustomMod] = useState("");
   const [log, setLog] = useState<{ file: File; meta: LogMeta } | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
   const [publishLog, setPublishLog] = useState(false);
@@ -283,7 +321,10 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
       const upload = new File([parsed.text], parsed.name, { type: "application/x-ndjson" });
       setLog({ file: upload, meta: logMeta });
       const raw = logMeta.models[0];
-      if (raw && !model) setModel(matchModel(raw, catalog.models)?.name ?? raw);
+      if (raw && !model) {
+        const match = matchModel(raw, catalog.models) ?? (await resolveModelName(raw));
+        setModel(match?.name ?? raw);
+      }
       const sourceHarness = LOG_SOURCE_LABELS[logMeta.source];
       if (!harness && catalog.harnesses.some((h) => h.name === sourceHarness)) setHarness(sourceHarness);
     } catch (e) {
@@ -295,7 +336,6 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   function addMod(name: string) {
     const clean = name.trim();
     if (clean && !mods.includes(clean)) setMods([...mods, clean]);
-    setCustomMod("");
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -305,10 +345,15 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
 
     let entries: BundleEntry[];
     try {
-      if (bundle.source?.kind === "file") entries = bundle.source.entries;
-      else if (bundle.source?.kind === "paste" && html.trim()) {
-        entries = buildBundle([{ path: ENTRY_FILE, data: new TextEncoder().encode(html) }]);
-      } else throw new BundleError("请上传或粘贴结果网页");
+      if (bundle.source?.kind === "file") {
+        entries = bundle.source.entries;
+      } else if (bundle.source?.kind === "paste" && text.trim()) {
+        const data = new TextEncoder().encode(text);
+        if (kind !== "web") readTextBundle(kind, data);
+        entries = buildBundle([{ path: meta.entry, data }], kind);
+      } else {
+        throw new BundleError(`请上传或粘贴${meta.resultTitle}`);
+      }
     } catch (err) {
       setClientError(err instanceof BundleError ? err.message : String(err));
       return;
@@ -337,8 +382,8 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
       <h1 className="mt-2 text-title font-bold tracking-tight">交答案</h1>
 
       <form onSubmit={onSubmit} className="mt-6 space-y-8">
-        <Section title="结果网页">
-          <BundlePicker bundle={bundle} html={html} setHtml={setHtml} />
+        <Section title={meta.resultTitle} hint={meta.hint}>
+          <BundlePicker bundle={bundle} kind={kind} text={text} setText={setText} />
         </Section>
 
         <Section title="生成信息">
@@ -346,19 +391,18 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
             <Combobox
               name={FIELDS.model}
               label="模型"
+              kind="models"
               options={catalog.models}
               value={model}
               onChange={setModel}
               placeholder="选择或输入模型"
               required
-              hint={
-                logModelHint &&
-                (logModelHint.match ? `日志记录：${logModelHint.raw}` : `日志记录：${logModelHint.raw}`)
-              }
+              hint={logModelHint && `日志记录：${logModelHint.raw}`}
             />
             <Combobox
               name={FIELDS.provider}
               label="提供方"
+              kind="providers"
               options={catalog.providers}
               value={provider}
               onChange={setProvider}
@@ -368,6 +412,7 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
             <Combobox
               name={FIELDS.harness}
               label="客户端"
+              kind="harnesses"
               options={catalog.harnesses}
               value={harness}
               onChange={setHarness}
@@ -415,30 +460,15 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                   </button>
                 );
               })}
-              <div className="inline-flex items-center gap-1">
-                <input
-                  value={customMod}
-                  onChange={(e) => setCustomMod(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      addMod(customMod);
-                    }
-                  }}
-                  placeholder="其他"
-                  maxLength={30}
-                  className="h-7 w-20 rounded-full border border-control px-2.5 text-xs placeholder:text-muted/60 focus:border-accent focus:outline-none"
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="添加增强"
-                  onClick={() => addMod(customMod)}
-                >
-                  <Plus className="size-3.5" strokeWidth={2} />
-                </Button>
-              </div>
+              <Combobox
+                options={catalog.mods}
+                kind="mods"
+                value=""
+                onChange={addMod}
+                placeholder="更多"
+                searchPlaceholder="搜索或新建增强"
+                className="w-24"
+              />
             </div>
             <p className="mt-1 text-xs text-muted">
               {mods.length === 0 ? "不选即为 vanilla。" : `已选 ${mods.length} 项`}

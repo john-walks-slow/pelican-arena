@@ -1,4 +1,15 @@
-import { and, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  gte,
+  inArray,
+  or,
+  sql,
+} from "drizzle-orm";
+import type { SQLiteColumn } from "drizzle-orm/sqlite-core";
 import { db } from "~/db/client.server";
 import {
   harnesses,
@@ -13,6 +24,8 @@ import {
 } from "~/db/schema";
 import type { Catalog, CatalogEntry, CatalogKind } from "./catalog";
 import { slugify } from "./ids";
+import type { PromptKind } from "./kinds";
+import { matchModel } from "./model-match";
 
 /** Gallery order shrinks stars toward a neutral 3 so one vote does not top the list. */
 const PRIOR_VOTES = 3;
@@ -22,16 +35,87 @@ const priorVotes = sql.raw(String(PRIOR_VOTES));
 
 const CATALOG_TABLES = { models, providers, harnesses, mods };
 
-export async function getCatalog(): Promise<Catalog> {
+/** Escapes LIKE wildcards so a literal "%" in a search does not match everything. */
+function likePattern(query: string) {
+  return `%${query.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
+}
+
+const nameLike = (column: SQLiteColumn, query: string) =>
+  sql`${column} like ${likePattern(query)} escape '\\'`;
+
+/** Popular entries only; the full catalog is searched remotely as the user types. */
+export async function searchCatalog(kind: CatalogKind, query = "", limit = 20) {
   const d = db();
+
+  if (kind === "mods") {
+    const [rows, [total]] = await Promise.all([
+      d
+        .select({ id: mods.id, name: mods.name, uses: count(submissions.id) })
+        .from(mods)
+        .leftJoin(submissionMods, eq(submissionMods.modId, mods.id))
+        .leftJoin(
+          submissions,
+          and(
+            eq(submissions.id, submissionMods.submissionId),
+            eq(submissions.status, "active"),
+          ),
+        )
+        .where(query ? nameLike(mods.name, query) : undefined)
+        .groupBy(mods.id, mods.name)
+        .orderBy(desc(count(submissions.id)), asc(mods.name))
+        .limit(limit),
+      d
+        .select({ n: count() })
+        .from(mods)
+        .where(query ? nameLike(mods.name, query) : undefined),
+    ]);
+    return { items: rows, total: total.n };
+  }
+
+  const table = kind === "models" ? models : kind === "providers" ? providers : harnesses;
+  const usedBy =
+    kind === "models"
+      ? submissions.modelId
+      : kind === "providers"
+        ? submissions.providerId
+        : submissions.harnessId;
+  const [rows, [total]] = await Promise.all([
+    d
+      .select({ id: table.id, name: table.name, uses: count(submissions.id) })
+      .from(table)
+      .leftJoin(
+        submissions,
+        and(eq(usedBy, table.id), eq(submissions.status, "active")),
+      )
+      .where(query ? nameLike(table.name, query) : undefined)
+      .groupBy(table.id, table.name)
+      .orderBy(desc(count(submissions.id)), asc(table.name))
+      .limit(limit),
+    d
+      .select({ n: count() })
+      .from(table)
+      .where(query ? nameLike(table.name, query) : undefined),
+  ]);
+  return { items: rows, total: total.n };
+}
+
+/** Finds the catalog model prefixing a raw log id; scans names once per submission form. */
+export async function resolveModel(rawId: string) {
+  const rows = await db().select({ id: models.id, name: models.name }).from(models);
+  return matchModel(rawId, rows);
+}
+
+/** Popular entries for the submit form, without pulling the whole catalog. */
+export async function getCatalog(): Promise<Catalog> {
   const [m, p, h, md] = await Promise.all(
-    (Object.keys(CATALOG_TABLES) as CatalogKind[]).map((kind) =>
-      d.select({ id: CATALOG_TABLES[kind].id, name: CATALOG_TABLES[kind].name })
-        .from(CATALOG_TABLES[kind])
-        .orderBy(CATALOG_TABLES[kind].name),
-    ),
+    (Object.keys(CATALOG_TABLES) as CatalogKind[]).map((kind) => searchCatalog(kind, "", 20)),
   );
-  return { models: m, providers: p, harnesses: h, mods: md };
+  return {
+    models: m.items.map(({ id, name }) => ({ id, name })),
+    providers: p.items.map(({ id, name }) => ({ id, name })),
+    harnesses: h.items.map(({ id, name }) => ({ id, name })),
+    mods: md.items.map(({ id, name }) => ({ id, name })),
+  };
 }
 
 /** Resolves a user-typed catalog name to an id, creating the entry when new. */
@@ -62,28 +146,91 @@ const author = {
   avatarTemplate: users.avatarTemplate,
 };
 
-export async function listPrompts(limit = 60) {
-  return db()
-    .select({
-      id: prompts.id,
-      title: prompts.title,
-      body: prompts.body,
-      createdAt: prompts.createdAt,
-      author,
-      submissions: sql<number>`(select count(*) from ${submissions} s where s.prompt_id = ${prompts.id} and s.status = 'active')`,
-      coverSubmissionId: sql<string | null>`(
-        select s.id from ${submissions} s
-        left join ${ratings} r on r.submission_id = s.id
-        where s.prompt_id = ${prompts.id} and s.status = 'active'
-        group by s.id
-        order by (coalesce(sum(r.stars), 0) + ${priorStars}) * 1.0 / (count(r.stars) + ${priorVotes}) desc, s.created_at desc
-        limit 1)`,
-    })
-    .from(prompts)
-    .innerJoin(users, eq(users.id, prompts.authorId))
-    .where(eq(prompts.status, "active"))
-    .orderBy(desc(prompts.createdAt))
-    .limit(limit);
+export type PromptSort = "new" | "answers" | "top";
+
+export interface PromptQuery {
+  q?: string;
+  kind?: PromptKind | null;
+  sort?: PromptSort;
+  page?: number;
+  limit?: number;
+}
+
+const PROMPT_PAGE_SIZE = 18;
+
+export async function listPrompts(query: PromptQuery = {}) {
+  const page = Math.max(1, Math.floor(query.page ?? 1));
+  const limit = query.limit ?? PROMPT_PAGE_SIZE;
+  const conditions = [eq(prompts.status, "active")];
+  if (query.kind) conditions.push(eq(prompts.kind, query.kind));
+  if (query.q) {
+    conditions.push(
+      or(nameLike(prompts.title, query.q), nameLike(prompts.body, query.q))!,
+    );
+  }
+  const where = and(...conditions);
+
+  const answerCount = sql<number>`(select count(*) from ${submissions} s where s.prompt_id = ${prompts.id} and s.status = 'active')`;
+  const coverOrder = sql`(coalesce(sum(r.stars), 0) + ${priorStars}) * 1.0 / (count(r.stars) + ${priorVotes}) desc, s.created_at desc`;
+  const coverId = sql<string | null>`(
+    select s.id from ${submissions} s
+    left join ${ratings} r on r.submission_id = s.id
+    where s.prompt_id = ${prompts.id} and s.status = 'active'
+    group by s.id
+    order by ${coverOrder}
+    limit 1)`;
+  const coverExcerpt = sql<string | null>`(
+    select substr(s.content, 1, 900) from ${submissions} s
+    left join ${ratings} r on r.submission_id = s.id
+    where s.prompt_id = ${prompts.id} and s.status = 'active'
+    group by s.id
+    order by ${coverOrder}
+    limit 1)`;
+  const promptStars = sql<number>`coalesce((
+    select sum(r.stars) from ${submissions} s
+    inner join ${ratings} r on r.submission_id = s.id
+    where s.prompt_id = ${prompts.id} and s.status = 'active'), 0)`;
+  const promptVotes = sql<number>`(
+    select count(*) from ${submissions} s
+    inner join ${ratings} r on r.submission_id = s.id
+    where s.prompt_id = ${prompts.id} and s.status = 'active')`;
+  const promptScore = sql<number>`(${promptStars} + ${priorStars}) * 1.0 / (${promptVotes} + ${priorVotes})`;
+
+  const order =
+    query.sort === "answers"
+      ? [desc(answerCount), desc(prompts.createdAt)]
+      : query.sort === "top"
+        ? [desc(promptScore), desc(prompts.createdAt)]
+        : [desc(prompts.createdAt)];
+
+  const [rows, [total]] = await Promise.all([
+    db()
+      .select({
+        id: prompts.id,
+        title: prompts.title,
+        body: prompts.body,
+        kind: prompts.kind,
+        createdAt: prompts.createdAt,
+        author,
+        submissions: answerCount,
+        coverSubmissionId: coverId,
+        coverExcerpt,
+      })
+      .from(prompts)
+      .innerJoin(users, eq(users.id, prompts.authorId))
+      .where(where)
+      .orderBy(...order)
+      .limit(limit)
+      .offset((page - 1) * limit),
+    db().select({ n: count() }).from(prompts).where(where),
+  ]);
+
+  return {
+    prompts: rows,
+    total: total.n,
+    page,
+    nextPage: page * limit < total.n ? page + 1 : null,
+  };
 }
 
 export async function getPrompt(id: string) {
@@ -92,6 +239,7 @@ export async function getPrompt(id: string) {
       id: prompts.id,
       title: prompts.title,
       body: prompts.body,
+      kind: prompts.kind,
       status: prompts.status,
       createdAt: prompts.createdAt,
       author,
@@ -107,7 +255,6 @@ export interface SubmissionFilters {
   provider?: string;
   harness?: string;
   mod?: string;
-  vanilla?: boolean;
 }
 
 export type SubmissionSort = "top" | "new";
@@ -119,6 +266,7 @@ const submissionColumns = {
   createdAt: submissions.createdAt,
   totalBytes: submissions.totalBytes,
   logMeta: submissions.logMeta,
+  excerpt: sql<string | null>`substr(${submissions.content}, 1, 1200)`,
   model: { id: models.id, name: models.name },
   provider: { id: providers.id, name: providers.name },
   harness: { id: harnesses.id, name: harnesses.name },
@@ -137,7 +285,18 @@ function submissionQuery() {
     .leftJoin(harnesses, eq(harnesses.id, submissions.harnessId));
 }
 
-
+function submissionConditions(promptId: string, filters: SubmissionFilters) {
+  const conditions = [eq(submissions.promptId, promptId), eq(submissions.status, "active")];
+  if (filters.model) conditions.push(eq(submissions.modelId, filters.model));
+  if (filters.provider) conditions.push(eq(submissions.providerId, filters.provider));
+  if (filters.harness) conditions.push(eq(submissions.harnessId, filters.harness));
+  if (filters.mod) {
+    conditions.push(
+      sql`exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id} and sm.mod_id = ${filters.mod})`,
+    );
+  }
+  return and(...conditions);
+}
 
 async function attachMods<T extends { id: string }>(rows: T[]) {
   if (rows.length === 0) return rows.map((r) => ({ ...r, mods: [] as CatalogEntry[] }));
@@ -152,31 +311,94 @@ async function attachMods<T extends { id: string }>(rows: T[]) {
   }));
 }
 
+const SUBMISSION_PAGE_SIZE = 24;
+
 export async function listSubmissions(
   promptId: string,
   filters: SubmissionFilters,
   sort: SubmissionSort,
+  page = 1,
+  limit = SUBMISSION_PAGE_SIZE,
 ) {
-  const conditions = [eq(submissions.promptId, promptId), eq(submissions.status, "active")];
-  if (filters.model) conditions.push(eq(submissions.modelId, filters.model));
-  if (filters.provider) conditions.push(eq(submissions.providerId, filters.provider));
-  if (filters.harness) conditions.push(eq(submissions.harnessId, filters.harness));
-  if (filters.mod) {
-    conditions.push(
-      sql`exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id} and sm.mod_id = ${filters.mod})`,
-    );
-  }
-  if (filters.vanilla) {
-    conditions.push(
-      sql`not exists (select 1 from ${submissionMods} sm where sm.submission_id = ${submissions.id})`,
-    );
-  }
+  const where = submissionConditions(promptId, filters);
   const order =
     sort === "top"
-      ? [desc(sql`(${submissionColumns.starSum} + ${priorStars}) * 1.0 / (${submissionColumns.votes} + ${priorVotes})`), desc(submissions.createdAt)]
+      ? [
+          desc(
+            sql`(${submissionColumns.starSum} + ${priorStars}) * 1.0 / (${submissionColumns.votes} + ${priorVotes})`,
+          ),
+          desc(submissions.createdAt),
+        ]
       : [desc(submissions.createdAt)];
-  const rows = await submissionQuery().where(and(...conditions)).orderBy(...order).limit(200);
-  return attachMods(rows);
+  const [rows, [total]] = await Promise.all([
+    submissionQuery()
+      .where(where)
+      .orderBy(...order)
+      .limit(limit)
+      .offset((page - 1) * limit),
+    db().select({ n: count() }).from(submissions).where(where),
+  ]);
+  return {
+    submissions: await attachMods(rows),
+    total: total.n,
+    page,
+    nextPage: page * limit < total.n ? page + 1 : null,
+  };
+}
+
+export interface FacetEntry extends CatalogEntry {
+  count: number;
+}
+
+export interface PromptFacets {
+  models: FacetEntry[];
+  providers: FacetEntry[];
+  harnesses: FacetEntry[];
+  mods: FacetEntry[];
+}
+
+/** Only entries that actually appear under this prompt, so filter lists stay bounded. */
+export async function getPromptFacets(promptId: string): Promise<PromptFacets> {
+  const d = db();
+  const active = and(eq(submissions.promptId, promptId), eq(submissions.status, "active"));
+
+  const [m, p, h, md] = await Promise.all([
+    d
+      .select({ id: models.id, name: models.name, count: count(submissions.id) })
+      .from(submissions)
+      .innerJoin(models, eq(models.id, submissions.modelId))
+      .where(active)
+      .groupBy(models.id, models.name)
+      .orderBy(desc(count(submissions.id)), asc(models.name))
+      .limit(500),
+    d
+      .select({ id: providers.id, name: providers.name, count: count(submissions.id) })
+      .from(submissions)
+      .innerJoin(providers, eq(providers.id, submissions.providerId))
+      .where(active)
+      .groupBy(providers.id, providers.name)
+      .orderBy(desc(count(submissions.id)), asc(providers.name))
+      .limit(500),
+    d
+      .select({ id: harnesses.id, name: harnesses.name, count: count(submissions.id) })
+      .from(submissions)
+      .innerJoin(harnesses, eq(harnesses.id, submissions.harnessId))
+      .where(active)
+      .groupBy(harnesses.id, harnesses.name)
+      .orderBy(desc(count(submissions.id)), asc(harnesses.name))
+      .limit(500),
+    d
+      .select({ id: mods.id, name: mods.name, count: count(submissions.id) })
+      .from(submissions)
+      .innerJoin(submissionMods, eq(submissionMods.submissionId, submissions.id))
+      .innerJoin(mods, eq(mods.id, submissionMods.modId))
+      .where(active)
+      .groupBy(mods.id, mods.name)
+      .orderBy(desc(count(submissions.id)), asc(mods.name))
+      .limit(500),
+  ]);
+
+  return { models: m, providers: p, harnesses: h, mods: md };
 }
 
 export async function getSubmission(id: string) {
@@ -187,6 +409,7 @@ export async function getSubmission(id: string) {
     .select({
       files: submissions.files,
       notes: submissions.notes,
+      content: submissions.content,
       hasRawLog: submissions.hasRawLog,
       status: submissions.status,
       authorId: submissions.authorId,

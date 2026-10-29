@@ -1,8 +1,16 @@
 import { env } from "cloudflare:workers";
 import { db } from "~/db/client.server";
 import { submissionMods, submissions } from "~/db/schema";
-import { buildBundle, BUNDLE_LIMITS, contentTypeFor, describeBundle, type BundleEntry } from "./bundle";
+import {
+  buildBundle,
+  BUNDLE_LIMITS,
+  contentTypeFor,
+  describeBundle,
+  readTextBundle,
+  type BundleEntry,
+} from "./bundle";
 import { newId } from "./ids";
+import type { PromptKind } from "./kinds";
 import { ensureCatalogEntry } from "./queries.server";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
@@ -26,11 +34,14 @@ export async function readBundleEntries(form: FormData): Promise<BundleEntry[]> 
 export async function createSubmission(input: {
   promptId: string;
   authorId: number;
+  kind: PromptKind;
   entries: BundleEntry[];
   meta: SubmissionMeta;
   rawLog: File | null;
 }) {
-  const files = buildBundle(input.entries);
+  const files = buildBundle(input.entries, input.kind);
+  const text = input.kind === "web" ? null : readTextBundle(input.kind, files[0].data);
+  const content = input.kind === "markdown" ? text : null;
   const id = newId(14);
   const { meta } = input;
 
@@ -66,6 +77,7 @@ export async function createSubmission(input: {
     files: manifest,
     totalBytes: manifest.reduce((s, f) => s + f.size, 0),
     notes: meta.notes,
+    content,
     logMeta: meta.logMeta,
     hasRawLog: Boolean(input.rawLog),
   });
