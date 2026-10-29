@@ -6,9 +6,8 @@ import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { Button } from "~/components/ui/button";
-import { FilterSelect } from "~/components/ui/filter-select";
 import { Input } from "~/components/ui/input";
-import { SortSelect } from "~/components/ui/sort-select";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { formatRelative } from "~/lib/format";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
@@ -187,15 +186,17 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <div className="mt-6 flex flex-wrap items-center gap-2">
         <SearchField value={q} onCommit={commitQuery} />
 
-        <FilterSelect
-          label="类型"
-          value={kind ?? ""}
-          options={PROMPT_KINDS.map((value) => ({
-            value,
-            label: KIND_META[value].label,
-          }))}
-          onChange={(value) => update("kind", value || null)}
-          searchable={false}
+        <CompactSelect
+          label="作品类型"
+          value={kind ?? "all"}
+          options={[
+            { value: "all", label: "全部类型" },
+            ...PROMPT_KINDS.map((value) => ({
+              value,
+              label: KIND_META[value].label,
+            })),
+          ]}
+          onChange={(value) => update("kind", value === "all" ? null : value)}
         />
 
         <div className="ml-auto flex items-center gap-1.5">
@@ -209,7 +210,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               清除
             </Button>
           )}
-          <SortSelect
+          <CompactSelect
+            label="排序"
             value={sort}
             onChange={(value) => update("sort", value === "new" ? null : value)}
             options={[

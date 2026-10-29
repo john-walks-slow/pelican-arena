@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Check, ChevronsUpDown, Loader2, Plus } from "lucide-react";
+import { Check, ChevronDown, Loader2, Plus } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import {
   Command,
@@ -117,7 +117,12 @@ export function Combobox({
             )}
           >
             <span className="truncate">{displayLabel}</span>
-            <ChevronsUpDown className="ml-2 size-3.5 shrink-0 opacity-50" />
+            <ChevronDown
+              className={cn(
+                "ml-2 size-3.5 shrink-0 opacity-50 transition-transform duration-200 motion-reduce:transition-none",
+                open && "rotate-180",
+              )}
+            />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">

@@ -7,23 +7,23 @@ import {
 } from "~/components/ui/select";
 import { cn } from "~/lib/utils";
 
-export interface SortOption {
+export interface CompactSelectOption {
   value: string;
   label: string;
 }
 
-/** Compact sort dropdown, visually aligned with FilterSelect. */
-export function SortSelect({
+/** Small select used for toolbars; matches the filter trigger styling. */
+export function CompactSelect({
   value,
   options,
   onChange,
-  label = "排序",
+  label,
   className,
 }: {
   value: string;
-  options: SortOption[];
+  options: CompactSelectOption[];
   onChange: (value: string) => void;
-  label?: string;
+  label: string;
   className?: string;
 }) {
   return (

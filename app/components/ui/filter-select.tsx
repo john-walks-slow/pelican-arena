@@ -58,7 +58,12 @@ export function FilterSelect({
           )}
         >
           <span className="max-w-40 truncate">{current?.label ?? label}</span>
-          <ChevronDown className="size-3.5 shrink-0 opacity-50" />
+          <ChevronDown
+            className={cn(
+              "size-3.5 shrink-0 opacity-50 transition-transform duration-200 motion-reduce:transition-none",
+              open && "rotate-180",
+            )}
+          />
         </button>
       </PopoverTrigger>
       <PopoverContent className="w-60 p-0" align="start">

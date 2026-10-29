@@ -10,7 +10,7 @@ import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
 import { FilterSelect } from "~/components/ui/filter-select";
-import { SortSelect } from "~/components/ui/sort-select";
+import { CompactSelect } from "~/components/ui/compact-select";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
 import { KIND_META } from "~/lib/kinds";
@@ -136,7 +136,8 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
             清除
           </Button>
         )}
-        <SortSelect
+        <CompactSelect
+          label="排序"
           value={sort}
           onChange={(v) => set("sort", v === "top" ? null : v)}
           options={[
