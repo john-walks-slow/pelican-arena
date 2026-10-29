@@ -423,12 +423,15 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
                 思考强度
               </label>
               <input type="hidden" name={FIELDS.reasoning} value={reasoning} />
-              <Select value={reasoning || "unknown"} onValueChange={(v) => setReasoning(v === "unknown" ? "" : v)}>
-                <SelectTrigger id="reasoning">
+              <Select
+                value={reasoning || "default"}
+                onValueChange={(v) => setReasoning(v === "default" ? "" : v)}
+              >
+                <SelectTrigger id="reasoning" className="h-8 px-2.5">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unknown">未知</SelectItem>
+                  <SelectItem value="default">默认</SelectItem>
                   {REASONING_LEVELS.map((r) => (
                     <SelectItem key={r} value={r}>
                       {REASONING_LABELS[r]}

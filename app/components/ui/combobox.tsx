@@ -128,16 +128,14 @@ export function Combobox({
               onValueChange={setQuery}
             />
             <CommandList>
-              <CommandEmpty className="px-3 py-3 text-center text-sm text-muted">
-                {loading ? "搜索中…" : emptyText}
+              <CommandEmpty
+                className={cn(
+                  "px-3 py-3 text-center text-sm text-muted",
+                  loading && "hidden",
+                )}
+              >
+                {emptyText}
               </CommandEmpty>
-
-              {loading && (
-                <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-muted">
-                  <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
-                  搜索中
-                </div>
-              )}
 
               {showSelected && (
                 <CommandGroup heading="当前">
@@ -171,7 +169,7 @@ export function Combobox({
                 </CommandGroup>
               )}
 
-              <CommandGroup heading="目录">
+              <CommandGroup>
                 {list.map((option) => {
                   const isSelected = value.toLowerCase() === option.name.toLowerCase();
                   return (
@@ -195,6 +193,13 @@ export function Combobox({
                   );
                 })}
               </CommandGroup>
+
+              {loading && (
+                <div className="flex items-center gap-2 px-3 py-2 text-xs text-muted">
+                  <Loader2 className="size-3.5 animate-spin" strokeWidth={2} />
+                  搜索中
+                </div>
+              )}
             </CommandList>
             {kind && total > list.length && (
               <p className="border-t border-rule px-3 py-1.5 text-[11px] text-muted">

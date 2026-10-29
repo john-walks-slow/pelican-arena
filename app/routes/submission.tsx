@@ -241,7 +241,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <MetaRow label="模型">{s.model.name}</MetaRow>
               <MetaRow label="提供方">{s.provider.name}</MetaRow>
               <MetaRow label="客户端">{s.harness?.name ?? "—"}</MetaRow>
-              <MetaRow label="思考强度">{s.reasoning ? REASONING_LABELS[s.reasoning] : "—"}</MetaRow>
+              <MetaRow label="思考强度">{s.reasoning ? REASONING_LABELS[s.reasoning] : "默认"}</MetaRow>
               <MetaRow label="增强">
                 <span className="inline-flex flex-wrap justify-end gap-1">
                   <ModTags mods={s.mods} />

@@ -37,7 +37,11 @@ export function formatStars(starSum: number, votes: number) {
 
 export const REASONING_LABELS = {
   off: "不思考",
+  minimal: "最低",
   low: "低",
   medium: "中",
   high: "高",
+  xhigh: "极高",
+  max: "最高",
+  auto: "自动",
 } as const;

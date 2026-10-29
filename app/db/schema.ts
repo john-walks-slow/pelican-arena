@@ -63,7 +63,16 @@ export const providers = catalog("providers");
 export const harnesses = catalog("harnesses");
 export const mods = catalog("mods");
 
-export const REASONING_LEVELS = ["off", "low", "medium", "high"] as const;
+export const REASONING_LEVELS = [
+  "off",
+  "minimal",
+  "low",
+  "medium",
+  "high",
+  "xhigh",
+  "max",
+  "auto",
+] as const;
 export type ReasoningLevel = (typeof REASONING_LEVELS)[number];
 
 export const submissions = sqliteTable(
