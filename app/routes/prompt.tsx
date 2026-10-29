@@ -47,7 +47,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     listSubmissions(prompt.id, filters, sort),
     getCatalog(),
   ]);
-  return { prompt, submissions, catalog, usercontentOrigin: origins().usercontent };
+  return { prompt, submissions, catalog, usercontentOrigin: origins(request).usercontent };
 }
 
 function FilterBar({ catalog }: { catalog: Route.ComponentProps["loaderData"]["catalog"] }) {

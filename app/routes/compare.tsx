@@ -26,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return {
     prompt: { id: prompt.id, title: prompt.title },
     submissions: submissions.filter((s) => s.promptId === prompt.id),
-    usercontentOrigin: origins().usercontent,
+    usercontentOrigin: origins(request).usercontent,
   };
 }
 

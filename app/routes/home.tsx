@@ -24,9 +24,9 @@ export const meta: Route.MetaFunction = () => [
   },
 ];
 
-export async function loader() {
+export async function loader({ request }: Route.LoaderArgs) {
   const [prompts, stats] = await Promise.all([listPrompts(), siteStats()]);
-  return { prompts, stats, usercontentOrigin: origins().usercontent };
+  return { prompts, stats, usercontentOrigin: origins(request).usercontent };
 }
 
 export default function Home({ loaderData }: Route.ComponentProps) {

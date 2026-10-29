@@ -49,7 +49,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     submission,
     prompt: { id: prompt.id, title: prompt.title, body: prompt.body },
     myRating,
-    usercontentOrigin: origins().usercontent,
+    usercontentOrigin: origins(request).usercontent,
   };
 }
 
