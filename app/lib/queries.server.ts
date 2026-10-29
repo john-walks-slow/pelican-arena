@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   inArray,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -174,7 +175,7 @@ export async function listPrompts(query: PromptQuery = {}) {
   }
   const where = and(...conditions);
 
-  const answerCount = sql<number>`(select count(*) from ${submissions} s where s.prompt_id = ${prompts.id} and s.status = 'active')`;
+  const answerCount = sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id and s.status = 'active')`;
   const coverOrder = sql`(coalesce(sum(r.stars), 0) + ${priorStars}) * 1.0 / (count(r.stars) + ${priorVotes}) desc, s.created_at desc`;
   const coverId = sql<string | null>`(
     select s.id from ${submissions} s
@@ -193,11 +194,11 @@ export async function listPrompts(query: PromptQuery = {}) {
   const promptStars = sql<number>`coalesce((
     select sum(r.stars) from ${submissions} s
     inner join ${ratings} r on r.submission_id = s.id
-    where s.prompt_id = ${prompts.id} and s.status = 'active'), 0)`;
+    where s.prompt_id = prompts.id and s.status = 'active'), 0)`;
   const promptVotes = sql<number>`(
     select count(*) from ${submissions} s
     inner join ${ratings} r on r.submission_id = s.id
-    where s.prompt_id = ${prompts.id} and s.status = 'active')`;
+    where s.prompt_id = prompts.id and s.status = 'active')`;
   const promptScore = sql<number>`(${promptStars} + ${priorStars}) * 1.0 / (${promptVotes} + ${priorVotes})`;
   const lastActivityAt = sql<number>`coalesce((
     select max(s.created_at) from ${submissions} s
@@ -252,12 +253,169 @@ export async function getPrompt(id: string) {
       kind: prompts.kind,
       status: prompts.status,
       createdAt: prompts.createdAt,
+      updatedAt: prompts.updatedAt,
       author,
     })
     .from(prompts)
     .innerJoin(users, eq(users.id, prompts.authorId))
     .where(eq(prompts.id, id));
   return row ?? null;
+}
+
+/** Read model for the author's own prompt list. Includes hidden records. */
+export async function listOwnPrompts(authorId: number, page = 1, limit = 18) {
+  const answerCount = sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id and s.status = 'active')`;
+  const submissionCount = sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id)`;
+  const starSum = sql<number>`coalesce((select sum(r.stars) from ${submissions} s inner join ${ratings} r on r.submission_id = s.id where s.prompt_id = prompts.id and s.status = 'active'), 0)`;
+  const votes = sql<number>`(select count(*) from ${submissions} s inner join ${ratings} r on r.submission_id = s.id where s.prompt_id = prompts.id and s.status = 'active')`;
+  const where = eq(prompts.authorId, authorId);
+  const pageQuery = db()
+    .select({
+      id: prompts.id,
+      title: prompts.title,
+      kind: prompts.kind,
+      status: prompts.status,
+      createdAt: prompts.createdAt,
+      updatedAt: prompts.updatedAt,
+      answers: answerCount,
+      submissions: submissionCount,
+      starSum,
+      votes,
+    })
+    .from(prompts)
+    .where(where)
+    .orderBy(desc(prompts.createdAt))
+    .limit(limit)
+    .offset((page - 1) * limit);
+  const [rows, [total]] = await Promise.all([
+    pageQuery,
+    db().select({ n: count() }).from(prompts).where(where),
+  ]);
+  return {
+    prompts: rows,
+    total: total.n,
+    page,
+    nextPage: page * limit < total.n ? page + 1 : null,
+  };
+}
+
+/** Read model for the author's own answer list. Includes withdrawn answers. */
+export async function listOwnSubmissions(authorId: number, page = 1, limit = 24) {
+  const where = eq(submissions.authorId, authorId);
+  const [rows, [total]] = await Promise.all([
+    db()
+      .select({
+        id: submissions.id,
+        promptId: submissions.promptId,
+        promptTitle: prompts.title,
+        promptKind: prompts.kind,
+        promptStatus: prompts.status,
+        status: submissions.status,
+        createdAt: submissions.createdAt,
+        updatedAt: submissions.updatedAt,
+        excerpt: sql<string | null>`substr(${submissions.content}, 1, 900)`,
+        model: { id: models.id, name: models.name },
+        provider: { id: providers.id, name: providers.name },
+        starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = submissions.id), 0)`,
+        votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id)`,
+        otherVotes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id and r.user_id <> submissions.author_id)`,
+      })
+      .from(submissions)
+      .innerJoin(prompts, eq(prompts.id, submissions.promptId))
+      .innerJoin(models, eq(models.id, submissions.modelId))
+      .innerJoin(providers, eq(providers.id, submissions.providerId))
+      .where(where)
+      .orderBy(desc(submissions.createdAt))
+      .limit(limit)
+      .offset((page - 1) * limit),
+    db().select({ n: count() }).from(submissions).where(where),
+  ]);
+  return {
+    submissions: rows,
+    total: total.n,
+    page,
+    nextPage: page * limit < total.n ? page + 1 : null,
+  };
+}
+
+export async function ownContentCounts(authorId: number) {
+  const [[p], [s]] = await Promise.all([
+    db().select({ n: count() }).from(prompts).where(eq(prompts.authorId, authorId)),
+    db().select({ n: count() }).from(submissions).where(eq(submissions.authorId, authorId)),
+  ]);
+  return { prompts: p.n, submissions: s.n };
+}
+
+/** Everything the prompt edit page and the delete guard need. */
+export async function getPromptForEdit(id: string) {
+  const [row] = await db()
+    .select({
+      id: prompts.id,
+      authorId: prompts.authorId,
+      title: prompts.title,
+      body: prompts.body,
+      kind: prompts.kind,
+      status: prompts.status,
+      createdAt: prompts.createdAt,
+      updatedAt: prompts.updatedAt,
+      answers: sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id and s.status = 'active')`,
+      submissions: sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id)`,
+    })
+    .from(prompts)
+    .where(eq(prompts.id, id));
+  return row ?? null;
+}
+
+export async function countOtherRatings(submissionId: string, authorId: number) {
+  const [row] = await db()
+    .select({ n: count() })
+    .from(ratings)
+    .where(and(eq(ratings.submissionId, submissionId), ne(ratings.userId, authorId)));
+  return row.n;
+}
+
+export async function updatePrompt(input: {
+  id: string;
+  authorId: number;
+  title: string;
+  body: string;
+  kind: PromptKind;
+  locked: boolean;
+}) {
+  const set = input.locked
+    ? { title: input.title, updatedAt: new Date() }
+    : { title: input.title, body: input.body, kind: input.kind, updatedAt: new Date() };
+  const condition = input.locked
+    ? and(eq(prompts.id, input.id), eq(prompts.authorId, input.authorId))
+    : and(
+        eq(prompts.id, input.id),
+        eq(prompts.authorId, input.authorId),
+        sql`not exists (select 1 from ${submissions} where submissions.prompt_id = prompts.id and submissions.status = 'active')`,
+      );
+  const result = await db().update(prompts).set(set).where(condition);
+  return result.meta.changes > 0;
+}
+
+export type DeletePromptResult = "ok" | "not_found" | "forbidden" | "has_submissions";
+
+export async function deletePrompt(id: string, authorId: number): Promise<DeletePromptResult> {
+  const [row] = await db()
+    .select({ authorId: prompts.authorId })
+    .from(prompts)
+    .where(eq(prompts.id, id));
+  if (!row) return "not_found";
+  if (row.authorId !== authorId) return "forbidden";
+
+  const result = await db()
+    .delete(prompts)
+    .where(
+      and(
+        eq(prompts.id, id),
+        eq(prompts.authorId, authorId),
+        sql`not exists (select 1 from ${submissions} where submissions.prompt_id = prompts.id)`,
+      ),
+    );
+  return result.meta.changes > 0 ? "ok" : "has_submissions";
 }
 
 export interface SubmissionFilters {
@@ -274,6 +432,7 @@ const submissionColumns = {
   promptId: submissions.promptId,
   reasoning: submissions.reasoning,
   createdAt: submissions.createdAt,
+  updatedAt: submissions.updatedAt,
   totalBytes: submissions.totalBytes,
   logMeta: submissions.logMeta,
   excerpt: sql<string | null>`substr(${submissions.content}, 1, 1200)`,
@@ -281,8 +440,8 @@ const submissionColumns = {
   provider: { id: providers.id, name: providers.name },
   harness: { id: harnesses.id, name: harnesses.name },
   author,
-  votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = ${submissions.id})`,
-  starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = ${submissions.id}), 0)`,
+  votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id)`,
+  starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = submissions.id), 0)`,
 };
 
 function submissionQuery() {
@@ -457,7 +616,11 @@ export async function siteStats() {
   const [[p], [s], [r]] = await Promise.all([
     d.select({ n: count() }).from(prompts).where(eq(prompts.status, "active")),
     d.select({ n: count() }).from(submissions).where(eq(submissions.status, "active")),
-    d.select({ n: count() }).from(ratings),
+    d
+      .select({ n: count() })
+      .from(ratings)
+      .innerJoin(submissions, eq(submissions.id, ratings.submissionId))
+      .where(eq(submissions.status, "active")),
   ]);
   return { prompts: p.n, submissions: s.n, ratings: r.n };
 }

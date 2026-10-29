@@ -18,3 +18,8 @@ export async function dailyLimitError(user: User, kind: "submit" | "createPrompt
   const limit = DAILY_LIMITS[kind];
   return used >= limit ? `24 小时内最多${kind === "submit" ? "提交" : "出题"} ${limit} 次` : null;
 }
+
+/** Author-only actions bypass trust-level gates but never bypass ownership. */
+export function requireOwnership(user: User, authorId: number) {
+  if (user.id !== authorId) throw data("只能操作自己的内容", { status: 403 });
+}

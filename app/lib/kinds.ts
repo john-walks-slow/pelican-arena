@@ -10,7 +10,6 @@ interface KindMeta {
   accept: string;
   resultTitle: string;
   placeholder: string;
-  hint: string;
 }
 
 export const KIND_META: Record<PromptKind, KindMeta> = {
@@ -22,7 +21,6 @@ export const KIND_META: Record<PromptKind, KindMeta> = {
     accept: ".html,.htm,.zip,text/html,application/zip",
     resultTitle: "结果网页",
     placeholder: "Generate an SVG of a pelican riding a bicycle, as a single HTML page.",
-    hint: "写明输出要求，比如「单个 HTML 文件、不引用外部资源」。",
   },
   markdown: {
     label: "Markdown",
@@ -32,7 +30,6 @@ export const KIND_META: Record<PromptKind, KindMeta> = {
     accept: ".md,.markdown,.txt,text/markdown,text/plain",
     resultTitle: "Markdown 文档",
     placeholder: "写一篇介绍……的文章，使用 Markdown，保留小标题与代码块。",
-    hint: "写明输出要求，比如「用 Markdown 写完整回答，不要省略」。",
   },
   svg: {
     label: "SVG",
@@ -42,7 +39,6 @@ export const KIND_META: Record<PromptKind, KindMeta> = {
     accept: ".svg,image/svg+xml",
     resultTitle: "SVG 图片",
     placeholder: "Generate an SVG of a pelican riding a bicycle.",
-    hint: "写明输出要求，比如「单个 SVG，不引用外部资源」。",
   },
 };
 

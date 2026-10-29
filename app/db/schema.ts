@@ -43,6 +43,7 @@ export const prompts = sqliteTable(
       .notNull()
       .default("active"),
     createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     index("prompts_created_idx").on(t.createdAt),
@@ -106,6 +107,7 @@ export const submissions = sqliteTable(
       .notNull()
       .default("active"),
     createdAt: createdAt(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     index("submissions_prompt_idx").on(t.promptId),

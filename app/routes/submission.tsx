@@ -1,17 +1,19 @@
 import {
-  ArrowLeft,
   Code2,
   Download,
   ExternalLink,
   Eye,
   FileText,
   Maximize2,
+  Pencil,
+  Undo2,
 } from "lucide-react";
 import { useState } from "react";
-import { data, Link } from "react-router";
+import { data, Link, Outlet, redirect, useNavigation, useSearchParams, useSubmit } from "react-router";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
 import { Markdown } from "~/components/markdown";
+import { PageHeader } from "~/components/page-header";
 import { LiveFrame } from "~/components/page-preview";
 import { SourceViewer } from "~/components/source-viewer";
 import { StarRating } from "~/components/star-rating";
@@ -21,12 +23,22 @@ import { Button } from "~/components/ui/button";
 import { formatBytes } from "~/lib/bundle";
 import { KIND_META } from "~/lib/kinds";
 import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~/lib/format";
+import { backTarget, safeFrom, withFrom } from "~/lib/navigation";
 import { requirePermission } from "~/lib/guards.server";
 import { origins } from "~/lib/origins.server";
 import { can, denyReason } from "~/lib/permissions";
-import { clearRating, getPrompt, getSubmission, getUserRating, setRating } from "~/lib/queries.server";
+import {
+  clearRating,
+  countOtherRatings,
+  getPrompt,
+  getSubmission,
+  getUserRating,
+  setRating,
+} from "~/lib/queries.server";
 import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
-import { getUser } from "~/lib/session.server";
+import { flashToast, getUser, requireUser } from "~/lib/session.server";
+import { setSubmissionStatus } from "~/lib/submissions.server";
+import { ConfirmDialog } from "~/components/confirm-dialog";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
 import { useOptionalUser } from "~/lib/use-user";
 
@@ -47,21 +59,40 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const [prompt, user] = await Promise.all([getPrompt(submission.promptId), getUser(request)]);
   if (!prompt) throw data("Not Found", { status: 404 });
   const myRating = user ? await getUserRating(user.id, submission.id) : null;
+  const otherRatings =
+    user?.id === submission.authorId
+      ? await countOtherRatings(submission.id, submission.authorId)
+      : 0;
   return {
     submission,
     prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
     myRating,
+    otherRatings,
     usercontentOrigin: origins(request).usercontent,
   };
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
+  const form = await request.formData();
+  if (form.get("intent") === "withdraw") {
+    const user = await requireUser(request);
+    const submission = await getSubmission(params.submissionId);
+    if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
+    const result = await setSubmissionStatus(submission.id, user.id, "hidden");
+    if (result !== "ok") throw data("只能撤回自己的答案", { status: 403 });
+    const from =
+      safeFrom(String(form.get("from") ?? "")) ??
+      safeFrom(new URL(request.url).searchParams.get("from"));
+    return redirect(from ?? `/p/${submission.promptId}`, {
+      headers: { "Set-Cookie": await flashToast(request, "答案已撤回") },
+    });
+  }
+
   const user = await requirePermission(request, "rate");
   const submission = await getSubmission(params.submissionId);
   if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
   if (submission.authorId === user.id) throw data("不能给自己的答案打分", { status: 403 });
 
-  const form = await request.formData();
   const stars = Number(form.get("stars"));
   if (stars === 0) await clearRating(user.id, submission.id);
   else if (Number.isInteger(stars) && stars >= 1 && stars <= 5) await setRating(user.id, submission.id, stars);
@@ -100,13 +131,25 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
 }
 
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
-  const { submission: s, prompt, myRating, usercontentOrigin } = loaderData;
+  const { submission: s, prompt, myRating, otherRatings, usercontentOrigin } = loaderData;
   const user = useOptionalUser();
+  const [params] = useSearchParams();
+  const navigation = useNavigation();
+  const submit = useSubmit();
+  const from = params.get("from");
+  const back = backTarget(from, { label: prompt.title, to: `/p/${prompt.id}` });
+  const query = params.toString();
+  const here = `/s/${s.id}${query ? `?${query}` : ""}`;
+  const editHref = withFrom(`/s/${s.id}/edit`, here);
+  const promptHref = withFrom(`/p/${prompt.id}`, here);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [tab, setTab] = useState<"preview" | "source">("preview");
   const kind = prompt.kind;
   const pageUrl = submissionUrl(usercontentOrigin, s.id, kind);
   const baseUrl = usercontentUrl(usercontentOrigin, s.id);
   const log = s.logMeta;
+  const isAuthor = user?.id === s.author.id;
+  const editable = isAuthor && otherRatings === 0;
 
   const ratingBlock = !user
     ? "登录后可打分"
@@ -118,31 +161,44 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="mx-auto max-w-[1400px]">
-      <Link
-        to={`/p/${prompt.id}`}
-        className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink"
-      >
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        {prompt.title}
-      </Link>
-
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-title font-bold tracking-tight">{s.model.name}</h1>
-          <p className="mt-1 text-sm text-muted">
+      <PageHeader
+        back={{
+          to: back.to,
+          label: back.label,
+          history: !back.explicit,
+          trail:
+            back.label !== prompt.title
+              ? { to: promptHref, label: prompt.title }
+              : undefined,
+        }}
+        title={s.model.name}
+        subtitle={
+          <>
             {s.provider.name}
             {s.harness && ` · ${s.harness.name}`}
-          </p>
-        </div>
-        <Button asChild variant="outline" className="gap-1.5">
-          <a href={pageUrl} target="_blank" rel="noreferrer">
-            <ExternalLink className="size-4" strokeWidth={1.75} />
-            新标签页打开
-          </a>
-        </Button>
-      </div>
+          </>
+        }
+        actions={
+          <>
+            {editable && (
+              <Button asChild variant="outline" className="gap-1.5">
+                <Link to={editHref} preventScrollReset>
+                  <Pencil className="size-4 text-muted" strokeWidth={1.75} />
+                  编辑
+                </Link>
+              </Button>
+            )}
+            <Button asChild variant="outline" className="gap-1.5">
+              <a href={pageUrl} target="_blank" rel="noreferrer">
+                <ExternalLink className="size-4" strokeWidth={1.75} />
+                新标签页打开
+              </a>
+            </Button>
+          </>
+        }
+      />
 
-      <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface">
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(
@@ -241,7 +297,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <MetaRow label="模型">{s.model.name}</MetaRow>
               <MetaRow label="提供方">{s.provider.name}</MetaRow>
               <MetaRow label="客户端">{s.harness?.name ?? "—"}</MetaRow>
-              <MetaRow label="思考强度">{s.reasoning ? REASONING_LABELS[s.reasoning] : "默认"}</MetaRow>
+              <MetaRow label="思考强度">{s.reasoning ? REASONING_LABELS[s.reasoning] : "Default"}</MetaRow>
               <MetaRow label="增强">
                 <span className="inline-flex flex-wrap justify-end gap-1">
                   <ModTags mods={s.mods} />
@@ -285,9 +341,29 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <Avatar template={s.author.avatarTemplate} username={s.author.username} size={24} />
               <div className="min-w-0">
                 <div className="truncate text-xs font-medium">{s.author.username}</div>
-                <div className="text-[11px] text-muted">{formatRelative(s.createdAt)}</div>
+                <div className="text-[11px] text-muted">
+                  {formatRelative(s.createdAt)}
+                  {s.updatedAt && " · 已编辑"}
+                </div>
               </div>
             </div>
+            {isAuthor && (
+              <div className="mt-2.5 border-t border-rule pt-2.5 text-xs text-muted">
+                {otherRatings > 0 ? (
+                  <p>已有 {otherRatings} 人打分，答案已锁定。</p>
+                ) : (
+                  <p>还没有人打分，你可以编辑内容或撤回。</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setWithdrawOpen(true)}
+                  className="mt-1.5 inline-flex items-center gap-1 text-muted hover:text-negative"
+                >
+                  <Undo2 className="size-3.5" strokeWidth={1.75} />
+                  撤回这份答案
+                </button>
+              </div>
+            )}
             {s.notes && (
               <p className="mt-2.5 border-t border-rule pt-2.5 text-xs whitespace-pre-wrap text-muted">
                 {s.notes}
@@ -296,6 +372,21 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
           </SideSection>
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        title="撤回这份答案？"
+        description="撤回后会从题目页与统计中消失。文件与评分记录会保留，你可以在「我的」里恢复。"
+        confirmLabel="撤回"
+        destructive
+        busy={navigation.state !== "idle"}
+        onConfirm={() => {
+          submit({ intent: "withdraw", from: from ?? "" }, { method: "post" });
+        }}
+      />
+
+      <Outlet />
     </div>
   );
 }

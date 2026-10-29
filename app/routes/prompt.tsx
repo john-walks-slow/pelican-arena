@@ -1,10 +1,24 @@
-import { ArrowLeft, ArrowUpDown, Check, Columns2, Copy, Upload, X } from "lucide-react";
+import {
+  AppWindow,
+  ArrowUpDown,
+  Check,
+  Columns2,
+  Copy,
+  Cpu,
+  Pencil,
+  Puzzle,
+  Server,
+  Upload,
+  X,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { data, Link, useFetcher, useSearchParams } from "react-router";
+import { data, Link, Outlet, useFetcher, useLocation, useSearchParams } from "react-router";
 import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
 import { Markdown } from "~/components/markdown";
+import { OutputRequirements } from "~/components/output-requirements";
+import { PageHeader } from "~/components/page-header";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
@@ -13,8 +27,10 @@ import { FilterSelect } from "~/components/ui/filter-select";
 import { CompactSelect } from "~/components/ui/compact-select";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
+import { backTarget, withFrom } from "~/lib/navigation";
 import { KIND_META } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
+import { promptWithRequirements } from "~/lib/output-requirements";
 import { can } from "~/lib/permissions";
 import {
   getPrompt,
@@ -92,13 +108,12 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
     );
   };
 
-  const active = ["model", "provider", "harness", "mod"].some((k) => params.get(k));
-
   return (
     <div className="flex items-start gap-2">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
         <FilterSelect
           label="模型"
+          icon={<Cpu className="size-3.5" strokeWidth={1.75} />}
           value={params.get("model") ?? ""}
           options={facets.models.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
           onChange={(v) => set("model", v)}
@@ -106,6 +121,7 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
         />
         <FilterSelect
           label="提供方"
+          icon={<Server className="size-3.5" strokeWidth={1.75} />}
           value={params.get("provider") ?? ""}
           options={facets.providers.map((p) => ({ value: p.id, label: p.name, count: p.count }))}
           onChange={(v) => set("provider", v)}
@@ -113,6 +129,7 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
         />
         <FilterSelect
           label="客户端"
+          icon={<AppWindow className="size-3.5" strokeWidth={1.75} />}
           value={params.get("harness") ?? ""}
           options={facets.harnesses.map((h) => ({ value: h.id, label: h.name, count: h.count }))}
           onChange={(v) => set("harness", v)}
@@ -120,6 +137,7 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
         />
         <FilterSelect
           label="增强"
+          icon={<Puzzle className="size-3.5" strokeWidth={1.75} />}
           value={params.get("mod") ?? ""}
           options={facets.mods.map((m) => ({ value: m.id, label: m.name, count: m.count }))}
           onChange={(v) => set("mod", v)}
@@ -128,16 +146,6 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-1.5">
-        {active && (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-muted"
-            onClick={() => setParams(new URLSearchParams(), { replace: true, preventScrollReset: true })}
-          >
-            清除
-          </Button>
-        )}
         <CompactSelect
           label="排序"
           icon={<ArrowUpDown className="size-3.5" strokeWidth={1.75} />}
@@ -157,6 +165,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
+  const { search } = useLocation();
+  const from = params.get("from");
+  const back = backTarget(from, { label: "题目", to: "/" });
+  const here = `/p/${prompt.id}${search}`;
+  const editHref = withFrom(`/p/${prompt.id}/edit`, here);
+  const answerHref = (id: string) => withFrom(`/s/${id}`, here);
   const fetcher = useFetcher<MoreSubmissions>();
 
   const [items, setItems] = useState(submissions);
@@ -198,7 +212,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(prompt.body);
+      await navigator.clipboard.writeText(promptWithRequirements(prompt.body, prompt.kind));
       setCopied(true);
       toast.success("提示词已复制");
       setTimeout(() => setCopied(false), 1800);
@@ -209,50 +223,70 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
 
   return (
     <div className="mx-auto max-w-[1240px]">
-      <Link to="/" className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        题目
-      </Link>
-
-      <div className="mt-2 flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="text-title font-bold tracking-tight">{prompt.title}</h1>
-          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted">
+      <PageHeader
+        back={{ to: back.to, label: back.label, history: !back.explicit }}
+        title={prompt.title}
+        subtitle={
+          <div className="flex items-center gap-2 text-xs text-muted">
             <span>{KIND_META[prompt.kind].label}</span>
             <span>·</span>
             <Avatar template={prompt.author.avatarTemplate} username={prompt.author.username} size={18} />
             <span>{prompt.author.username}</span>
             <span>·</span>
             <span>{formatRelative(prompt.createdAt)}</span>
-          </div>
-        </div>
-        <div className="flex gap-1.5">
-          <Button
-            variant="outline"
-            onClick={copy}
-            className={`gap-1.5 ${copied ? "border-positive/40 text-positive" : ""}`}
-            aria-live="polite"
-          >
-            {copied ? (
-              <Check className="size-4" strokeWidth={2} />
-            ) : (
-              <Copy className="size-4 text-muted" strokeWidth={1.75} />
+            {prompt.updatedAt && (
+              <>
+                <span>·</span>
+                <span>已编辑</span>
+              </>
             )}
-            {copied ? "已复制" : "复制提示词"}
-          </Button>
-          <Button asChild variant="primary" className="gap-1.5">
-            <Link to={user ? `/p/${prompt.id}/submit` : `/auth/login?returnTo=/p/${prompt.id}/submit`}>
-              <Upload className="size-4" strokeWidth={1.75} />
-              交答案
-            </Link>
-          </Button>
-        </div>
-      </div>
+          </div>
+        }
+        actions={
+          <>
+            {user?.id === prompt.author.id && (
+              <Button asChild variant="outline" className="gap-1.5 max-sm:px-2.5">
+                <Link to={editHref} aria-label="编辑">
+                  <Pencil className="size-4 text-muted" strokeWidth={1.75} />
+                  <span className="hidden sm:inline">编辑</span>
+                </Link>
+              </Button>
+            )}
+            <Button
+              variant="outline"
+              onClick={copy}
+              className={`gap-1.5 ${copied ? "border-positive/40 text-positive" : ""}`}
+              aria-live="polite"
+            >
+              {copied ? (
+                <Check className="size-4" strokeWidth={2} />
+              ) : (
+                <Copy className="size-4 text-muted" strokeWidth={1.75} />
+              )}
+              {copied ? "已复制" : "复制提示词"}
+            </Button>
+            <Button asChild variant="primary" className="gap-1.5">
+              <Link
+                to={
+                  user
+                    ? { pathname: `/p/${prompt.id}/submit`, search }
+                    : `/auth/login?returnTo=/p/${prompt.id}/submit`
+                }
+                preventScrollReset={Boolean(user)}
+              >
+                <Upload className="size-4" strokeWidth={1.75} />
+                提交答案
+              </Link>
+            </Button>
+          </>
+        }
+      />
 
-      <section className="mt-5 rounded-card border border-border bg-surface px-4 py-3.5">
+      <section className="mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
         <div className="max-h-64 overflow-y-auto scroll-thin">
           <Markdown>{prompt.body}</Markdown>
         </div>
+        <OutputRequirements kind={prompt.kind} className="mt-3" />
       </section>
 
       <section className="mt-8">
@@ -281,7 +315,10 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                       isSelected ? "border-accent" : "border-border hover:border-control"
                     }`}
                   >
-                    <Link to={`/s/${s.id}`} aria-label={`${s.model.name} · ${s.provider.name}`}>
+                    <Link
+                      to={answerHref(s.id)}
+                      aria-label={`${s.model.name} · ${s.provider.name}`}
+                    >
                       <SubmissionPreview
                         kind={prompt.kind}
                         submissionId={s.id}
@@ -292,7 +329,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                     </Link>
                     <div className="px-3.5 pt-3 pb-3">
                       <div className="flex items-start justify-between gap-3">
-                        <Link to={`/s/${s.id}`} className="min-w-0 hover:text-accent-ink">
+                        <Link to={answerHref(s.id)} className="min-w-0 hover:text-accent-ink">
                           <div className="truncate text-sm font-semibold">{s.model.name}</div>
                           <div className="truncate text-[13px] text-muted">
                             {s.provider.name}
@@ -354,6 +391,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           </div>
         </div>
       )}
+      <Outlet />
     </div>
   );
 }

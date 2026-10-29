@@ -35,7 +35,7 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
     "Access-Control-Allow-Origin": "*",
     "Cross-Origin-Resource-Policy": "cross-origin",
     "Referrer-Policy": "no-referrer",
-    "Cache-Control": "public, max-age=31536000, immutable",
+    "Cache-Control": "no-store",
     ETag: object.httpEtag,
   });
   return new Response(request.method === "HEAD" ? null : object.body, { headers });

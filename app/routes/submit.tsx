@@ -1,13 +1,34 @@
-import { ArrowLeft, FileArchive, FileCode2, FileText, Upload, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
-import { data, Link, redirect, useFetcher } from "react-router";
+import { useMemo, useState } from "react";
+import {
+  data,
+  isRouteErrorResponse,
+  redirect,
+  useFetcher,
+  useLocation,
+  useParams,
+} from "react-router";
+import { FileText, X } from "lucide-react";
 import type { Route } from "./+types/submit";
+import { Markdown } from "~/components/markdown";
+import { SectionHeading } from "~/components/section-heading";
+import { SessionLogSummary } from "~/components/submission/session-log-summary";
+import { FileDropZone } from "~/components/submission/file-drop-zone";
+import { InlineWorkPreview } from "~/components/submission/inline-work-preview";
+import { PickedBundleCard } from "~/components/submission/picked-bundle-card";
+import { SubmissionMetaFields } from "~/components/submission/meta-fields";
 import { SessionLogHelp } from "~/components/session-log-help";
 import { Button } from "~/components/ui/button";
-import { Combobox } from "~/components/ui/combobox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "~/components/ui/dialog";
+import { Segmented } from "~/components/ui/segmented";
 import { Textarea } from "~/components/ui/textarea";
-import { REASONING_LEVELS } from "~/db/schema";
 import {
   buildBundle,
   BundleError,
@@ -19,19 +40,22 @@ import {
   type BundleEntry,
 } from "~/lib/bundle";
 import type { CatalogEntry } from "~/lib/catalog";
-import { formatCount, formatDuration, REASONING_LABELS } from "~/lib/format";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { KIND_META, type PromptKind } from "~/lib/kinds";
-import { flashToast } from "~/lib/session.server";
 import { matchModel } from "~/lib/model-match";
+import { safeFrom, withFrom } from "~/lib/navigation";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
-import { LOG_SOURCE_LABELS, LogParseError, totalTokens, type LogMeta } from "~/lib/session-log";
+import { SANDBOX } from "~/lib/sandbox";
+import { flashToast } from "~/lib/session.server";
+import { LOG_SOURCE_LABELS, LogParseError, type LogMeta } from "~/lib/session-log";
 import { readSessionLogFile } from "~/lib/session-log-file";
-import { FIELDS, NOTES_LIMIT, parseSubmissionMeta, RAW_LOG_LIMIT } from "~/lib/submission-input";
+import { FIELDS, parseSubmissionMeta, RAW_LOG_LIMIT } from "~/lib/submission-input";
 import { createSubmission, readBundleEntries } from "~/lib/submissions.server";
+import { useDialogClose } from "~/lib/use-dialog-close";
+import { useFileBundle } from "~/lib/use-file-bundle";
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [
-  { title: `交答案 · ${loaderData?.prompt.title ?? ""} · Pelican Arena` },
+  { title: `提交答案 · ${loaderData?.prompt.title ?? ""} · Pelican Arena` },
 ];
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -72,7 +96,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       meta,
       rawLog: rawLogFile,
     });
-    return redirect(`/s/${id}`, {
+    const from = safeFrom(new URL(request.url).searchParams.get("from"));
+    return redirect(withFrom(`/s/${id}`, from), {
       headers: { "Set-Cookie": await flashToast(request, "已提交，感谢你的参与") },
     });
   } catch (e) {
@@ -81,198 +106,143 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-type Source = { kind: "file"; name: string; entries: BundleEntry[] } | { kind: "paste" };
-
-function useBundleSource(kind: PromptKind) {
-  const [source, setSource] = useState<Source | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function pickFile(file: File) {
-    setError(null);
-    try {
-      const bytes = new Uint8Array(await file.arrayBuffer());
-      const isZip = kind === "web" && file.name.toLowerCase().endsWith(".zip");
-      if (!isZip && file.size > singleFileLimit(kind)) {
-        throw new BundleError(`文件超过 ${formatBytes(singleFileLimit(kind))}`);
-      }
-      let entries: BundleEntry[];
-      if (isZip) {
-        entries = buildBundle(unzipBundle(bytes), kind);
-      } else {
-        const entry = KIND_META[kind].entry;
-        if (kind !== "web") readTextBundle(kind, bytes);
-        entries = buildBundle([{ path: entry, data: bytes }], kind);
-      }
-      setSource({ kind: "file", name: file.name, entries });
-    } catch (e) {
-      setSource(null);
-      setError(e instanceof BundleError ? e.message : "无法读取文件，请确认格式");
-    }
-  }
-
-  return { source, setSource, error, pickFile };
-}
-
-function BundlePicker({
+function WorkSection({
+  mode,
+  setMode,
   bundle,
   kind,
   text,
   setText,
 }: {
-  bundle: ReturnType<typeof useBundleSource>;
+  mode: "upload" | "paste";
+  setMode: (mode: "upload" | "paste") => void;
+  bundle: ReturnType<typeof useFileBundle>;
   kind: PromptKind;
   text: string;
   setText: (v: string) => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const { source, setSource, error, pickFile } = bundle;
+  const [previewPaste, setPreviewPaste] = useState(false);
+  const { picked, setPicked, error, pickFile } = bundle;
   const meta = KIND_META[kind];
-
-  if (source?.kind === "file") {
-    const total = source.entries.reduce((s, e) => s + e.data.byteLength, 0);
-    const Icon = kind !== "web" ? FileText : source.entries.length > 1 ? FileArchive : FileCode2;
-    return (
-      <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <Icon className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{source.name}</div>
-            <div className="num text-xs text-muted">
-              {source.entries.length} 个文件 · {formatBytes(total)}
-            </div>
-          </div>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            aria-label="移除"
-            onClick={() => setSource(null)}
-          >
-            <X className="size-4" strokeWidth={1.75} />
-          </Button>
-        </div>
-        {source.entries.length > 1 && (
-          <ul className="mt-2 max-h-36 space-y-0.5 overflow-y-auto scroll-thin border-t border-border pt-2 font-mono text-xs text-muted">
-            {source.entries.map((e) => (
-              <li key={e.path} className="flex justify-between gap-4">
-                <span className="truncate">{e.path}</span>
-                <span className="num shrink-0">{formatBytes(e.data.byteLength)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
-
-  if (source?.kind === "paste") {
-    return (
-      <div>
-        <Textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={12}
-          className="font-mono text-xs leading-relaxed"
-          placeholder={meta.placeholder}
-          spellCheck={false}
-          autoFocus
-        />
-        <div className="mt-1 flex items-center justify-between text-xs text-muted">
-          <button type="button" className="hover:text-ink" onClick={() => setSource(null)}>
-            改为上传文件
-          </button>
-          <span className="num">{formatBytes(new Blob([text]).size)}</span>
-        </div>
-      </div>
-    );
-  }
 
   const pasteLabel =
     kind === "markdown" ? "Markdown" : kind === "svg" ? "SVG 源码" : "HTML 源码";
   const uploadLabel = kind === "web" ? "HTML / zip" : `.${meta.extension}`;
 
+  const validatedSvgSrc = useMemo(() => {
+    if (kind !== "svg" || !previewPaste || !text.trim()) return null;
+    try {
+      readTextBundle("svg", new TextEncoder().encode(text));
+      return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(text)}`;
+    } catch {
+      return null;
+    }
+  }, [kind, previewPaste, text]);
+
   return (
-    <div>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => inputRef.current?.click()}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && inputRef.current?.click()}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDragging(false);
-          const file = e.dataTransfer.files[0];
-          if (file) pickFile(file);
-        }}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-control border border-dashed px-6 py-8 text-center transition-colors ${
-          dragging ? "border-accent bg-accent-soft" : "border-control hover:bg-raised/60"
-        }`}
-      >
-        <Upload className="size-4 text-muted" strokeWidth={1.75} />
-        <div className="text-sm font-medium">拖入或选择 {uploadLabel}</div>
-        <div className="text-xs text-muted">
-          {kind === "web"
-            ? `zip 需包含 index.html，解压后不超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`
-            : `单个文件，不超过 ${formatBytes(singleFileLimit(kind))}`}
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={meta.accept}
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) pickFile(file);
-            e.target.value = "";
-          }}
-        />
+    <section className="flex min-h-0 flex-1 flex-col">
+      <SectionHeading
+        title="结果"
+        badge={
+          <span className="rounded bg-raised px-1.5 py-0.5 text-[11px] font-medium text-muted">
+            {meta.label}
+          </span>
+        }
+        aside={
+          <Segmented
+            label="作品录入方式"
+            value={mode}
+            onChange={(id) => {
+              setMode(id);
+              setPreviewPaste(false);
+            }}
+            options={[
+              { value: "upload", label: "上传文件" },
+              { value: "paste", label: `粘贴${kind === "markdown" ? "文本" : "源码"}` },
+            ]}
+          />
+        }
+      />
+
+      <div className="mt-3 flex min-h-0 flex-1 flex-col">
+        {mode === "upload" ? (
+          picked ? (
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-control border border-border bg-raised/60">
+              <PickedBundleCard picked={picked} kind={kind} onRemove={() => setPicked(null)} />
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+                <InlineWorkPreview kind={kind} entries={picked.entries} name={picked.name} />
+              </div>
+            </div>
+          ) : (
+            <FileDropZone
+              accept={meta.accept}
+              label={`拖入或选择 ${uploadLabel}`}
+              hint={
+                kind === "web"
+                  ? `zip 需包含 index.html，解压后不超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`
+                  : `单个文件，不超过 ${formatBytes(singleFileLimit(kind))}`
+              }
+              error={error}
+              onPick={pickFile}
+            />
+          )
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
+            {previewPaste ? (
+              <div className="flex min-h-[196px] flex-1 flex-col overflow-hidden rounded-control border border-border bg-white">
+                {kind === "web" ? (
+                  <iframe
+                    srcDoc={text}
+                    title="HTML 预览"
+                    sandbox={SANDBOX}
+                    allow="fullscreen; autoplay"
+                    referrerPolicy="no-referrer"
+                    className="min-h-[196px] flex-1 border-0"
+                  />
+                ) : kind === "markdown" ? (
+                  <div className="flex-1 overflow-y-auto scroll-thin bg-ground/50 p-3.5">
+                    <Markdown>{text}</Markdown>
+                  </div>
+                ) : validatedSvgSrc ? (
+                  <div className="flex flex-1 items-center justify-center bg-ground/50 p-2">
+                    <img
+                      src={validatedSvgSrc}
+                      alt="SVG 预览"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  </div>
+                ) : (
+                  <p className="p-3.5 text-xs text-negative">不是有效的 SVG 源码。</p>
+                )}
+              </div>
+            ) : (
+              <Textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={9}
+                className="min-h-[196px] flex-1 font-mono text-xs leading-relaxed"
+                placeholder={`在此粘贴 ${pasteLabel}…`}
+                spellCheck={false}
+                autoFocus
+              />
+            )}
+            <div className="mt-1.5 flex items-center justify-between text-xs text-muted">
+              {text.trim() ? (
+                <button
+                  type="button"
+                  className="font-medium text-ink hover:text-accent"
+                  onClick={() => setPreviewPaste((v) => !v)}
+                >
+                  {previewPaste ? "返回编辑源码" : "预览效果"}
+                </button>
+              ) : (
+                <span>保存为 {meta.entry}</span>
+              )}
+              <span className="num">{formatBytes(new Blob([text]).size)}</span>
+            </div>
+          </div>
+        )}
       </div>
-      <button
-        type="button"
-        className="mt-1.5 text-xs text-muted hover:text-ink"
-        onClick={() => setSource({ kind: "paste" })}
-      >
-        或者直接粘贴 {pasteLabel}
-      </button>
-      {error && <p className="mt-1 text-xs text-negative">{error}</p>}
-    </div>
-  );
-}
-
-function LogSummary({ meta }: { meta: LogMeta }) {
-  const rows = [
-    ["来源", LOG_SOURCE_LABELS[meta.source]],
-    ["模型", meta.models.join("、") || "—"],
-    ["总 token", formatCount(totalTokens(meta))],
-    ["输入 / 输出", `${formatCount(meta.inputTokens)} / ${formatCount(meta.outputTokens)}`],
-    ["缓存读取", formatCount(meta.cacheReadTokens)],
-    ["用时", meta.durationMs == null ? "—" : formatDuration(meta.durationMs)],
-    ["轮数 / 工具调用", `${meta.turns} / ${meta.toolCalls}`],
-  ];
-  return (
-    <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-xs">
-      {rows.map(([k, v]) => (
-        <div key={k} className="contents">
-          <dt className="text-muted">{k}</dt>
-          <dd className="num truncate">{v}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
-  return (
-    <section className="border-t border-border pt-5 first:border-0 first:pt-0">
-      <h2 className="text-sm font-semibold">{title}</h2>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-      <div className="mt-3">{children}</div>
     </section>
   );
 }
@@ -292,14 +262,19 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   const { prompt, catalog } = loaderData;
   const kind = prompt.kind;
   const meta = KIND_META[kind];
+  const { search } = useLocation();
+  const { open, close } = useDialogClose(`/p/${prompt.id}${search}`);
   const fetcher = useFetcher<{ error: string }>();
-  const bundle = useBundleSource(kind);
+
+  const [mode, setMode] = useState<"upload" | "paste">("upload");
+  const bundle = useFileBundle(kind);
   const [text, setText] = useState("");
   const [model, setModel] = useState("");
   const [provider, setProvider] = useState("");
   const [harness, setHarness] = useState("");
   const [reasoning, setReasoning] = useState("");
   const [mods, setMods] = useState<string[]>([]);
+  const [notes, setNotes] = useState("");
   const [log, setLog] = useState<{ file: File; meta: LogMeta } | null>(null);
   const [logError, setLogError] = useState<string | null>(null);
   const [publishLog, setPublishLog] = useState(false);
@@ -308,10 +283,14 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   const submitting = fetcher.state !== "idle";
   const serverError = fetcher.data && "error" in fetcher.data ? fetcher.data.error : null;
 
-  const logModelHint = useMemo(() => {
-    const raw = log?.meta.models[0];
-    return raw ? { raw, match: matchModel(raw, catalog.models) } : null;
-  }, [log, catalog.models]);
+  const dirty = Boolean(
+    bundle.picked || text.trim() || model || provider || harness || mods.length > 0 || notes.trim() || log,
+  );
+
+  const hasWork = mode === "upload" ? Boolean(bundle.picked) : text.trim().length > 0;
+  const ready = hasWork && model.trim().length > 0 && provider.trim().length > 0;
+
+  const logModelHint = useMemo(() => log?.meta.models[0] ?? null, [log]);
 
   async function pickLog(file: File) {
     setLogError(null);
@@ -333,11 +312,6 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
     }
   }
 
-  function addMod(name: string) {
-    const clean = name.trim();
-    if (clean && !mods.includes(clean)) setMods([...mods, clean]);
-  }
-
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setClientError(null);
@@ -345,12 +319,12 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
 
     let entries: BundleEntry[];
     try {
-      if (bundle.source?.kind === "file") {
-        entries = bundle.source.entries;
-      } else if (bundle.source?.kind === "paste" && text.trim()) {
-        const data = new TextEncoder().encode(text);
-        if (kind !== "web") readTextBundle(kind, data);
-        entries = buildBundle([{ path: meta.entry, data }], kind);
+      if (mode === "upload" && bundle.picked) {
+        entries = bundle.picked.entries;
+      } else if (mode === "paste" && text.trim()) {
+        const bytes = new TextEncoder().encode(text);
+        if (kind !== "web") readTextBundle(kind, bytes);
+        entries = buildBundle([{ path: meta.entry, data: bytes }], kind);
       } else {
         throw new BundleError(`请上传或粘贴${meta.resultTitle}`);
       }
@@ -371,205 +345,181 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
     fetcher.submit(form, { method: "post", encType: "multipart/form-data" });
   }
 
-  const modOptions = [...new Set([...catalog.mods.map((m) => m.name), ...mods])];
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && !submitting && close()}>
+      <DialogContent
+        className="sm:max-w-[880px]"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => {
+          if (dirty || submitting) e.preventDefault();
+        }}
+        onEscapeKeyDown={(e) => {
+          if (submitting) e.preventDefault();
+        }}
+      >
+        <DialogHeader>
+          <div className="min-w-0">
+            <DialogTitle>提交答案</DialogTitle>
+            <DialogDescription className="mt-0.5 truncate">
+              给「{prompt.title}」
+            </DialogDescription>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={onSubmit} className="flex min-h-0 flex-1 flex-col">
+          <DialogBody>
+            <div className="grid lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="flex min-w-0 flex-col gap-6 p-5">
+                <WorkSection
+                  mode={mode}
+                  setMode={setMode}
+                  bundle={bundle}
+                  kind={kind}
+                  text={text}
+                  setText={setText}
+                />
+
+                <section className="border-t border-border pt-6">
+                  <SectionHeading
+                    title="Session log"
+                    hint="可选"
+                    aside={
+                      !log && (
+                        <Button asChild variant="outline" size="sm">
+                          <label className="cursor-pointer gap-1.5">
+                            <FileText className="size-3.5 text-muted" strokeWidth={1.75} />
+                            选择日志文件
+                            <input
+                              type="file"
+                              accept=".jsonl,.json,.log,.txt,.zstd,.zst"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) pickLog(file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        </Button>
+                      )
+                    }
+                  />
+                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
+                    从日志里读取 token 和用时，自动填写模型与客户端。原始文件不会上传。
+                  </p>
+
+                  {logError && <p className="mt-1.5 text-xs text-negative">{logError}</p>}
+
+                  {log && (
+                    <div className="mt-2.5 rounded-control border border-border bg-raised/60 px-3 py-2.5">
+                      <div className="flex items-center gap-2.5">
+                        <FileText className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
+                        <div className="min-w-0 flex-1 truncate text-sm font-medium">{log.file.name}</div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon-sm"
+                          aria-label="移除日志"
+                          onClick={() => {
+                            setLog(null);
+                            setPublishLog(false);
+                          }}
+                        >
+                          <X className="size-4" strokeWidth={1.75} />
+                        </Button>
+                      </div>
+                      <div className="mt-2.5 border-t border-border pt-2.5">
+                        <SessionLogSummary meta={log.meta} />
+                      </div>
+                      <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-border pt-2.5 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={publishLog}
+                          onChange={(e) => setPublishLog(e.target.checked)}
+                          className="mt-0.5 accent-accent"
+                        />
+                        <span>
+                          公开原始日志
+                          <span className="block text-muted">
+                            任何人可下载。日志里可能有本机路径和密钥，请先检查。
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  )}
+
+                  <SessionLogHelp />
+                </section>
+              </div>
+
+              <aside className="border-t border-border px-5 pt-6 pb-5 lg:border-t-0 lg:border-l lg:bg-raised/60 lg:p-5">
+                <SectionHeading title="生成信息" />
+                <SubmissionMetaFields
+                  catalog={catalog}
+                  model={model}
+                  setModel={setModel}
+                  provider={provider}
+                  setProvider={setProvider}
+                  harness={harness}
+                  setHarness={setHarness}
+                  reasoning={reasoning}
+                  setReasoning={setReasoning}
+                  mods={mods}
+                  setMods={setMods}
+                  notes={notes}
+                  setNotes={setNotes}
+                  logModelHint={logModelHint}
+                />
+              </aside>
+            </div>
+          </DialogBody>
+
+          <DialogFooter className="max-sm:flex-col max-sm:items-stretch max-sm:gap-2.5">
+            {(clientError || serverError) && (
+              <p className="min-w-0 flex-1 text-xs text-negative max-sm:truncate" role="alert">
+                {clientError || serverError}
+              </p>
+            )}
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 max-sm:justify-end">
+              <Button type="button" variant="outline" onClick={close} disabled={submitting}>
+                取消
+              </Button>
+              <Button type="submit" variant="primary" disabled={!ready || submitting}>
+                {submitting ? "提交中…" : "提交"}
+              </Button>
+            </div>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
+  const { promptId = "" } = useParams();
+  const { search } = useLocation();
+  const { open, close } = useDialogClose(promptId ? `/p/${promptId}${search}` : "/");
+  let title = "无法提交答案";
+  let message = "加载失败，请稍后再试。";
+  if (isRouteErrorResponse(error)) {
+    if (error.status === 403) title = "没有提交权限";
+    if (typeof error.data === "string") message = error.data;
+  }
 
   return (
-    <div className="mx-auto max-w-[680px]">
-      <Link to={`/p/${prompt.id}`} className="inline-flex items-center gap-1 text-xs text-muted hover:text-ink">
-        <ArrowLeft className="size-3.5" strokeWidth={1.75} />
-        {prompt.title}
-      </Link>
-      <h1 className="mt-2 text-title font-bold tracking-tight">交答案</h1>
-
-      <form onSubmit={onSubmit} className="mt-6 space-y-8">
-        <Section title={meta.resultTitle} hint={meta.hint}>
-          <BundlePicker bundle={bundle} kind={kind} text={text} setText={setText} />
-        </Section>
-
-        <Section title="生成信息">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Combobox
-              name={FIELDS.model}
-              label="模型"
-              kind="models"
-              options={catalog.models}
-              value={model}
-              onChange={setModel}
-              placeholder="选择或输入模型"
-              required
-              hint={logModelHint && `日志记录：${logModelHint.raw}`}
-            />
-            <Combobox
-              name={FIELDS.provider}
-              label="提供方"
-              kind="providers"
-              options={catalog.providers}
-              value={provider}
-              onChange={setProvider}
-              placeholder="官方 API、OpenRouter、某中转站…"
-              required
-            />
-            <Combobox
-              name={FIELDS.harness}
-              label="客户端"
-              kind="harnesses"
-              options={catalog.harnesses}
-              value={harness}
-              onChange={setHarness}
-              placeholder="Claude Code、Cherry Studio…"
-            />
-            <div className="space-y-1.5">
-              <label className="block text-sm font-medium" htmlFor="reasoning">
-                思考强度
-              </label>
-              <input type="hidden" name={FIELDS.reasoning} value={reasoning} />
-              <Select
-                value={reasoning || "default"}
-                onValueChange={(v) => setReasoning(v === "default" ? "" : v)}
-              >
-                <SelectTrigger id="reasoning" className="h-8 px-2.5">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">默认</SelectItem>
-                  {REASONING_LEVELS.map((r) => (
-                    <SelectItem key={r} value={r}>
-                      {REASONING_LABELS[r]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium">增强</label>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-              {modOptions.map((name) => {
-                const on = mods.includes(name);
-                return (
-                  <button
-                    key={name}
-                    type="button"
-                    aria-pressed={on}
-                    onClick={() => (on ? setMods(mods.filter((m) => m !== name)) : setMods([...mods, name]))}
-                    className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs transition-colors ${
-                      on
-                        ? "border-accent/30 bg-accent-soft font-medium text-accent-ink"
-                        : "border-control text-muted hover:bg-raised hover:text-ink"
-                    }`}
-                  >
-                    {name}
-                  </button>
-                );
-              })}
-              <Combobox
-                options={catalog.mods}
-                kind="mods"
-                value=""
-                onChange={addMod}
-                placeholder="更多"
-                searchPlaceholder="搜索或新建增强"
-                className="w-24"
-              />
-            </div>
-            <p className="mt-1 text-xs text-muted">
-              {mods.length === 0 ? "不选即为 vanilla。" : `已选 ${mods.length} 项`}
-            </p>
-          </div>
-
-          <div className="mt-4">
-            <label className="block text-sm font-medium" htmlFor="notes">
-              备注
-            </label>
-            <Textarea
-              id="notes"
-              name={FIELDS.notes}
-              rows={2}
-              maxLength={NOTES_LIMIT}
-              className="mt-1.5"
-              placeholder="温度、系统提示词、遇到的问题…"
-            />
-          </div>
-        </Section>
-
-        <Section
-          title="Session log"
-          hint="从日志中解析 token 和用时等统计信息。原始日志仅在浏览器读取，不会上传。支持 Claude Code、Codex CLI、pi、DSH 与 opencode。"
-        >
-          {log ? (
-            <div className="rounded-control border border-border bg-raised/60 px-3 py-2.5">
-              <div className="flex items-center gap-2.5">
-                <FileText className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
-                <div className="min-w-0 flex-1 truncate text-sm font-medium">{log.file.name}</div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="移除日志"
-                  onClick={() => {
-                    setLog(null);
-                    setPublishLog(false);
-                  }}
-                >
-                  <X className="size-4" strokeWidth={1.75} />
-                </Button>
-              </div>
-              <div className="mt-2.5 border-t border-border pt-2.5">
-                <LogSummary meta={log.meta} />
-              </div>
-              <label className="mt-2.5 flex cursor-pointer items-start gap-2 border-t border-border pt-2.5 text-xs">
-                <input
-                  type="checkbox"
-                  checked={publishLog}
-                  onChange={(e) => setPublishLog(e.target.checked)}
-                  className="mt-0.5 accent-accent"
-                />
-                <span>
-                  公开原始日志
-                  <span className="block text-muted">
-                    任何人可下载。日志里可能有本机路径和密钥，请先检查。
-                  </span>
-                </span>
-              </label>
-            </div>
-          ) : (
-            <div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-control border border-control bg-surface px-2.5 py-1.5 text-xs font-medium hover:bg-raised">
-                <FileText className="size-3.5 text-muted" strokeWidth={1.75} />
-                选择日志文件
-                <input
-                  type="file"
-                  accept=".jsonl,.json,.log,.txt,.zstd,.zst"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) pickLog(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              {logError && <p className="mt-1 text-xs text-negative">{logError}</p>}
-            </div>
-          )}
-          <SessionLogHelp />
-        </Section>
-
-        {(clientError || serverError) && (
-          <p className="text-sm text-negative" role="alert">
-            {clientError || serverError}
-          </p>
-        )}
-
-        <div className="flex justify-end gap-1.5">
-          <Button asChild variant="outline">
-            <Link to={`/p/${prompt.id}`}>取消</Link>
+    <Dialog open={open} onOpenChange={(next) => !next && close()}>
+      <DialogContent className="sm:max-w-[420px]">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">{message}</DialogDescription>
+        </DialogHeader>
+        <DialogBody className="px-5 py-4 text-sm text-muted">{message}</DialogBody>
+        <DialogFooter className="justify-end">
+          <Button type="button" variant="primary" onClick={close}>
+            知道了
           </Button>
-          <Button type="submit" variant="primary" disabled={submitting}>
-            {submitting ? "提交中…" : "提交"}
-          </Button>
-        </div>
-      </form>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
