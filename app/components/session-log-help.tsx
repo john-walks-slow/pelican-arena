@@ -56,7 +56,7 @@ const HELP: ClientHelp[] = [
         value: String.raw`(Get-ChildItem "$env:USERPROFILE\.dsh\sessions\*\*\session*.jsonl.zstd" | Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName`,
       },
     ],
-    note: "压缩日志可以直接上传，会在浏览器里解开。",
+    note: "",
   },
   {
     id: "opencode",
@@ -166,7 +166,7 @@ export function SessionLogHelp() {
       </button>
       {open && (
         <>
-          <div className="mt-2 overflow-hidden rounded-control border border-border">
+          <div className="mt-2 overflow-hidden rounded-control border border-border bg-active">
             <div
               role="tablist"
               aria-label="客户端"
@@ -203,12 +203,9 @@ export function SessionLogHelp() {
               {help.rows.map((row) => (
                 <CopyRow key={row.label} {...row} />
               ))}
-              <p className="pt-0.5 text-[11px] text-muted">{help.note}</p>
+              {help.note && <p className="pt-0.5 text-[11px] text-muted">{help.note}</p>}
             </div>
           </div>
-          <p className="mt-1.5 text-[11px] text-muted">
-            命令会打印最近一次日志的路径，按路径选择上传即可。
-          </p>
         </>
       )}
     </div>
