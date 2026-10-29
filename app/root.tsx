@@ -15,6 +15,7 @@ import { AppShell, baseScreenKey } from "./components/app-shell";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
+import { useTrackNavigationHistory } from "./lib/navigation-history";
 import "./app.css";
 
 export const links: Route.LinksFunction = () => [
@@ -106,6 +107,7 @@ function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
 
 function RouteTransition({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
+  useTrackNavigationHistory();
   const screenKey = baseScreenKey(pathname);
   const stateRef = useRef<{ key: string; motion: RouteMotion }>({
     key: screenKey,

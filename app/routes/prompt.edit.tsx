@@ -77,7 +77,7 @@ export default function EditPrompt({ loaderData, actionData }: Route.ComponentPr
   return (
     <div className="mx-auto max-w-[1240px]">
       <PageHeader
-        back={{ to: back.to, label: back.label, history: !back.explicit }}
+        back={{ to: back.to, label: back.label }}
         title="编辑题目"
         subtitle={locked ? "调整题目标题。" : "修改标题、正文和作品类型。"}
       />
@@ -90,7 +90,6 @@ export default function EditPrompt({ loaderData, actionData }: Route.ComponentPr
         errors={actionData?.errors}
         values={actionData?.values}
         cancelTo={back.to}
-        cancelHistory={!back.explicit}
         submitLabel="保存修改"
       />
     </div>

@@ -1,9 +1,10 @@
 import type { ComponentProps, MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
+import { canGoBackInApp } from "~/lib/navigation-history";
 
 /**
- * Follows the in-app history when there is one, otherwise falls back to an
- * explicit target. Pages with an explicit `from` pass history={false}.
+ * Follows the in-app history when there is one. The explicit target is used
+ * when the page was opened directly, so a new tab still has a way back.
  */
 type LinkProps = ComponentProps<typeof Link>;
 
@@ -19,7 +20,6 @@ export function BackLink({
     onClickProp?.(event);
     if (event.defaultPrevented || !history) return;
     if (
-      event.defaultPrevented ||
       event.button !== 0 ||
       event.metaKey ||
       event.ctrlKey ||
@@ -28,12 +28,13 @@ export function BackLink({
     ) {
       return;
     }
-    const idx = Number(
-      (window.history.state as { idx?: number } | null)?.idx ?? 0,
-    );
-    if (idx > 0) {
-      event.preventDefault();
+    event.preventDefault();
+    if (canGoBackInApp()) {
       navigate(-1);
+    } else {
+      // Opening a detail in a new tab leaves no in-app entry to pop. Replace
+      // the orphan entry so its fallback page does not point back at it.
+      navigate(to, { replace: true });
     }
   }
 

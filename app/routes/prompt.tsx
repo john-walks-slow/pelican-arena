@@ -224,7 +224,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   return (
     <div className="mx-auto max-w-[1240px]">
       <PageHeader
-        back={{ to: back.to, label: back.label, history: !back.explicit }}
+        back={{ to: back.to, label: back.label }}
         title={prompt.title}
         subtitle={
           <div className="flex items-center gap-2 text-xs text-muted">

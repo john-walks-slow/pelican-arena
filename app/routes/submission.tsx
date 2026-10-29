@@ -165,7 +165,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
         back={{
           to: back.to,
           label: back.label,
-          history: !back.explicit,
           trail:
             back.label !== prompt.title
               ? { to: promptHref, label: prompt.title }
