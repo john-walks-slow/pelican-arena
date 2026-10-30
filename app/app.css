@@ -678,6 +678,16 @@ html[data-nav-dir="shared-collapse"]::view-transition-new(vt-screen) {
   will-change: transform;
 }
 
+/* Secondary header actions recede instead of riding into the compact rail. */
+.page-header-actions .header-collapse-fade {
+  opacity: clamp(0, 1 - var(--p) * 2.2, 1);
+}
+
+.page-header[data-compact="true"] .page-header-actions .header-collapse-fade {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .nav-progress-bar,
   .route-stage,

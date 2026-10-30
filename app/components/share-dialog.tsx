@@ -52,7 +52,11 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
   return (
     <Dialog onOpenChange={(open) => open && setCopied(false)}>
       <DialogTrigger asChild>
-        <Button variant="outline" className="gap-1.5 max-sm:px-2.5" aria-label="分享">
+        <Button
+          variant="outline"
+          className="header-collapse-fade gap-1.5 max-sm:px-2.5"
+          aria-label="分享"
+        >
           <Share2 className="size-4 text-muted" strokeWidth={1.75} />
           <span className="hidden sm:inline">分享</span>
         </Button>

@@ -264,7 +264,11 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         actions={
           <>
             {user?.id === prompt.author.id && (
-              <Button asChild variant="outline" className="gap-1.5 max-sm:px-2.5">
+              <Button
+                asChild
+                variant="outline"
+                className="header-collapse-fade gap-1.5 max-sm:px-2.5"
+              >
                 <Link to={editHref} prefetch="intent" aria-label="编辑">
                   <Pencil className="size-4 text-muted" strokeWidth={1.75} />
                   <span className="hidden sm:inline">编辑</span>

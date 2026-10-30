@@ -197,7 +197,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
         actions={
           <>
             {editable && (
-              <Button asChild variant="outline" className="gap-1.5">
+              <Button
+                asChild
+                variant="outline"
+                className="header-collapse-fade gap-1.5"
+              >
                 <Link to={editHref} preventScrollReset>
                   <Pencil className="size-4 text-muted" strokeWidth={1.75} />
                   编辑
