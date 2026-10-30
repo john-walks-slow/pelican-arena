@@ -10,6 +10,13 @@ export function isValidRating(stars: number): boolean {
   return Number.isFinite(stars) && stars >= 0.5 && stars <= 5 && Number.isInteger(stars * 2);
 }
 
+export function calculateRatingFromRatio(ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 0) return 0.5;
+  if (ratio >= 1) return 5;
+  const score = Math.ceil(ratio * 10) / 2;
+  return Math.max(0.5, Math.min(5, score));
+}
+
 export function formatRatingLabel(stars: number): string {
   const desc = RATING_LABELS[stars];
   return desc ? `${stars} 星 · ${desc}` : `${stars} 星`;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatRatingLabel, isValidRating } from "./rating";
+import { calculateRatingFromRatio, formatRatingLabel, isValidRating } from "./rating";
 import { formatStars } from "./format";
 
 describe("rating validation", () => {
@@ -46,5 +46,28 @@ describe("formatStars with half-star ratings", () => {
     expect(formatStars(3.5, 1)).toBe("3.5");
     expect(formatStars(7.5, 2)).toBe("3.8"); // (3.5 + 4) / 2 = 3.75 -> 3.8
     expect(formatStars(8, 2)).toBe("4.0"); // (3.5 + 4.5) / 2 = 4.0
+  });
+});
+
+describe("calculateRatingFromRatio", () => {
+  it("maps ratios evenly to 0.5 step ratings from 0.5 to 5", () => {
+    expect(calculateRatingFromRatio(0.05)).toBe(0.5);
+    expect(calculateRatingFromRatio(0.1)).toBe(0.5);
+    expect(calculateRatingFromRatio(0.15)).toBe(1.0);
+    expect(calculateRatingFromRatio(0.2)).toBe(1.0);
+    expect(calculateRatingFromRatio(0.25)).toBe(1.5);
+    expect(calculateRatingFromRatio(0.45)).toBe(2.5);
+    expect(calculateRatingFromRatio(0.65)).toBe(3.5);
+    expect(calculateRatingFromRatio(0.75)).toBe(4.0);
+    expect(calculateRatingFromRatio(0.85)).toBe(4.5);
+    expect(calculateRatingFromRatio(0.95)).toBe(5.0);
+    expect(calculateRatingFromRatio(1.0)).toBe(5.0);
+  });
+
+  it("clamps out-of-bound ratios securely", () => {
+    expect(calculateRatingFromRatio(-0.5)).toBe(0.5);
+    expect(calculateRatingFromRatio(0)).toBe(0.5);
+    expect(calculateRatingFromRatio(1.5)).toBe(5.0);
+    expect(calculateRatingFromRatio(Number.NaN)).toBe(0.5);
   });
 });

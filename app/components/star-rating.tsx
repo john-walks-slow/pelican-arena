@@ -1,8 +1,8 @@
 import { Star } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "~/components/ui/toaster";
-import { formatRatingLabel } from "~/lib/rating";
+import { calculateRatingFromRatio, formatRatingLabel } from "~/lib/rating";
 
 export function StarRating({
   current,
@@ -14,15 +14,102 @@ export function StarRating({
   const fetcher = useFetcher<{ stars: number }>();
   const [hover, setHover] = useState(0);
 
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isDraggingRef = useRef(false);
+  const startPosRef = useRef({ x: 0, y: 0 });
+  const hasMovedRef = useRef(false);
+
   useEffect(() => {
     if (!fetcher.data) return;
     if (fetcher.data.stars) toast.success(`已评 ${fetcher.data.stars} 星`);
     else toast("评分已取消");
+    setHover(0);
   }, [fetcher.data]);
 
   const pending = fetcher.formData ? Number(fetcher.formData.get("stars")) : null;
   const value = pending ?? current ?? 0;
   const shown = hover || value;
+
+  const commitRating = (stars: number) => {
+    setHover(0);
+    fetcher.submit({ intent: "rate", stars: String(stars) }, { method: "post" });
+  };
+
+  const getScoreFromClientX = (clientX: number): number => {
+    if (!containerRef.current) return 0;
+    const rect = containerRef.current.getBoundingClientRect();
+    if (rect.width <= 0) return 0;
+    const ratio = (clientX - rect.left) / rect.width;
+    return calculateRatingFromRatio(ratio);
+  };
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (disabledReason) return;
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+
+    isDraggingRef.current = true;
+    hasMovedRef.current = false;
+    startPosRef.current = { x: e.clientX, y: e.clientY };
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {}
+
+    const score = getScoreFromClientX(e.clientX);
+    setHover(score);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (disabledReason) return;
+
+    if (isDraggingRef.current) {
+      const dist = Math.hypot(
+        e.clientX - startPosRef.current.x,
+        e.clientY - startPosRef.current.y,
+      );
+      if (dist > 8) {
+        hasMovedRef.current = true;
+      }
+      const score = getScoreFromClientX(e.clientX);
+      setHover(score);
+    } else if (e.pointerType === "mouse") {
+      const score = getScoreFromClientX(e.clientX);
+      setHover(score);
+    }
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+
+    const targetScore = getScoreFromClientX(e.clientX);
+
+    // 未明显拖动且点击相同星级 -> 撤销为 0 分
+    if (!hasMovedRef.current && targetScore === value) {
+      commitRating(0);
+    } else {
+      commitRating(targetScore);
+    }
+  };
+
+  const handlePointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {}
+    setHover(0);
+  };
+
+  const handlePointerLeave = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDraggingRef.current && e.pointerType === "mouse") {
+      setHover(0);
+    }
+  };
 
   if (disabledReason) {
     return (
@@ -33,12 +120,16 @@ export function StarRating({
   }
 
   return (
-    <fetcher.Form method="post" className="space-y-2">
-      <input type="hidden" name="intent" value="rate" />
+    <div className="space-y-2">
       <div className="flex items-center gap-2">
         <div
-          className="flex gap-0.5"
-          onMouseLeave={() => setHover(0)}
+          ref={containerRef}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onPointerLeave={handlePointerLeave}
+          className="relative flex cursor-pointer touch-none select-none items-center gap-0.5 py-0.5"
           role="radiogroup"
           aria-label="打分"
         >
@@ -49,10 +140,7 @@ export function StarRating({
             const isHalf = !isFull && shown >= halfVal;
 
             return (
-              <div
-                key={n}
-                className="group relative p-0.5 transition-transform active:scale-90 hover:scale-110"
-              >
+              <div key={n} className="relative p-0.5">
                 <div className="relative size-7">
                   {/* 底层空心星 */}
                   <Star className="size-7 text-control transition-colors" strokeWidth={1.5} />
@@ -69,28 +157,26 @@ export function StarRating({
                     </div>
                   )}
 
-                  {/* 左半星交互按钮 (n - 0.5) */}
+                  {/* 键盘无障碍交互按钮 (左半星 n - 0.5) */}
                   <button
-                    type="submit"
-                    name="stars"
-                    value={value === halfVal ? 0 : halfVal}
+                    type="button"
+                    tabIndex={0}
                     role="radio"
                     aria-checked={value === halfVal}
                     aria-label={`${halfVal} 星`}
-                    onMouseEnter={() => setHover(halfVal)}
-                    className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-l"
+                    onClick={() => commitRating(value === halfVal ? 0 : halfVal)}
+                    className="pointer-events-none absolute inset-y-0 left-0 z-10 w-1/2 opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-l"
                   />
 
-                  {/* 右半星交互按钮 (n) */}
+                  {/* 键盘无障碍交互按钮 (右半星 n) */}
                   <button
-                    type="submit"
-                    name="stars"
-                    value={value === fullVal ? 0 : fullVal}
+                    type="button"
+                    tabIndex={0}
                     role="radio"
                     aria-checked={value === fullVal}
                     aria-label={`${fullVal} 星`}
-                    onMouseEnter={() => setHover(fullVal)}
-                    className="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-r"
+                    onClick={() => commitRating(value === fullVal ? 0 : fullVal)}
+                    className="pointer-events-none absolute inset-y-0 right-0 z-10 w-1/2 opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-r"
                   />
                 </div>
               </div>
@@ -102,8 +188,8 @@ export function StarRating({
         </span>
       </div>
       <p className="text-[11px] text-muted">
-        {value ? "点击相同星级可撤销评分" : "点击星星打分，每份答案限一票"}
+        {value ? "点击相同星级可撤销评分" : "点击或滑动星星打分，每份答案限一票"}
       </p>
-    </fetcher.Form>
+    </div>
   );
 }
