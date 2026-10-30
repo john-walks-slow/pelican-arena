@@ -1,7 +1,6 @@
 import type { ComponentProps, MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { canGoBackInApp } from "~/lib/navigation-history";
-import { prepareBackTransition } from "~/lib/shared-transition";
 
 /**
  * Follows the in-app history when there is one, otherwise falls back to an
@@ -31,7 +30,6 @@ export function BackLink({
       return;
     }
     event.preventDefault();
-    prepareBackTransition();
     if (canGoBackInApp()) {
       navigate(-1);
     } else {

@@ -9,7 +9,7 @@ import {
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
-import { useEffect, useRef, ViewTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
@@ -18,17 +18,9 @@ import { toast, Toaster } from "./components/ui/toaster";
 import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
-import { consumeSharedTransitionMode } from "./lib/shared-transition";
 import "./app.css";
 
-type RouteMotion =
-  | "steady"
-  | "forward"
-  | "back"
-  | "lateral-down"
-  | "lateral-up"
-  | "shared-expand"
-  | "shared-collapse";
+type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up";
 
 function screenRank(key: string): { depth: number; slot: number } {
   if (key === "/") return { depth: 0, slot: 0 };
@@ -43,12 +35,6 @@ function screenRank(key: string): { depth: number; slot: number } {
 
 function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
   if (prevKey === nextKey) return "steady";
-
-  // If a shared element container transition was explicitly scheduled (e.g. card click)
-  const shared = consumeSharedTransitionMode();
-  if (shared === "expand") return "shared-expand";
-  if (shared === "collapse") return "shared-collapse";
-
   const prev = screenRank(prevKey);
   const next = screenRank(nextKey);
   if (next.depth > prev.depth) return "forward";
@@ -140,65 +126,26 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
   return null;
 }
 
-function RouteTransition({ children }: { children: React.ReactNode }) {
-  const { pathname } = useLocation();
+export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
-  const screenKey = baseScreenKey(pathname);
-  const stateRef = useRef<{ key: string; motion: RouteMotion }>({
-    key: screenKey,
-    motion: "steady",
-  });
+  const location = useLocation();
+  const screenKey = baseScreenKey(location.pathname);
+  const prevScreenRef = useRef(screenKey);
+  const [motion, setMotion] = useState<RouteMotion>("steady");
 
-  if (stateRef.current.key !== screenKey) {
-    const motion = resolveMotion(stateRef.current.key, screenKey);
-    stateRef.current = { key: screenKey, motion };
-    if (typeof document !== "undefined") {
-      document.documentElement.dataset.navDir = motion;
-    }
-    // Synchronously reset window scroll to top when mounting a new screen.
-    // Old view was already captured; new view renders and is captured cleanly at top=0,
-    // completely eliminating the flash to the top.
-    if (typeof window !== "undefined" && motion !== "shared-collapse") {
-      try {
-        window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-      } catch {
-        window.scrollTo(0, 0);
-      }
-    }
+  if (prevScreenRef.current !== screenKey) {
+    const nextMotion = resolveMotion(prevScreenRef.current, screenKey);
+    prevScreenRef.current = screenKey;
+    setMotion(nextMotion);
   }
 
-  const motion = stateRef.current.motion;
-
-  return (
-    <ViewTransition
-      key={screenKey}
-      enter="vt-screen"
-      exit="vt-screen"
-      update="none"
-      default="none"
-      onEnter={() => {
-        document.documentElement.dataset.navDir = motion;
-      }}
-    >
-      <div
-        data-motion={motion}
-        style={{ viewTransitionName: "vt-screen" }}
-        className="route-stage"
-      >
-        {children}
-      </div>
-    </ViewTransition>
-  );
-}
-
-export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <FlashToasts flash={loaderData.toast} />
       <AppShell user={loaderData.user}>
-        <RouteTransition>
+        <div key={screenKey} data-motion={motion} className="route-stage">
           <Outlet />
-        </RouteTransition>
+        </div>
       </AppShell>
     </>
   );

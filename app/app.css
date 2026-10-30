@@ -188,15 +188,6 @@ body {
 }
 
 /* Smooth SPA & UI micro-interactions */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
 @keyframes nav-progress {
   0% {
     transform: translateX(-100%) scaleX(0.25);
@@ -209,219 +200,110 @@ body {
   }
 }
 
-@keyframes route-in-forward {
+/* Soft fade with micro-spatial lift: the title rail moves, content stays put */
+@keyframes stage-forward {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0) scale(0.994);
+    transform: translate3d(14px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: none;
   }
 }
 
-@keyframes route-out-forward {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(0, -6px, 0) scale(0.994);
-  }
-}
-
-@keyframes route-in-back {
+@keyframes stage-back {
   from {
     opacity: 0;
-    transform: translate3d(0, -8px, 0) scale(1.005);
+    transform: translate3d(-14px, 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: none;
   }
 }
 
-@keyframes route-out-back {
+@keyframes stage-down {
   from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0;
+    transform: translate3d(0, 12px, 0);
   }
   to {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0) scale(0.994);
+    opacity: 1;
+    transform: none;
   }
 }
 
-@keyframes route-in-lateral-down {
+@keyframes stage-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -12px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes reveal-rise {
   from {
     opacity: 0;
     transform: translate3d(0, 8px, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: none;
   }
 }
 
-@keyframes route-out-lateral-down {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    opacity: 0;
-    transform: translate3d(0, -6px, 0);
-  }
-}
-
-@keyframes route-in-lateral-up {
+/* Cascade Ripple entrance: delicate scale bloom with glide */
+@keyframes reveal-card-in {
   from {
     opacity: 0;
-    transform: translate3d(0, -8px, 0);
+    transform: translate3d(0, 10px, 0) scale(0.985);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
+    transform: none;
   }
 }
 
-@keyframes route-out-lateral-up {
-  from {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
+/* Skeleton shimmer sweep */
+@keyframes skeleton-shimmer {
+  0% {
+    transform: translateX(-100%);
   }
-  to {
-    opacity: 0;
-    transform: translate3d(0, 6px, 0);
-  }
-}
-
-/* Material You Fade Through for full-screen transitions when expanding/collapsing */
-@keyframes m3-fade-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
+  100% {
+    transform: translateX(100%);
   }
 }
 
-@keyframes m3-fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Directional entrance belongs to the page title rail only: the body of the
+   screen swaps instantly so the reading position never slides. */
+.route-stage[data-motion="forward"] .page-header {
+  animation: stage-forward 260ms var(--ease-spatial);
+}
+.route-stage[data-motion="back"] .page-header {
+  animation: stage-back 250ms var(--ease-spatial);
+}
+.route-stage[data-motion="lateral-down"] .page-header {
+  animation: stage-down 240ms var(--ease-spatial);
+}
+.route-stage[data-motion="lateral-up"] .page-header {
+  animation: stage-up 240ms var(--ease-spatial);
 }
 
-/* Material You Shared Container Transform for shared-card */
-@keyframes m3-card-out {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0;
-  }
+/* Tier 2: Subtitle / Filters / Tabs glide */
+.route-stage:not([data-motion="steady"]) .reveal-tier-1 {
+  animation: reveal-rise 260ms var(--ease-spatial);
+}
+.route-stage:not([data-motion="steady"]) .reveal-tier-2 {
+  animation: reveal-rise 280ms var(--ease-spatial);
 }
 
-@keyframes m3-card-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-/* AppShell components stay 100% frozen in view transitions to guarantee steady Brand header & sidebar */
-.shell-header {
-  view-transition-name: shell-header;
-}
-.shell-aside {
-  view-transition-name: shell-aside;
-}
-
-::view-transition-group(shell-header),
-::view-transition-group(shell-aside) {
-  animation: none !important;
-  z-index: 50;
-}
-::view-transition-old(shell-header),
-::view-transition-new(shell-header),
-::view-transition-old(shell-aside),
-::view-transition-new(shell-aside) {
-  animation: none !important;
-  mix-blend-mode: normal !important;
-}
-
-/* Disable full-viewport root cross-fade so outer shells and backgrounds never flash */
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation: none !important;
-  mix-blend-mode: normal !important;
-}
-
-/* Native View Transitions scoped strictly to vt-screen inside AppShell */
-::view-transition-group(vt-screen) {
-  animation-duration: 220ms;
-  animation-timing-function: var(--ease-spatial);
-}
-
-/* Directional View Transitions (when not in shared container mode) */
-html[data-nav-dir="forward"]::view-transition-old(vt-screen) {
-  animation: route-out-forward 130ms var(--ease-spatial) both;
-}
-html[data-nav-dir="forward"]::view-transition-new(vt-screen) {
-  animation: route-in-forward 220ms var(--ease-spatial) both;
-}
-
-html[data-nav-dir="back"]::view-transition-old(vt-screen) {
-  animation: route-out-back 130ms var(--ease-spatial) both;
-}
-html[data-nav-dir="back"]::view-transition-new(vt-screen) {
-  animation: route-in-back 210ms var(--ease-spatial) both;
-}
-
-html[data-nav-dir="lateral-down"]::view-transition-old(vt-screen) {
-  animation: route-out-lateral-down 125ms var(--ease-spatial) both;
-}
-html[data-nav-dir="lateral-down"]::view-transition-new(vt-screen) {
-  animation: route-in-lateral-down 200ms var(--ease-spatial) both;
-}
-
-html[data-nav-dir="lateral-up"]::view-transition-old(vt-screen) {
-  animation: route-out-lateral-up 125ms var(--ease-spatial) both;
-}
-html[data-nav-dir="lateral-up"]::view-transition-new(vt-screen) {
-  animation: route-in-lateral-up 200ms var(--ease-spatial) both;
-}
-
-/* Material You Shared Container Navigation (Zero-slide fade for the ambient screen) */
-html[data-nav-dir="shared-expand"]::view-transition-old(vt-screen),
-html[data-nav-dir="shared-collapse"]::view-transition-old(vt-screen) {
-  animation: m3-fade-out 90ms ease-out both;
-}
-html[data-nav-dir="shared-expand"]::view-transition-new(vt-screen),
-html[data-nav-dir="shared-collapse"]::view-transition-new(vt-screen) {
-  animation: m3-fade-in 240ms cubic-bezier(0.05, 0.7, 0.1, 1) 40ms both;
-}
-
-/* Material You Shared Container Transform for Cards */
-::view-transition-group(shared-card) {
-  animation-duration: 300ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  box-shadow: var(--card-shadow);
-  z-index: 25;
-}
-::view-transition-old(shared-card) {
-  animation: m3-card-out 80ms ease-out both;
-}
-::view-transition-new(shared-card) {
-  animation: m3-card-in 230ms cubic-bezier(0.05, 0.7, 0.1, 1) 60ms both;
+/* Tier 3: Staggered radial ripple gallery */
+.route-stage:not([data-motion="steady"]) .reveal-card {
+  animation: reveal-card-in 280ms var(--ease-spatial) var(--stagger, 0ms);
 }
 
 /* Tactile card hover & press physics with touch ripple feedback */
@@ -694,11 +576,6 @@ html[data-nav-dir="shared-collapse"]::view-transition-new(vt-screen) {
   .reveal-tier-1,
   .reveal-tier-2,
   .reveal-card {
-    animation: none !important;
-  }
-  ::view-transition-group(*),
-  ::view-transition-old(*),
-  ::view-transition-new(*) {
     animation: none !important;
   }
   .skeleton-shimmer::after {

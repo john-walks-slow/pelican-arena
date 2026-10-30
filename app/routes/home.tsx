@@ -20,7 +20,6 @@ import {
   type PromptSort,
 } from "~/lib/queries.server";
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
-import { isCardActive, prepareCardTransition } from "~/lib/shared-transition";
 import { useOptionalUser } from "~/lib/use-user";
 
 export const meta: Route.MetaFunction = () => [
@@ -273,7 +272,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               const row = Math.floor(index / 3);
               const col = index % 3;
               const rippleWave = row + col;
-              const isActive = isCardActive(p.id);
               return (
                 <li
                   key={p.id}
@@ -283,8 +281,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   <Link
                     to={`/p/${p.id}`}
                     prefetch="intent"
-                    onClick={(e) => prepareCardTransition(e, p.id)}
-                    style={isActive ? { viewTransitionName: "shared-card" } : undefined}
                     className="arena-card group block overflow-hidden rounded-card border border-border bg-surface hover:border-control"
                   >
                   {p.coverSubmissionId ? (
