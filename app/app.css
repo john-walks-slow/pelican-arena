@@ -170,6 +170,13 @@ html {
   -webkit-tap-highlight-color: transparent;
   /* reserve the scrollbar track so locking scroll never shifts the layout */
   scrollbar-gutter: stable;
+  /* Screens restore their own scroll and remount as a whole, so the browser's
+     anchor heuristics would otherwise ratchet the restored position a few pixels
+     per visit. Horizontal is clipped because route motion slides full-bleed
+     surfaces sideways, which makes mobile Chrome zoom the layout viewport out
+     for the duration of the animation. */
+  overflow-x: clip;
+  overflow-anchor: none;
 }
 
 /* Radix overlays (select, menu, dialog) lock the page by removing its scrollbar
