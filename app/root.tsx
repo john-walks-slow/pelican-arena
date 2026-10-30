@@ -18,6 +18,7 @@ import { toast, Toaster } from "./components/ui/toaster";
 import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
+import { themeScript } from "./lib/theme";
 import "./app.css";
 
 type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up";
@@ -98,15 +99,16 @@ export function shouldRevalidate({
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="zh-CN">
+    <html lang="zh-CN" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
-        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fb" />
-        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1114" />
+        <meta name="theme-color" content="#f8f9fb" />
         <Meta />
         <Links />
+        {/* Resolve the appearance before the browser paints the first frame. */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
         {children}

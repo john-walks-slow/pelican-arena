@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
 import { PelicanMark } from "./pelican-mark";
+import { ThemeMenu } from "./theme-menu";
 import { Button } from "./ui/button";
 import { LinuxDoIcon } from "./ui/linuxdo-icon";
 
@@ -253,7 +254,10 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
 
       <aside className="shell-aside sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
         <div className="space-y-5">
-          <Brand />
+          <div className="flex items-center justify-between">
+            <Brand />
+            <ThemeMenu />
+          </div>
           <NavItems user={user} />
         </div>
         <Account user={user} />
@@ -265,7 +269,10 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
         className="shell-header shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
       >
         <Brand />
-        <MenuButton open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
+        <div className="flex items-center">
+          <ThemeMenu className="size-10" />
+          <MenuButton open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
+        </div>
       </header>
 
       {menuMounted && (

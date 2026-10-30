@@ -1,7 +1,9 @@
 @import "tailwindcss" source(".");
 @import "tw-animate-css";
 
-/* Appearance follows the system preference; there is no manual override. */
+/* Explicit appearance control: the inline script in <head> resolves the stored
+   preference (or the system one) into `data-theme` before the first paint. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
 @theme {
   --font-sans: "DM Sans", "PingFang SC", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
@@ -109,59 +111,58 @@
   --skeleton-sheen: rgb(255 255 255 / 0.55);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
+[data-theme="dark"] {
+  color-scheme: dark;
+  color-scheme: dark;
 
-    --ground: #0f1114;
-    --surface: #16191e;
-    --raised: #1d2127;
-    --active: #262b33;
-    --border: #2a2f37;
-    --rule: #1f2329;
-    --control: #3a414b;
-    --ink: #e9ebef;
-    --muted: #98a0ab;
+  --ground: #0f1114;
+  --surface: #16191e;
+  --raised: #1d2127;
+  --active: #262b33;
+  --border: #2a2f37;
+  --rule: #1f2329;
+  --control: #3a414b;
+  --ink: #e9ebef;
+  --muted: #98a0ab;
 
-    --primary: #e9ebef;
-    --primary-ink: #14171b;
-    --primary-hover: #ffffff;
-    --scrim: rgb(0 0 0 / 0.62);
+  --primary: #e9ebef;
+  --primary-ink: #14171b;
+  --primary-hover: #ffffff;
+  --scrim: rgb(0 0 0 / 0.62);
 
-    --accent: #f08a52;
-    --accent-soft: #2a1a12;
-    --accent-track: #4a2a1a;
-    --accent-ink: #f6b795;
+  --accent: #f08a52;
+  --accent-soft: #2a1a12;
+  --accent-track: #4a2a1a;
+  --accent-ink: #f6b795;
 
-    --positive: #56c892;
-    --negative: #f07a7a;
-    --negative-solid: #b8262d;
-    --warning: #e3b25f;
-    --pill-positive: #12271c;
-    --pill-positive-ink: #7fdbab;
-    --pill-negative: #2b1618;
-    --pill-negative-ink: #f19a9a;
-    --pill-warning: #2a2110;
-    --pill-warning-ink: #edc273;
+  --positive: #56c892;
+  --negative: #f07a7a;
+  --negative-solid: #b8262d;
+  --warning: #e3b25f;
+  --pill-positive: #12271c;
+  --pill-positive-ink: #7fdbab;
+  --pill-negative: #2b1618;
+  --pill-negative-ink: #f19a9a;
+  --pill-warning: #2a2110;
+  --pill-warning-ink: #edc273;
 
-    --card-shadow:
-      0 10px 24px -12px rgb(0 0 0 / 0.6),
-      0 2px 8px -3px rgb(0 0 0 / 0.45);
-    --btn-primary-shadow:
-      0 1px 2px 0 rgb(0 0 0 / 0.45),
-      0 3px 8px -1px rgb(0 0 0 / 0.35),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.9),
-      inset 0 -1px 0 0 rgb(0 0 0 / 0.12);
-    --btn-primary-shadow-hover:
-      0 2px 4px 0 rgb(0 0 0 / 0.5),
-      0 5px 12px -2px rgb(0 0 0 / 0.45),
-      inset 0 1px 0 0 rgb(255 255 255 / 1),
-      inset 0 -1px 0 0 rgb(0 0 0 / 0.15);
-    --btn-control-shadow:
-      0 1px 2px 0 rgb(0 0 0 / 0.2),
-      inset 0 1px 0 0 rgb(255 255 255 / 0.05);
-    --skeleton-sheen: rgb(255 255 255 / 0.06);
-  }
+  --card-shadow:
+    0 10px 24px -12px rgb(0 0 0 / 0.6),
+    0 2px 8px -3px rgb(0 0 0 / 0.45);
+  --btn-primary-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.45),
+    0 3px 8px -1px rgb(0 0 0 / 0.35),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.9),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.12);
+  --btn-primary-shadow-hover:
+    0 2px 4px 0 rgb(0 0 0 / 0.5),
+    0 5px 12px -2px rgb(0 0 0 / 0.45),
+    inset 0 1px 0 0 rgb(255 255 255 / 1),
+    inset 0 -1px 0 0 rgb(0 0 0 / 0.15);
+  --btn-control-shadow:
+    0 1px 2px 0 rgb(0 0 0 / 0.2),
+    inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  --skeleton-sheen: rgb(255 255 255 / 0.06);
 }
 
 html {
