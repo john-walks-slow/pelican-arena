@@ -14,6 +14,7 @@ import { Avatar } from "~/components/avatar";
 import { Markdown } from "~/components/markdown";
 import { PageHeader } from "~/components/page-header";
 import { LiveFrame } from "~/components/page-preview";
+import { ShareDialog } from "~/components/share-dialog";
 import { SourceViewer } from "~/components/source-viewer";
 import { StarRating } from "~/components/star-rating";
 import { StarScore } from "~/components/stars";
@@ -63,6 +64,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
     myRating,
     usercontentOrigin: origins(request).usercontent,
+    appOrigin: origins(request).app,
   };
 }
 
@@ -125,7 +127,7 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
 }
 
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
-  const { submission: s, prompt, myRating, usercontentOrigin } = loaderData;
+  const { submission: s, prompt, myRating, usercontentOrigin, appOrigin } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
   const navigation = useNavigation();
@@ -181,6 +183,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                 </Link>
               </Button>
             )}
+            <ShareDialog
+              path={`/s/${s.id}`}
+              title={`${s.model.name} · ${s.provider.name} — ${prompt.title}`}
+              appOrigin={appOrigin}
+            />
             <Button asChild variant="outline" className="gap-1.5">
               <a href={pageUrl} target="_blank" rel="noreferrer">
                 <ExternalLink className="size-4" strokeWidth={1.75} />

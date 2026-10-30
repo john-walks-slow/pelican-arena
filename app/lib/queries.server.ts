@@ -613,3 +613,11 @@ export async function siteStats() {
   ]);
   return { prompts: p.n, submissions: s.n, ratings: r.n };
 }
+
+export async function countActiveAnswers(promptId: string) {
+  const [row] = await db()
+    .select({ n: count() })
+    .from(submissions)
+    .where(and(eq(submissions.promptId, promptId), eq(submissions.status, "active")));
+  return row?.n ?? 0;
+}

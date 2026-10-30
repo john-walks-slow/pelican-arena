@@ -19,6 +19,7 @@ import { LoadMore } from "~/components/load-more";
 import { Markdown } from "~/components/markdown";
 import { OutputRequirements } from "~/components/output-requirements";
 import { PageHeader } from "~/components/page-header";
+import { ShareDialog } from "~/components/share-dialog";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
@@ -78,6 +79,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     sort,
     key,
     usercontentOrigin: origins(request).usercontent,
+    appOrigin: origins(request).app,
   };
 }
 
@@ -162,7 +164,7 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
 }
 
 export default function PromptPage({ loaderData }: Route.ComponentProps) {
-  const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin } = loaderData;
+  const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin, appOrigin } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
   const { search } = useLocation();
@@ -252,6 +254,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                 </Link>
               </Button>
             )}
+            <ShareDialog path={`/p/${prompt.id}`} title={prompt.title} appOrigin={appOrigin} />
             <Button
               variant="outline"
               onClick={copy}
