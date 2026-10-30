@@ -24,7 +24,8 @@ interface ShareDialogProps {
 }
 
 export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogProps) {
-  const [format, setFormat] = useState<ShareFormat>("link");
+  // 默认直接选中与 Linux DO 论坛 100% 完美兼容的专属卡片代码
+  const [format, setFormat] = useState<ShareFormat>("forum");
   const [copied, setCopied] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
 
@@ -32,15 +33,14 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
 
   const origin = appOrigin.replace(/\/+$/, "");
   const pageUrl = `${origin}${path}`;
-  // 预览图 / og:image 链接
-  const thumbUrl = `${pageUrl}/card.svg`;
-  const snippet = shareSnippet({ pageUrl, cardUrl: thumbUrl, title }, format);
+  const cardUrl = `${pageUrl}/card.svg`;
+  const snippet = shareSnippet({ pageUrl, cardUrl, title }, format);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(snippet);
       setCopied(true);
-      toast.success("已复制到剪贴板");
+      toast.success("已复制到剪贴板，可直接发到 Linux DO");
       setTimeout(() => setCopied(false), 1800);
     } catch {
       toast.error("复制失败，请手动选择文本");
@@ -59,8 +59,8 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
       </DialogTrigger>
       <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
-          <DialogTitle>分享</DialogTitle>
-          <DialogDescription className="sr-only">复制分享链接或卡片</DialogDescription>
+          <DialogTitle>分享到论坛</DialogTitle>
+          <DialogDescription className="sr-only">复制专属卡片代码直接发帖</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4 px-5 py-4">
           {/* 实时卡片预览 */}
@@ -80,15 +80,15 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
               ) : (
                 <Copy className="size-4" strokeWidth={1.75} />
               )}
-              {copied ? "已复制" : "复制"}
+              {copied ? "已复制" : "复制代码"}
             </Button>
           </div>
           <textarea
             readOnly
             value={snippet}
-            rows={format === "link" ? 1 : 3}
+            rows={format === "forum" || format === "html" ? 3 : 2}
             onFocus={(e) => e.currentTarget.select()}
-            className="num block w-full resize-none rounded-control border border-control bg-raised px-3 py-2 text-xs leading-relaxed break-all text-ink outline-none focus:border-accent"
+            className="num block w-full resize-none rounded-control border border-control bg-raised px-3 py-2 text-xs leading-relaxed break-all text-ink outline-none focus:border-accent font-mono"
           />
         </DialogBody>
         {canNativeShare && (

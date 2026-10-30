@@ -45,7 +45,8 @@ describe("share cards", () => {
 
 describe("share snippets", () => {
   const target = { pageUrl: "https://a.test/s/1", cardUrl: "https://a.test/s/1/card.svg", title: "A [x]" };
-  it("builds each format", () => {
+  it("builds each format including forum picture format", () => {
+    expect(shareSnippet(target, "forum")).toContain('<picture><source type="image/svg+xml"');
     expect(shareSnippet(target, "markdown")).toBe("[![A \\[x\\]](https://a.test/s/1/card.svg)](https://a.test/s/1)");
     expect(shareSnippet(target, "html")).toContain('<a href="https://a.test/s/1"><img src="https://a.test/s/1/card.svg"');
     expect(shareSnippet(target, "link")).toBe("https://a.test/s/1");
