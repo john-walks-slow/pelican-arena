@@ -1,6 +1,6 @@
 import { Loader2, PenLine, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { data, Link, useFetcher } from "react-router";
+import { data, Link, useFetcher, useLocation } from "react-router";
 import type { Route } from "./+types/me";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { LoadMore } from "~/components/load-more";
@@ -20,6 +20,7 @@ import {
   listOwnSubmissions,
   ownContentCounts,
 } from "~/lib/queries.server";
+import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { setSubmissionStatus } from "~/lib/submissions.server";
 import { requireUser } from "~/lib/session.server";
 
@@ -47,6 +48,15 @@ export async function loader({ request }: Route.LoaderArgs) {
     return { ...shared, tab: "answers" as const, result: await listOwnSubmissions(user.id, page) };
   }
   return { ...shared, tab: "prompts" as const, result: await listOwnPrompts(user.id, page) };
+}
+
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
+}
+
+export async function clientAction({ serverAction }: Route.ClientActionArgs) {
+  clearRouteCache();
+  return serverAction();
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -106,8 +116,9 @@ function TabLink({
   return (
     <Link
       to={to}
+      prefetch="intent"
       aria-current={active ? "page" : undefined}
-      className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-colors ${
+      className={`-mb-px flex items-center gap-2 border-b-2 px-1 pb-3 text-sm transition-[color] duration-150 ${
         active
           ? "border-ink font-medium text-ink"
           : "border-transparent text-muted hover:text-ink"
@@ -143,6 +154,7 @@ function PromptRowItem({
           </span>
           <Link
             to={withFrom(`/p/${prompt.id}`, from)}
+            prefetch="intent"
             className="truncate text-[15px] font-semibold tracking-tight hover:text-accent-ink"
           >
             {prompt.title}
@@ -206,12 +218,14 @@ function PromptList({
 }) {
   const [items, setItems] = useState(result.prompts);
   const [next, setNext] = useState(result.nextPage);
+  const [source, setSource] = useState(result);
   const fetcher = useFetcher<Awaited<ReturnType<typeof listOwnPrompts>>>();
 
-  useEffect(() => {
+  if (source !== result) {
+    setSource(result);
     setItems(result.prompts);
     setNext(result.nextPage);
-  }, [result]);
+  }
 
   const more = fetcher.data;
   useEffect(() => {
@@ -230,7 +244,7 @@ function PromptList({
 
   return (
     <>
-      <ul className="mt-5 divide-y divide-rule overflow-hidden rounded-card border border-border bg-surface">
+      <ul className="reveal-tier-2 mt-5 divide-y divide-rule overflow-hidden rounded-card border border-border bg-surface">
         {items.map((prompt) => (
           <PromptRowItem key={prompt.id} prompt={prompt} from={from} onDelete={onDelete} />
         ))}
@@ -391,12 +405,14 @@ function AnswerList({
 }) {
   const [items, setItems] = useState(result.submissions);
   const [next, setNext] = useState(result.nextPage);
+  const [source, setSource] = useState(result);
   const fetcher = useFetcher<Awaited<ReturnType<typeof listOwnSubmissions>>>();
 
-  useEffect(() => {
+  if (source !== result) {
+    setSource(result);
     setItems(result.submissions);
     setNext(result.nextPage);
-  }, [result]);
+  }
 
   const more = fetcher.data;
   useEffect(() => {
@@ -426,7 +442,7 @@ function AnswerList({
 
   return (
     <>
-      <ul className="mt-5 divide-y divide-rule overflow-hidden rounded-card border border-border bg-surface">
+      <ul className="reveal-tier-2 mt-5 divide-y divide-rule overflow-hidden rounded-card border border-border bg-surface">
         {items.map((answer) => (
           <AnswerRowItem
             key={answer.id}
@@ -451,14 +467,20 @@ function AnswerList({
 
 export default function Me({ loaderData }: Route.ComponentProps) {
   const { counts, tab, result, canCreate, usercontentOrigin } = loaderData;
+  const { pathname, search } = useLocation();
   const actionFetcher = useFetcher<ActionResult>();
   const [pending, setPending] = useState<PendingAction | null>(null);
 
   useEffect(() => {
-    const result = actionFetcher.data;
-    if (!result) return;
-    if ("error" in result) toast.error(result.error);
-    else toast.success(result.message);
+    primeRouteCache(`${pathname}${search}`, loaderData);
+  }, [pathname, search, loaderData]);
+
+  useEffect(() => {
+    const res = actionFetcher.data;
+    if (!res) return;
+    clearRouteCache();
+    if ("error" in res) toast.error(res.error);
+    else toast.success(res.message);
     setPending(null);
   }, [actionFetcher.data]);
 
@@ -477,7 +499,7 @@ export default function Me({ loaderData }: Route.ComponentProps) {
         actions={
           canCreate ? (
             <Button asChild variant="primary" className="gap-1.5">
-              <Link to="/prompts/new">
+              <Link to="/prompts/new" prefetch="intent">
                 <PenLine className="size-4" strokeWidth={1.75} />
                 出题
               </Link>
@@ -486,7 +508,7 @@ export default function Me({ loaderData }: Route.ComponentProps) {
         }
       />
 
-      <div className="mt-3 flex items-end gap-5 border-b border-border">
+      <div className="reveal-tier-1 mt-3 flex items-end gap-5 border-b border-border">
         <TabLink
           to="/me"
           active={tab === "prompts"}
@@ -520,7 +542,7 @@ export default function Me({ loaderData }: Route.ComponentProps) {
         <div className="mt-6 rounded-card border border-dashed border-control px-6 py-14 text-center">
           <p className="text-sm text-muted">还没有交过答案。</p>
           <Button asChild variant="outline" className="mt-4">
-            <Link to="/">去题目列表看看</Link>
+            <Link to="/" prefetch="intent">去题目列表看看</Link>
           </Button>
         </div>
       ) : (

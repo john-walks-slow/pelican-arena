@@ -38,6 +38,7 @@ import {
 import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
 import { flashToast, getUser, requireUser } from "~/lib/session.server";
+import { isDetailActive } from "~/lib/shared-transition";
 import { setSubmissionStatus } from "~/lib/submissions.server";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
@@ -230,7 +231,10 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       />
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
+        <section
+          style={isDetailActive(s.id) ? { viewTransitionName: "shared-card" } : undefined}
+          className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface"
+        >
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(
               [
@@ -290,7 +294,10 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
           {tab === "preview" ? (
-            <div id="work-panel" className="h-[min(74vh,860px)] bg-surface">
+            <div
+              id="work-panel"
+              className="h-[min(74vh,860px)] bg-surface"
+            >
               {kind === "web" ? (
                 <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />
               ) : kind === "svg" ? (

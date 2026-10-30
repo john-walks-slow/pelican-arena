@@ -561,20 +561,31 @@ export async function getPromptFacets(promptId: string): Promise<PromptFacets> {
 }
 
 export async function getSubmission(id: string) {
-  const rows = await submissionQuery().where(eq(submissions.id, id));
-  if (rows.length === 0) return null;
-  const [row] = await attachMods(rows);
-  const [extra] = await db()
-    .select({
-      files: submissions.files,
-      notes: submissions.notes,
-      content: submissions.content,
-      status: submissions.status,
-      authorId: submissions.authorId,
-    })
-    .from(submissions)
-    .where(eq(submissions.id, id));
-  return { ...row, ...extra };
+  const [rows, modLinks] = await Promise.all([
+    db()
+      .select({
+        ...submissionColumns,
+        files: submissions.files,
+        notes: submissions.notes,
+        content: submissions.content,
+        status: submissions.status,
+        authorId: submissions.authorId,
+      })
+      .from(submissions)
+      .innerJoin(users, eq(users.id, submissions.authorId))
+      .innerJoin(models, eq(models.id, submissions.modelId))
+      .innerJoin(providers, eq(providers.id, submissions.providerId))
+      .leftJoin(harnesses, eq(harnesses.id, submissions.harnessId))
+      .where(eq(submissions.id, id)),
+    db()
+      .select({ id: mods.id, name: mods.name })
+      .from(submissionMods)
+      .innerJoin(mods, eq(mods.id, submissionMods.modId))
+      .where(eq(submissionMods.submissionId, id)),
+  ]);
+  const row = rows[0];
+  if (!row) return null;
+  return { ...row, mods: modLinks };
 }
 
 export async function getUserRating(userId: number, submissionId: string) {

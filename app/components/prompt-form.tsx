@@ -49,7 +49,7 @@ export function PromptForm({
   return (
     <Form
       method="post"
-      className="mt-3 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]"
+      className="reveal-tier-1 mt-3 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]"
     >
       <div className="rounded-card border border-border bg-surface">
         {locked && (

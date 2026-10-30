@@ -28,6 +28,11 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   const object = await bucket.get(bundleKey(id, clean));
   if (!object) return new Response("Not Found", { status: 404 });
 
+  // Gallery previews get a short private cache so navigating back reuses the
+  // document instead of flashing the skeleton again. Direct visits and full
+  // submissions stay `no-store`: a retracted answer must take effect at once.
+  const preview = url.searchParams.has("preview");
+
   const headers = new Headers({
     "Content-Type": contentTypeFor(clean),
     "Content-Security-Policy": `sandbox ${SANDBOX}`,
@@ -35,7 +40,9 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
     "Access-Control-Allow-Origin": "*",
     "Cross-Origin-Resource-Policy": "cross-origin",
     "Referrer-Policy": "no-referrer",
-    "Cache-Control": "no-store",
+    "Cache-Control": preview
+      ? "private, max-age=60, stale-while-revalidate=60"
+      : "no-store",
     ETag: object.httpEtag,
   });
   return new Response(request.method === "HEAD" ? null : object.body, { headers });

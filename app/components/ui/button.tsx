@@ -4,24 +4,27 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "~/lib/utils";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition-colors focus-visible:outline-none disabled:pointer-events-none disabled:cursor-not-allowed select-none",
+  "inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-control font-medium transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:cursor-not-allowed select-none",
   {
     variants: {
       variant: {
-        default: "bg-ink text-white hover:bg-black disabled:bg-raised disabled:text-muted",
-        primary: "bg-ink text-white hover:bg-black disabled:bg-raised disabled:text-muted",
+        primary:
+          "border border-black/15 bg-primary font-semibold text-primary-ink shadow-btn-primary hover:bg-primary-hover hover:shadow-btn-primary-hover active:scale-[0.985] active:translate-y-[0.5px] active:shadow-none disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none dark:border-white/20",
+        default:
+          "border border-black/10 bg-primary font-medium text-primary-ink shadow-xs hover:bg-primary-hover active:scale-[0.985] active:translate-y-[0.5px] disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none dark:border-white/10",
         destructive:
-          "bg-negative text-white hover:bg-[#a61c22] disabled:bg-raised disabled:text-muted",
+          "border border-negative-solid/20 bg-negative-solid font-medium text-white shadow-btn-primary hover:bg-negative-solid/90 active:scale-[0.985] active:translate-y-[0.5px] disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none",
         outline:
-          "border border-control bg-surface text-ink hover:border-ink/30 hover:bg-raised disabled:border-border disabled:bg-surface disabled:text-muted",
+          "border border-control bg-surface font-medium text-ink shadow-btn-control hover:border-ink/30 hover:bg-raised active:scale-[0.985] active:translate-y-[0.5px] disabled:border-border disabled:bg-surface disabled:text-muted disabled:shadow-none",
         secondary:
-          "bg-raised text-ink hover:bg-active disabled:bg-surface disabled:text-muted",
-        ghost: "text-muted hover:bg-raised hover:text-ink disabled:text-muted/60",
-        link: "h-auto p-0 text-accent underline-offset-4 hover:underline disabled:text-muted",
-        linuxdo: "bg-[#1c1c1e] text-white hover:bg-black disabled:bg-raised disabled:text-muted",
+          "border border-transparent bg-raised font-medium text-ink shadow-2xs hover:bg-active active:scale-[0.985] active:translate-y-[0.5px] disabled:bg-surface disabled:text-muted disabled:shadow-none",
+        ghost: "font-medium text-muted hover:bg-raised hover:text-ink disabled:text-muted/60",
+        link: "h-auto p-0 font-medium text-accent underline-offset-4 hover:underline disabled:text-muted",
+        linuxdo:
+          "border border-black/20 bg-[#1c1c1e] font-medium text-white shadow-btn-primary hover:bg-black hover:shadow-btn-primary-hover active:scale-[0.985] active:translate-y-[0.5px] disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none dark:border-white/15 dark:bg-[#1c1c1e] dark:text-white dark:hover:bg-[#26262a]",
       },
       size: {
-        default: "h-8 px-3 text-sm",
+        default: "h-8 px-3.5 text-xs sm:text-sm",
         sm: "h-7 px-2.5 text-xs",
         lg: "h-9 px-4 text-sm",
         icon: "h-8 w-8 p-0",

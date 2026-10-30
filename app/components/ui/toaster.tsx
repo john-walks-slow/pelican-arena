@@ -15,7 +15,7 @@ export const Toaster = ({ ...props }: ToasterProps) => {
           toast:
             "group toast !rounded-card !border !border-border !bg-surface !text-ink !text-[13px] !shadow-lg",
           description: "!text-muted",
-          actionButton: "!bg-ink !text-white",
+          actionButton: "!bg-primary !text-primary-ink",
           cancelButton: "!bg-raised !text-ink",
           icon: "!text-accent",
         },

@@ -54,11 +54,19 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
 
     let delta = 0;
     let rafId = 0;
+    let mounted = false;
     const desktopMql = window.matchMedia(DESKTOP_QUERY);
     const reducedMql = window.matchMedia(REDUCED_MOTION_QUERY);
 
     const applyScroll = () => {
       rafId = 0;
+      // On fresh navigation / mount, guarantee uncollapsed state so the header
+      // never flashes in sticky compact mode before scroll restoration completes.
+      if (!mounted) {
+        header.style.setProperty("--p", "0");
+        header.dataset.compact = "false";
+        return;
+      }
       const y = Math.max(0, window.scrollY);
       if (reducedMql.matches) {
         const compact = delta > 4 ? y >= delta * 0.5 : y > 8;
@@ -156,6 +164,15 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
     };
 
     measure();
+    header.style.setProperty("--p", "0");
+    header.dataset.compact = "false";
+
+    const rafMount = window.requestAnimationFrame(() => {
+      mounted = true;
+      if (window.scrollY > 0) {
+        applyScroll();
+      }
+    });
 
     const ro = new ResizeObserver(measure);
     ro.observe(inner);
@@ -166,6 +183,7 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
     reducedMql.addEventListener("change", applyScroll);
 
     return () => {
+      window.cancelAnimationFrame(rafMount);
       if (rafId) window.cancelAnimationFrame(rafId);
       ro.disconnect();
       window.removeEventListener("scroll", onScroll);

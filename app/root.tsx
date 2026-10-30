@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
 import { useEffect, useRef, ViewTransition } from "react";
@@ -14,9 +15,49 @@ import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
+import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
+import { consumeSharedTransitionMode } from "./lib/shared-transition";
 import "./app.css";
+
+type RouteMotion =
+  | "steady"
+  | "forward"
+  | "back"
+  | "lateral-down"
+  | "lateral-up"
+  | "shared-expand"
+  | "shared-collapse";
+
+function screenRank(key: string): { depth: number; slot: number } {
+  if (key === "/") return { depth: 0, slot: 0 };
+  if (key === "/prompts/new") return { depth: 0, slot: 1 };
+  if (key.startsWith("/me")) return { depth: 0, slot: 2 };
+  if (key.startsWith("/auth")) return { depth: 0, slot: 3 };
+  if (/^\/p\/[^/]+\/edit$/.test(key)) return { depth: 2, slot: 0 };
+  if (key.startsWith("/p/")) return { depth: 1, slot: 0 };
+  if (key.startsWith("/s/") || key.startsWith("/compare")) return { depth: 2, slot: 0 };
+  return { depth: 1, slot: 0 };
+}
+
+function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
+  if (prevKey === nextKey) return "steady";
+
+  // If a shared element container transition was explicitly scheduled (e.g. card click)
+  const shared = consumeSharedTransitionMode();
+  if (shared === "expand") return "shared-expand";
+  if (shared === "collapse") return "shared-collapse";
+
+  const prev = screenRank(prevKey);
+  const next = screenRank(nextKey);
+  if (next.depth > prev.depth) return "forward";
+  if (next.depth < prev.depth) return "back";
+  if (next.depth === 0 && prev.depth === 0) {
+    return next.slot >= prev.slot ? "lateral-down" : "lateral-up";
+  }
+  return "forward";
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
@@ -53,12 +94,31 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
 }
 
+export function shouldRevalidate({
+  formMethod,
+  actionResult,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") {
+    clearRouteCache();
+    return defaultShouldRevalidate;
+  }
+  if (actionResult !== undefined) {
+    clearRouteCache();
+    return defaultShouldRevalidate;
+  }
+  return false;
+}
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="color-scheme" content="light dark" />
+        <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f8f9fb" />
+        <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0f1114" />
         <Meta />
         <Links />
       </head>
@@ -80,31 +140,6 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
   return null;
 }
 
-type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up";
-
-function screenRank(key: string): { depth: number; slot: number } {
-  if (key === "/") return { depth: 0, slot: 0 };
-  if (key === "/prompts/new") return { depth: 0, slot: 1 };
-  if (key.startsWith("/me")) return { depth: 0, slot: 2 };
-  if (key.startsWith("/auth")) return { depth: 0, slot: 3 };
-  if (/^\/p\/[^/]+\/edit$/.test(key)) return { depth: 2, slot: 0 };
-  if (key.startsWith("/p/")) return { depth: 1, slot: 0 };
-  if (key.startsWith("/s/") || key.startsWith("/compare")) return { depth: 2, slot: 0 };
-  return { depth: 1, slot: 0 };
-}
-
-function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
-  if (prevKey === nextKey) return "steady";
-  const prev = screenRank(prevKey);
-  const next = screenRank(nextKey);
-  if (next.depth > prev.depth) return "forward";
-  if (next.depth < prev.depth) return "back";
-  if (next.depth === 0 && prev.depth === 0) {
-    return next.slot >= prev.slot ? "lateral-down" : "lateral-up";
-  }
-  return "forward";
-}
-
 function RouteTransition({ children }: { children: React.ReactNode }) {
   const { pathname } = useLocation();
   useTrackNavigationHistory();
@@ -119,6 +154,16 @@ function RouteTransition({ children }: { children: React.ReactNode }) {
     stateRef.current = { key: screenKey, motion };
     if (typeof document !== "undefined") {
       document.documentElement.dataset.navDir = motion;
+    }
+    // Synchronously reset window scroll to top when mounting a new screen.
+    // Old view was already captured; new view renders and is captured cleanly at top=0,
+    // completely eliminating the flash to the top.
+    if (typeof window !== "undefined" && motion !== "shared-collapse") {
+      try {
+        window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+      } catch {
+        window.scrollTo(0, 0);
+      }
     }
   }
 
@@ -135,7 +180,11 @@ function RouteTransition({ children }: { children: React.ReactNode }) {
         document.documentElement.dataset.navDir = motion;
       }}
     >
-      <div data-motion={motion} className="route-stage">
+      <div
+        data-motion={motion}
+        style={{ viewTransitionName: "vt-screen" }}
+        className="route-stage"
+      >
         {children}
       </div>
     </ViewTransition>

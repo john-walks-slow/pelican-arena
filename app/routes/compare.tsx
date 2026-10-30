@@ -1,4 +1,5 @@
 import { ArrowUpRight } from "lucide-react";
+import type { CSSProperties } from "react";
 import { data, Link } from "react-router";
 import type { Route } from "./+types/compare";
 import { Markdown } from "~/components/markdown";
@@ -8,6 +9,7 @@ import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
 import { origins } from "~/lib/origins.server";
 import { getPrompt, getSubmission } from "~/lib/queries.server";
+import { cachedClientLoader } from "~/lib/route-cache";
 import { submissionUrl } from "~/lib/sandbox";
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [
@@ -32,6 +34,10 @@ export async function loader({ request }: Route.LoaderArgs) {
   };
 }
 
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
+}
+
 const COLS: Record<number, string> = {
   2: "lg:grid-cols-2",
   3: "lg:grid-cols-3",
@@ -48,10 +54,11 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
       />
 
       <div className={`mt-2.5 grid gap-4 ${COLS[submissions.length]}`}>
-        {submissions.map((s) => (
+        {submissions.map((s, index) => (
           <section
             key={s.id}
-            className="flex flex-col overflow-hidden rounded-card border border-border bg-surface"
+            style={{ "--stagger": `${index * 20}ms` } as CSSProperties}
+            className="reveal-card flex flex-col overflow-hidden rounded-card border border-border bg-surface"
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-3.5 py-2.5">
               <div className="min-w-0">
@@ -59,6 +66,7 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
                   <h2 className="truncate text-sm font-semibold">{s.model.name}</h2>
                   <Link
                     to={`/s/${s.id}`}
+                    prefetch="intent"
                     className="text-muted hover:text-accent transition-colors shrink-0"
                     title="查看详情"
                   >
@@ -92,7 +100,7 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
                 />
               </div>
             ) : (
-              <div className="h-[68vh] overflow-y-auto scroll-thin bg-white px-6 py-6">
+              <div className="h-[68vh] overflow-y-auto scroll-thin bg-surface px-6 py-6">
                 <Markdown>{s.content ?? ""}</Markdown>
               </div>
             )}

@@ -41,6 +41,11 @@ import {
   type SubmissionSort,
 } from "~/lib/queries.server";
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
+import {
+  isCardActive,
+  isDetailActive,
+  prepareCardTransition,
+} from "~/lib/shared-transition";
 import { useOptionalUser } from "~/lib/use-user";
 
 const MAX_COMPARE = 4;
@@ -315,7 +320,10 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         }
       />
 
-      <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
+      <section
+        style={isDetailActive(prompt.id) ? { viewTransitionName: "shared-card" } : undefined}
+        className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5"
+      >
         <div className="max-h-64 overflow-y-auto scroll-thin">
           <Markdown>{prompt.body}</Markdown>
         </div>
@@ -344,58 +352,70 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                 const row = Math.floor(index / 3);
                 const col = index % 3;
                 const rippleWave = row + col;
+                const isCardThisActive = isCardActive(s.id);
                 return (
                   <li
                     key={s.id}
                     style={{ "--stagger": `${Math.min(rippleWave, 7) * 22}ms` } as CSSProperties}
-                    className={`reveal-card arena-card overflow-hidden rounded-card border bg-surface ${
-                      isSelected ? "border-accent" : "border-border hover:border-control"
-                    }`}
+                    className="reveal-card"
                   >
-                    <Link
-                      to={answerHref(s.id)}
-                      prefetch="intent"
-                      aria-label={`${s.model.name} · ${s.provider.name}`}
+                    <div
+                      style={
+                        isCardThisActive ? { viewTransitionName: "shared-card" } : undefined
+                      }
+                      className={`arena-card overflow-hidden rounded-card border bg-surface ${
+                        isSelected ? "border-accent" : "border-border hover:border-control"
+                      }`}
                     >
-                      <SubmissionPreview
-                        kind={prompt.kind}
-                        submissionId={s.id}
-                        origin={usercontentOrigin}
-                        title={s.model.name}
-                        excerpt={s.excerpt}
-                      />
-                    </Link>
-                    <div className="px-3.5 pt-3 pb-3">
-                      <div className="flex items-start justify-between gap-3">
-                        <Link
-                          to={answerHref(s.id)}
-                          prefetch="intent"
-                          className="min-w-0 hover:text-accent-ink"
-                        >
-                          <div className="truncate text-sm font-semibold">{s.model.name}</div>
-                          <div className="truncate text-[13px] text-muted">
-                            {s.provider.name}
-                            {s.harness && ` · ${s.harness.name}`}
-                          </div>
-                        </Link>
-                        <StarScore starSum={s.starSum} votes={s.votes} />
-                      </div>
-                      <div className="mt-2.5 flex items-center justify-between gap-2">
-                        <div className="flex min-w-0 flex-wrap items-center gap-1">
-                          <ModTags mods={s.mods} />
+                      <Link
+                        to={answerHref(s.id)}
+                        prefetch="intent"
+                        onClick={(e) => prepareCardTransition(e, s.id)}
+                        aria-label={`${s.model.name} · ${s.provider.name}`}
+                      >
+                        <SubmissionPreview
+                          kind={prompt.kind}
+                          submissionId={s.id}
+                          origin={usercontentOrigin}
+                          title={s.model.name}
+                          excerpt={s.excerpt}
+                        />
+                      </Link>
+                      <div className="px-3.5 pt-3 pb-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <Link
+                            to={answerHref(s.id)}
+                            prefetch="intent"
+                            onClick={(e) => prepareCardTransition(e, s.id)}
+                            className="min-w-0 hover:text-accent-ink"
+                          >
+                            <div className="truncate text-sm font-semibold">
+                              {s.model.name}
+                            </div>
+                            <div className="truncate text-[13px] text-muted">
+                              {s.provider.name}
+                              {s.harness && ` · ${s.harness.name}`}
+                            </div>
+                          </Link>
+                          <StarScore starSum={s.starSum} votes={s.votes} />
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => toggle(s.id)}
-                          aria-pressed={isSelected}
-                          disabled={!isSelected && selected.length >= MAX_COMPARE}
-                          className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors ${
-                            isSelected ? "text-accent-ink" : "text-muted hover:text-ink"
-                          }`}
-                        >
-                          <Columns2 className="size-3.5" strokeWidth={1.75} />
-                          {isSelected ? "已选" : "对比"}
-                        </button>
+                        <div className="mt-2.5 flex items-center justify-between gap-2">
+                          <div className="flex min-w-0 flex-wrap items-center gap-1">
+                            <ModTags mods={s.mods} />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => toggle(s.id)}
+                            aria-pressed={isSelected}
+                            disabled={!isSelected && selected.length >= MAX_COMPARE}
+                            className={`inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-xs transition-colors ${
+                              isSelected ? "text-accent-ink" : "text-muted hover:text-ink"
+                            }`}
+                          >
+                            <Columns2 className="size-3.5" strokeWidth={1.75} />
+                            {isSelected ? "已选" : "对比"}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </li>

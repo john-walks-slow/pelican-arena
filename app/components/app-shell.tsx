@@ -30,7 +30,7 @@ export function baseScreenKey(pathname: string) {
 
 function Brand() {
   return (
-    <Link to="/" className="flex items-center gap-2 px-1.5">
+    <Link to="/" prefetch="intent" className="flex items-center gap-2 px-1.5">
       <PelicanMark className="size-6 text-accent" />
       <span className="text-[15px] font-semibold tracking-tight">Pelican Arena</span>
     </Link>
@@ -40,43 +40,51 @@ function Brand() {
 function NavItems({
   onNavigate,
   user,
-  morphPill = false,
+  slidingPill = true,
 }: {
   onNavigate?: () => void;
   user: ShellUser | null;
-  morphPill?: boolean;
+  slidingPill?: boolean;
 }) {
+  const { pathname } = useLocation();
   const items = user
     ? [...NAV, { to: "/me", label: "我的", icon: UserRound, end: false }]
     : NAV;
+  const activeIndex = items.findIndex(({ to, end }) =>
+    end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`),
+  );
+
   return (
-    <nav className="flex flex-col gap-0.5">
+    <nav className="relative flex flex-col gap-0.5">
+      {slidingPill && activeIndex >= 0 && (
+        <span
+          aria-hidden="true"
+          style={{ transform: `translate3d(0, ${activeIndex * 38}px, 0)` }}
+          className="pointer-events-none absolute inset-x-0 top-0 h-9 rounded-control bg-raised transition-transform duration-200 ease-[var(--ease-spatial)] motion-reduce:transition-none"
+        />
+      )}
       {items.map(({ to, label, icon: Icon, end }) => (
         <NavLink
           key={to}
           to={to}
           end={end}
+          prefetch="intent"
           onClick={onNavigate}
           className={({ isActive }) =>
-            `relative flex h-9 items-center gap-2.5 rounded-control px-2.5 text-sm transition-colors duration-150 ${
-              isActive ? "font-medium text-ink" : "text-muted hover:bg-raised/70 hover:text-ink"
+            `relative z-10 flex h-9 items-center gap-2.5 rounded-control px-2.5 text-sm transition-colors duration-150 ${
+              isActive
+                ? `${slidingPill ? "" : "bg-raised "}font-medium text-ink`
+                : "text-muted hover:bg-raised/65 hover:text-ink"
             }`
           }
         >
           {({ isActive }) => (
             <>
-              {isActive && (
-                <span
-                  aria-hidden="true"
-                  style={morphPill ? { viewTransitionName: "nav-active-pill" } : undefined}
-                  className="pointer-events-none absolute inset-0 rounded-control bg-raised"
-                />
-              )}
               <Icon
-                className={`relative z-10 size-4 transition-colors duration-150 ${isActive ? "text-accent" : ""}`}
+                className={`size-4 transition-colors duration-150 ${isActive ? "text-accent" : ""}`}
                 strokeWidth={1.75}
               />
-              <span className="relative z-10">{label}</span>
+              <span>{label}</span>
             </>
           )}
         </NavLink>
@@ -123,6 +131,7 @@ function Account({ user }: { user: ShellUser | null }) {
     <div className="flex items-center gap-2.5 px-1.5 py-1">
       <Link
         to="/me"
+        prefetch="intent"
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control transition-opacity hover:opacity-80"
       >
         <Avatar template={user.avatarTemplate} username={user.username} size={32} />
@@ -169,7 +178,7 @@ function usePresence(open: boolean, exitMs: number) {
 function NavigationProgress() {
   const navigation = useNavigation();
   const location = useLocation();
-  const [visible, setVisible] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "running" | "completing">("idle");
 
   const isScreenLoad =
     navigation.state === "loading" &&
@@ -177,21 +186,34 @@ function NavigationProgress() {
     baseScreenKey(navigation.location.pathname) !== baseScreenKey(location.pathname);
 
   useEffect(() => {
-    if (!isScreenLoad) {
-      setVisible(false);
-      return;
+    if (isScreenLoad) {
+      const timer = setTimeout(() => setPhase("running"), 220);
+      return () => clearTimeout(timer);
     }
-    const timer = setTimeout(() => setVisible(true), 120);
-    return () => clearTimeout(timer);
+    setPhase((prev) => (prev === "running" ? "completing" : prev));
   }, [isScreenLoad]);
 
-  if (!visible) return null;
+  useEffect(() => {
+    if (phase !== "completing") return;
+    const timer = setTimeout(() => setPhase("idle"), 220);
+    return () => clearTimeout(timer);
+  }, [phase]);
+
+  if (phase === "idle") return null;
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none fixed inset-x-0 top-0 z-50 h-[1.5px] overflow-hidden"
+      className={`pointer-events-none fixed inset-x-0 top-0 z-50 h-[2px] overflow-hidden transition-opacity duration-200 ${
+        phase === "completing" ? "opacity-0" : "opacity-100"
+      }`}
     >
-      <div className="nav-progress-bar h-full w-full origin-left bg-accent/80" />
+      <div
+        className={`h-full w-full origin-left bg-accent shadow-[0_0_8px_var(--color-accent)] ${
+          phase === "completing"
+            ? "scale-x-100 transition-transform duration-150 ease-out"
+            : "nav-progress-bar"
+        }`}
+      />
     </div>
   );
 }
@@ -201,7 +223,6 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
   const menuMounted = usePresence(menuOpen, 150);
-  const isBareScreen = pathname.startsWith("/auth/");
 
   useEffect(() => setMenuOpen(false), [pathname]);
 
@@ -227,25 +248,21 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
   }, [menuOpen]);
 
   return (
-    <div className="min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]">
+    <div className="shell min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]">
       <NavigationProgress />
 
-      <aside className="sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
+      <aside className="shell-aside sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
         <div className="space-y-5">
           <Brand />
-          <NavItems user={user} morphPill />
+          <NavItems user={user} />
         </div>
         <Account user={user} />
       </aside>
 
       <header
-        className={`sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color] duration-150 lg:hidden ${
-          menuOpen
-            ? "border-b border-border bg-ground"
-            : scrolled
-              ? `${isBareScreen ? "border-b border-border" : "border-b border-transparent"} bg-[color-mix(in_srgb,var(--color-surface)_84%,var(--color-raised))] backdrop-blur-md`
-              : "border-b border-transparent bg-ground"
-        }`}
+        data-menu={menuOpen}
+        data-scrolled={scrolled}
+        className="shell-header shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
       >
         <Brand />
         <MenuButton open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
@@ -267,7 +284,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
         </div>
       )}
 
-      <main className="@container/main min-w-0 px-5 pt-6 pb-16 sm:px-6 lg:px-8 lg:pt-8">
+      <main className="main-column @container/main min-w-0 px-5 pt-6 pb-16 sm:px-6 lg:px-8 lg:pt-8">
         {children}
       </main>
     </div>

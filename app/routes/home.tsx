@@ -1,6 +1,6 @@
 import { ArrowUpDown, Code2, PenLine, Search, Shapes, X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useFetcher, useSearchParams } from "react-router";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { Link, useFetcher, useLocation, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
 import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
@@ -14,12 +14,13 @@ import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/ki
 import { origins } from "~/lib/origins.server";
 import { can } from "~/lib/permissions";
 import {
-  DEFAULT_PROMPT_SORT,
   isPromptSort,
   listPrompts,
   siteStats,
   type PromptSort,
 } from "~/lib/queries.server";
+import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
+import { isCardActive, prepareCardTransition } from "~/lib/shared-transition";
 import { useOptionalUser } from "~/lib/use-user";
 
 export const meta: Route.MetaFunction = () => [
@@ -43,7 +44,7 @@ function readQuery(request: Request) {
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
   const sortParam = params.get("sort");
-  const sort: PromptSort = isPromptSort(sortParam) ? sortParam : DEFAULT_PROMPT_SORT;
+  const sort: PromptSort = isPromptSort(sortParam) ? sortParam : DEFAULT_SORT;
   return { q, kind, sort };
 }
 
@@ -56,6 +57,10 @@ export async function loader({ request }: Route.LoaderArgs) {
     stats,
     usercontentOrigin: origins(request).usercontent,
   };
+}
+
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
 }
 
 function SearchField({ value, onCommit }: { value: string; onCommit: (value: string) => void }) {
@@ -117,17 +122,23 @@ interface MorePrompts {
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   const { prompts, nextPage, total, q, kind, sort, stats, usercontentOrigin } = loaderData;
+  const { pathname, search } = useLocation();
   const [, setParams] = useSearchParams();
   const user = useOptionalUser();
   const fetcher = useFetcher<MorePrompts>();
 
   const [items, setItems] = useState(prompts);
   const [next, setNext] = useState(nextPage);
-
-  useEffect(() => {
+  const [source, setSource] = useState(prompts);
+  if (source !== prompts) {
+    setSource(prompts);
     setItems(prompts);
     setNext(nextPage);
-  }, [prompts, nextPage]);
+  }
+
+  useEffect(() => {
+    primeRouteCache(`${pathname}${search}`, loaderData);
+  }, [pathname, search, loaderData]);
 
   const more = fetcher.data;
   useEffect(() => {
@@ -184,7 +195,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         actions={
           can(user, "createPrompt") ? (
             <Button asChild variant="primary" className="gap-1.5">
-              <Link to="/prompts/new">
+              <Link to="/prompts/new" prefetch="intent">
                 <PenLine className="size-4" strokeWidth={1.75} />
                 出题
               </Link>
@@ -193,7 +204,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         }
       />
 
-      <div className="mt-3 flex items-start gap-2">
+      <div className="reveal-tier-1 mt-3 flex items-start gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
           <SearchField value={q} onCommit={commitQuery} />
 
@@ -258,12 +269,24 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       ) : (
         <>
           <ul className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {items.map((p) => (
-              <li key={p.id}>
-                <Link
-                  to={`/p/${p.id}`}
-                  className="group block overflow-hidden rounded-card border border-border bg-surface transition-colors hover:border-control"
+            {items.map((p, index) => {
+              const row = Math.floor(index / 3);
+              const col = index % 3;
+              const rippleWave = row + col;
+              const isActive = isCardActive(p.id);
+              return (
+                <li
+                  key={p.id}
+                  style={{ "--stagger": `${Math.min(rippleWave, 7) * 22}ms` } as CSSProperties}
+                  className="reveal-card"
                 >
+                  <Link
+                    to={`/p/${p.id}`}
+                    prefetch="intent"
+                    onClick={(e) => prepareCardTransition(e, p.id)}
+                    style={isActive ? { viewTransitionName: "shared-card" } : undefined}
+                    className="arena-card group block overflow-hidden rounded-card border border-border bg-surface hover:border-control"
+                  >
                   {p.coverSubmissionId ? (
                     <SubmissionPreview
                       kind={p.kind}
@@ -303,7 +326,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   </div>
                 </Link>
               </li>
-            ))}
+            );
+          })}
           </ul>
 
           <LoadMore

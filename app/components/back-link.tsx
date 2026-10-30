@@ -1,16 +1,18 @@
 import type { ComponentProps, MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { canGoBackInApp } from "~/lib/navigation-history";
+import { prepareBackTransition } from "~/lib/shared-transition";
 
 /**
- * Follows the in-app history when there is one. The explicit target is used
- * when the page was opened directly, so a new tab still has a way back.
+ * Follows the in-app history when there is one, otherwise falls back to an
+ * explicit target. Pages with an explicit `from` pass history={false}.
  */
 type LinkProps = ComponentProps<typeof Link>;
 
 export function BackLink({
   to,
   history = true,
+  prefetch = "intent",
   onClick: onClickProp,
   ...rest
 }: LinkProps & { history?: boolean }) {
@@ -29,6 +31,7 @@ export function BackLink({
       return;
     }
     event.preventDefault();
+    prepareBackTransition();
     if (canGoBackInApp()) {
       navigate(-1);
     } else {
@@ -38,5 +41,5 @@ export function BackLink({
     }
   }
 
-  return <Link to={to} {...rest} onClick={onClick} />;
+  return <Link to={to} prefetch={prefetch} {...rest} onClick={onClick} />;
 }

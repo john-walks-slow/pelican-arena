@@ -7,6 +7,7 @@ import { prompts } from "~/db/schema";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { newId } from "~/lib/ids";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
+import { cachedClientLoader, clearRouteCache } from "~/lib/route-cache";
 import { flashToast } from "~/lib/session.server";
 
 export const meta: Route.MetaFunction = () => [{ title: "出题 · Pelican Arena" }];
@@ -16,6 +17,15 @@ const LIMITS = { title: 80, body: 8000 };
 export async function loader({ request }: Route.LoaderArgs) {
   await requirePermission(request, "createPrompt");
   return null;
+}
+
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
+}
+
+export async function clientAction({ serverAction }: Route.ClientActionArgs) {
+  clearRouteCache();
+  return serverAction();
 }
 
 export async function action({ request }: Route.ActionArgs) {

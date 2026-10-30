@@ -103,7 +103,7 @@ function SourceEditor({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {preview ? (
-        <div className={`flex ${minHeight} flex-1 flex-col overflow-hidden rounded-control border border-border bg-white`}>
+        <div className={`flex ${minHeight} flex-1 flex-col overflow-hidden rounded-control border border-border bg-surface`}>
           {kind === "web" ? (
             <iframe
               srcDoc={value}
@@ -111,7 +111,7 @@ function SourceEditor({
               sandbox={SANDBOX}
               allow="fullscreen; autoplay"
               referrerPolicy="no-referrer"
-              className="min-h-[196px] flex-1 border-0"
+              className="min-h-[196px] flex-1 border-0 bg-white"
             />
           ) : kind === "markdown" ? (
             <div className="flex-1 overflow-y-auto scroll-thin bg-ground/50 p-3.5">

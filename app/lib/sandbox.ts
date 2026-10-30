@@ -17,3 +17,12 @@ export function usercontentUrl(origin: string, submissionId: string, path = "") 
 export function submissionUrl(origin: string, submissionId: string, kind: PromptKind) {
   return usercontentUrl(origin, submissionId, KIND_META[kind].entry);
 }
+
+/**
+ * Entry URL for gallery previews. Marked so the worker may cache it briefly:
+ * previews are destroyed and re-created on every navigation and would
+ * otherwise reload from scratch behind a skeleton.
+ */
+export function previewUrl(origin: string, submissionId: string, kind: PromptKind) {
+  return `${submissionUrl(origin, submissionId, kind)}?preview=1`;
+}
