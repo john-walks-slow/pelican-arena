@@ -39,11 +39,9 @@ const V_HEIGHT = 630;
 function ScaledFrame({
   src,
   kind,
-  aspectRatio,
 }: {
   src: string;
   kind: PromptKind;
-  aspectRatio: "full" | "third";
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0);
@@ -53,17 +51,18 @@ function ScaledFrame({
     if (!el) return;
     const update = () => {
       const w = el.clientWidth;
-      if (w > 0) {
-        // "full" 模式下以 1200 宽为基准，"third" 模式下以 400 宽为基准裁切居中
-        const baseWidth = aspectRatio === "full" ? V_WIDTH : V_WIDTH / 3;
-        setScale(w / baseWidth);
+      const h = el.clientHeight;
+      if (w > 0 && h > 0) {
+        // 使用 cover 逻辑：取宽比和高比的较大者，确保画面填满整个格子
+        const s = Math.max(w / V_WIDTH, h / V_HEIGHT);
+        setScale(s);
       }
     };
     update();
     const obs = new ResizeObserver(update);
     obs.observe(el);
     return () => obs.disconnect();
-  }, [aspectRatio]);
+  }, []);
 
   if (kind === "svg") {
     return (
@@ -86,11 +85,11 @@ function ScaledFrame({
           sandbox={SANDBOX}
           tabIndex={-1}
           referrerPolicy="no-referrer"
-          className="pointer-events-none absolute top-0 left-1/2 origin-top border-0 bg-white"
+          className="pointer-events-none absolute top-1/2 left-1/2 origin-center border-0 bg-white"
           style={{
             width: V_WIDTH,
             height: V_HEIGHT,
-            transform: `translateX(-50%) scale(${scale})`,
+            transform: `translate(-50%, -50%) scale(${scale})`,
           }}
         />
       )}
@@ -103,9 +102,9 @@ export function ShareCardPreview({ data }: { data: ShareCardData }) {
     const avg = data.votes > 0 ? (data.starSum / data.votes).toFixed(1) : null;
     return (
       <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-card border border-border bg-ground select-none">
-        {/* 背景作品完整铺满 */}
+        {/* 背景作品双向绝对居中铺满 */}
         <div className="absolute inset-0">
-          <ScaledFrame src={data.previewUrl} kind={data.kind} aspectRatio="full" />
+          <ScaledFrame src={data.previewUrl} kind={data.kind} />
         </div>
 
         {/* 水印 Logo */}
@@ -152,7 +151,7 @@ export function ShareCardPreview({ data }: { data: ShareCardData }) {
   const top = data.topSubmissions.slice(0, 3);
   return (
     <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-card border border-border bg-ground select-none">
-      {/* 上半部分三格并排，每个答案各自缩放并居中裁剪 */}
+      {/* 上半部分三格并排，双向绝对居中裁剪 */}
       <div className="absolute inset-x-0 top-0 h-[60%] border-b border-border bg-raised">
         {top.length > 0 ? (
           <div
@@ -161,7 +160,7 @@ export function ShareCardPreview({ data }: { data: ShareCardData }) {
           >
             {top.map((item) => (
               <div key={item.id} className="relative h-full overflow-hidden bg-white">
-                <ScaledFrame src={item.previewUrl} kind={data.kind} aspectRatio="third" />
+                <ScaledFrame src={item.previewUrl} kind={data.kind} />
                 <div className="absolute bottom-2 left-2 z-10 flex max-w-[calc(100%-1rem)] items-center gap-1 truncate rounded-full border border-white/80 bg-surface/90 px-2 py-0.5 text-[10px] font-medium text-ink shadow-sm backdrop-blur-sm sm:text-xs">
                   <span className="truncate">{item.modelName}</span>
                 </div>
