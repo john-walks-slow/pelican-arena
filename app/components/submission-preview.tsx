@@ -1,8 +1,60 @@
+import { useEffect, useRef, useState } from "react";
 import { Markdown } from "~/components/markdown";
 import { PagePreview } from "~/components/page-preview";
+import { PreviewSkeleton } from "~/components/preview-skeleton";
 import type { PromptKind } from "~/lib/kinds";
-import { submissionUrl } from "~/lib/sandbox";
+import { previewUrl, submissionUrl } from "~/lib/sandbox";
 import { cn } from "~/lib/utils";
+
+function SvgPreview({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className?: string;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  useEffect(() => {
+    setLoaded(false);
+    if (imgRef.current?.complete && imgRef.current?.naturalWidth > 0) {
+      setLoaded(true);
+    }
+  }, [src]);
+
+  return (
+    <div
+      className={cn(
+        "relative flex aspect-[16/10] items-center justify-center overflow-hidden border-b border-rule bg-surface p-6",
+        className,
+      )}
+    >
+      <div
+        className={cn(
+          "absolute inset-0 transition-opacity duration-300 ease-out",
+          loaded ? "pointer-events-none opacity-0" : "opacity-100",
+        )}
+      >
+        <PreviewSkeleton />
+      </div>
+      <img
+        ref={imgRef}
+        src={src}
+        alt={alt}
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        className={cn(
+          "max-h-full max-w-full object-contain transition-opacity duration-300 ease-out",
+          loaded ? "opacity-100" : "opacity-0",
+        )}
+      />
+    </div>
+  );
+}
 
 /** A gallery-sized view of one work: live page, Markdown excerpt, or SVG. */
 export function SubmissionPreview({
@@ -38,22 +90,19 @@ export function SubmissionPreview({
 
   if (kind === "svg") {
     return (
-      <div
-        className={cn(
-          "flex aspect-[16/10] items-center justify-center border-b border-rule bg-surface p-6",
-          className,
-        )}
-      >
-        <img
-          src={submissionUrl(origin, submissionId, kind)}
-          alt={title}
-          loading="lazy"
-          decoding="async"
-          className="max-h-full max-w-full object-contain"
-        />
-      </div>
+      <SvgPreview
+        src={previewUrl(origin, submissionId, kind)}
+        alt={title}
+        className={className}
+      />
     );
   }
 
-  return <PagePreview src={submissionUrl(origin, submissionId, kind)} title={title} />;
+  return (
+    <PagePreview
+      src={submissionUrl(origin, submissionId, kind)}
+      title={title}
+      className={className}
+    />
+  );
 }

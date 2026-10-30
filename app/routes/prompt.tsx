@@ -11,7 +11,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { data, Link, Outlet, useFetcher, useLocation, useSearchParams } from "react-router";
 import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
@@ -29,6 +29,7 @@ import { CompactSelect } from "~/components/ui/compact-select";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
 import { backTarget, withFrom } from "~/lib/navigation";
+import { submissionUrl } from "~/lib/sandbox";
 import { KIND_META } from "~/lib/kinds";
 import { origins } from "~/lib/origins.server";
 import { promptWithRequirements } from "~/lib/output-requirements";
@@ -39,6 +40,7 @@ import {
   listSubmissions,
   type SubmissionSort,
 } from "~/lib/queries.server";
+import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
 import { useOptionalUser } from "~/lib/use-user";
 
 const MAX_COMPARE = 4;
@@ -56,9 +58,6 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const prompt = await getPrompt(params.promptId);
-  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
-
   const q = new URL(request.url).searchParams;
   const sort: SubmissionSort = q.get("sort") === "new" ? "new" : "top";
   const filters = {
@@ -67,10 +66,13 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     harness: q.get("harness") || undefined,
     mod: q.get("mod") || undefined,
   };
-  const [gallery, facets] = await Promise.all([
-    listSubmissions(prompt.id, filters, sort),
-    getPromptFacets(prompt.id),
+  const [prompt, gallery, facets] = await Promise.all([
+    getPrompt(params.promptId),
+    listSubmissions(params.promptId, filters, sort),
+    getPromptFacets(params.promptId),
   ]);
+  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
+
   const key = [sort, filters.model, filters.provider, filters.harness, filters.mod].join("|");
   return {
     prompt,
@@ -81,6 +83,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     usercontentOrigin: origins(request).usercontent,
     appOrigin: origins(request).app,
   };
+}
+
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
 }
 
 type Facets = Route.ComponentProps["loaderData"]["facets"];
@@ -167,7 +173,11 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin, appOrigin } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
+
+  useEffect(() => {
+    primeRouteCache(`${pathname}${search}`, loaderData);
+  }, [pathname, search, loaderData]);
   const from = params.get("from");
   const back = backTarget(from, { label: "题目", to: "/" });
   const here = `/p/${prompt.id}${search}`;
@@ -177,13 +187,15 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
 
   const [items, setItems] = useState(submissions);
   const [next, setNext] = useState(nextPage);
+  const [source, setSource] = useState(submissions);
   const [selected, setSelected] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
+  if (source !== submissions) {
+    setSource(submissions);
     setItems(submissions);
     setNext(nextPage);
-  }, [submissions, nextPage]);
+  }
 
   const more = fetcher.data;
   useEffect(() => {
@@ -248,13 +260,31 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           <>
             {user?.id === prompt.author.id && (
               <Button asChild variant="outline" className="gap-1.5 max-sm:px-2.5">
-                <Link to={editHref} aria-label="编辑">
+                <Link to={editHref} prefetch="intent" aria-label="编辑">
                   <Pencil className="size-4 text-muted" strokeWidth={1.75} />
                   <span className="hidden sm:inline">编辑</span>
                 </Link>
               </Button>
             )}
-            <ShareDialog path={`/p/${prompt.id}`} title={prompt.title} appOrigin={appOrigin} />
+            <ShareDialog
+              path={`/p/${prompt.id}`}
+              title={prompt.title}
+              appOrigin={appOrigin}
+              cardData={{
+                type: "prompt",
+                title: prompt.title,
+                body: prompt.body,
+                kind: prompt.kind,
+                totalSubmissions: total,
+                topSubmissions: submissions.slice(0, 3).map((item) => ({
+                  id: item.id,
+                  modelName: item.model.name,
+                  previewUrl: submissionUrl(usercontentOrigin, item.id, prompt.kind),
+                  starSum: item.starSum,
+                  votes: item.votes,
+                })),
+              }}
+            />
             <Button
               variant="outline"
               onClick={copy}
@@ -285,7 +315,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         }
       />
 
-      <section className="mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
+      <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
         <div className="max-h-64 overflow-y-auto scroll-thin">
           <Markdown>{prompt.body}</Markdown>
         </div>
@@ -293,33 +323,38 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
       </section>
 
       <section className="mt-8">
-        <div className="flex items-baseline gap-2">
+        <div className="reveal-tier-2 flex items-baseline gap-2">
           <h2 className="text-section font-semibold">答案</h2>
           <span className="num text-sm text-muted">{total}</span>
         </div>
 
-        <div className="mt-3">
+        <div className="reveal-tier-2 mt-3">
           <FilterBar facets={facets} total={facets.models.reduce((sum, f) => sum + f.count, 0)} />
         </div>
 
         {items.length === 0 ? (
-          <div className="mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center text-sm text-muted">
+          <div className="reveal-tier-2 mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center text-sm text-muted">
             没有符合条件的答案。
           </div>
         ) : (
           <>
             <ul className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-              {items.map((s) => {
+              {items.map((s, index) => {
                 const isSelected = selected.includes(s.id);
+                const row = Math.floor(index / 3);
+                const col = index % 3;
+                const rippleWave = row + col;
                 return (
                   <li
                     key={s.id}
-                    className={`overflow-hidden rounded-card border bg-surface transition-colors ${
+                    style={{ "--stagger": `${Math.min(rippleWave, 7) * 22}ms` } as CSSProperties}
+                    className={`reveal-card arena-card overflow-hidden rounded-card border bg-surface ${
                       isSelected ? "border-accent" : "border-border hover:border-control"
                     }`}
                   >
                     <Link
                       to={answerHref(s.id)}
+                      prefetch="intent"
                       aria-label={`${s.model.name} · ${s.provider.name}`}
                     >
                       <SubmissionPreview
@@ -332,7 +367,11 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                     </Link>
                     <div className="px-3.5 pt-3 pb-3">
                       <div className="flex items-start justify-between gap-3">
-                        <Link to={answerHref(s.id)} className="min-w-0 hover:text-accent-ink">
+                        <Link
+                          to={answerHref(s.id)}
+                          prefetch="intent"
+                          className="min-w-0 hover:text-accent-ink"
+                        >
                           <div className="truncate text-sm font-semibold">{s.model.name}</div>
                           <div className="truncate text-[13px] text-muted">
                             {s.provider.name}
@@ -378,14 +417,15 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
 
       {selected.length > 0 && (
         <div className="fixed inset-x-0 bottom-5 z-30 flex justify-center px-4">
-          <div className="flex items-center gap-3 rounded-full bg-ink py-1.5 pr-1.5 pl-4 text-xs text-white/80">
+          <div className="flex items-center gap-3 rounded-full bg-primary py-1.5 pr-1.5 pl-4 text-xs text-primary-ink/75">
             <span className="num">已选 {selected.length} / {MAX_COMPARE}</span>
-            <button type="button" className="hover:text-white" onClick={() => setSelected([])}>
+            <button type="button" className="hover:text-primary-ink" onClick={() => setSelected([])}>
               <X className="size-3.5" strokeWidth={2} />
             </button>
             <Link
               to={`/compare?ids=${selected.join(",")}`}
-              className={`inline-flex h-7 items-center rounded-full bg-white px-3 text-xs font-medium text-ink ${
+              prefetch="intent"
+              className={`inline-flex h-7 items-center rounded-full bg-surface px-3 text-xs font-medium text-ink ${
                 selected.length < 2 ? "pointer-events-none opacity-40" : ""
               }`}
             >

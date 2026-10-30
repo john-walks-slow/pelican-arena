@@ -7,8 +7,8 @@ import {
   Pencil,
   Undo2,
 } from "lucide-react";
-import { useState } from "react";
-import { data, Link, Outlet, redirect, useNavigation, useSearchParams, useSubmit } from "react-router";
+import { useEffect, useState } from "react";
+import { data, Link, Outlet, redirect, useLocation, useNavigation, useSearchParams, useSubmit } from "react-router";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
 import { Markdown } from "~/components/markdown";
@@ -35,6 +35,7 @@ import {
   getUserRating,
   setRating,
 } from "~/lib/queries.server";
+import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
 import { flashToast, getUser, requireUser } from "~/lib/session.server";
 import { setSubmissionStatus } from "~/lib/submissions.server";
@@ -54,11 +55,16 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const submission = await getSubmission(params.submissionId);
+  const [submission, user] = await Promise.all([
+    getSubmission(params.submissionId),
+    getUser(request),
+  ]);
   if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
-  const [prompt, user] = await Promise.all([getPrompt(submission.promptId), getUser(request)]);
+  const [prompt, myRating] = await Promise.all([
+    getPrompt(submission.promptId),
+    user ? getUserRating(user.id, submission.id) : Promise.resolve(null),
+  ]);
   if (!prompt) throw data("Not Found", { status: 404 });
-  const myRating = user ? await getUserRating(user.id, submission.id) : null;
   return {
     submission,
     prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
@@ -66,6 +72,15 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     usercontentOrigin: origins(request).usercontent,
     appOrigin: origins(request).app,
   };
+}
+
+export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
+  return cachedClientLoader(request, serverLoader);
+}
+
+export async function clientAction({ serverAction }: Route.ClientActionArgs) {
+  clearRouteCache();
+  return serverAction();
 }
 
 export async function action({ params, request }: Route.ActionArgs) {
@@ -129,7 +144,12 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const { submission: s, prompt, myRating, usercontentOrigin, appOrigin } = loaderData;
   const user = useOptionalUser();
+  const { pathname, search } = useLocation();
   const [params] = useSearchParams();
+
+  useEffect(() => {
+    primeRouteCache(`${pathname}${search}`, loaderData);
+  }, [pathname, search, loaderData]);
   const navigation = useNavigation();
   const submit = useSubmit();
   const from = params.get("from");
@@ -187,6 +207,17 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               path={`/s/${s.id}`}
               title={`${s.model.name} · ${s.provider.name} — ${prompt.title}`}
               appOrigin={appOrigin}
+              cardData={{
+                type: "answer",
+                promptTitle: prompt.title,
+                modelName: s.model.name,
+                providerName: s.provider.name,
+                harnessName: s.harness?.name,
+                kind: prompt.kind,
+                previewUrl: pageUrl,
+                starSum: s.starSum,
+                votes: s.votes,
+              }}
             />
             <Button asChild variant="outline" className="gap-1.5">
               <a href={pageUrl} target="_blank" rel="noreferrer">
@@ -199,7 +230,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       />
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="min-w-0 overflow-hidden rounded-card border border-border bg-surface">
+        <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(
               [
@@ -259,11 +290,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             </div>
           </div>
           {tab === "preview" ? (
-            <div id="work-panel" className="h-[min(74vh,860px)] bg-white panel-fade">
+            <div id="work-panel" className="h-[min(74vh,860px)] bg-surface">
               {kind === "web" ? (
                 <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />
               ) : kind === "svg" ? (
-                <div className="flex size-full items-center justify-center p-4">
+                <div className="flex size-full items-center justify-center bg-white p-4">
                   <img
                     src={pageUrl}
                     alt={`${s.model.name} 的答案`}
@@ -277,13 +308,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               )}
             </div>
           ) : (
-            <div className="panel-fade">
-              <SourceViewer files={s.files} baseUrl={baseUrl} />
-            </div>
+            <SourceViewer files={s.files} baseUrl={baseUrl} />
           )}
         </section>
 
-        <aside className="space-y-5">
+        <aside className="reveal-tier-2 space-y-5">
           <SideSection title="评分">
             <div className="mb-2.5">
               <StarScore starSum={s.starSum} votes={s.votes} />

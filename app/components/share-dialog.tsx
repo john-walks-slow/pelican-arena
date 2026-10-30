@@ -14,16 +14,17 @@ import {
 import { Segmented } from "~/components/ui/segmented";
 import { toast } from "~/components/ui/toaster";
 import { SHARE_FORMATS, shareSnippet, type ShareFormat } from "~/lib/share";
+import { ShareCardPreview, type ShareCardData } from "~/components/share-card-preview";
 
 interface ShareDialogProps {
-  /** Site-relative page path, such as `/s/abc`. The card lives at `${path}/card.svg`. */
   path: string;
   title: string;
   appOrigin: string;
+  cardData: ShareCardData;
 }
 
-export function ShareDialog({ path, title, appOrigin }: ShareDialogProps) {
-  const [format, setFormat] = useState<ShareFormat>("markdown");
+export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogProps) {
+  const [format, setFormat] = useState<ShareFormat>("link");
   const [copied, setCopied] = useState(false);
   const [canNativeShare, setCanNativeShare] = useState(false);
 
@@ -31,13 +32,15 @@ export function ShareDialog({ path, title, appOrigin }: ShareDialogProps) {
 
   const origin = appOrigin.replace(/\/+$/, "");
   const pageUrl = `${origin}${path}`;
-  const snippet = shareSnippet({ pageUrl, cardUrl: `${pageUrl}/card.svg`, title }, format);
+  // 预览图 / og:image 链接
+  const thumbUrl = `${pageUrl}/card.svg`;
+  const snippet = shareSnippet({ pageUrl, cardUrl: thumbUrl, title }, format);
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(snippet);
       setCopied(true);
-      toast.success("已复制");
+      toast.success("已复制到剪贴板");
       setTimeout(() => setCopied(false), 1800);
     } catch {
       toast.error("复制失败，请手动选择文本");
@@ -54,19 +57,15 @@ export function ShareDialog({ path, title, appOrigin }: ShareDialogProps) {
           <span className="hidden sm:inline">分享</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[520px]">
+      <DialogContent className="sm:max-w-[560px]">
         <DialogHeader>
           <DialogTitle>分享</DialogTitle>
-          <DialogDescription className="sr-only">复制分享卡片或链接</DialogDescription>
+          <DialogDescription className="sr-only">复制分享链接或卡片</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4 px-5 py-4">
-          <img
-            src={`${path}/card.svg`}
-            alt={title}
-            width={600}
-            height={315}
-            className="aspect-[600/315] w-full rounded-card border border-border"
-          />
+          {/* 实时卡片预览 */}
+          <ShareCardPreview data={cardData} />
+
           <div className="flex items-center justify-between gap-3">
             <Segmented label="分享格式" value={format} options={SHARE_FORMATS} onChange={setFormat} />
             <Button
