@@ -6,7 +6,6 @@ import {
   eq,
   gte,
   inArray,
-  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -318,7 +317,6 @@ export async function listOwnSubmissions(authorId: number, page = 1, limit = 24)
         provider: { id: providers.id, name: providers.name },
         starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = submissions.id), 0)`,
         votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id)`,
-        otherVotes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id and r.user_id <> submissions.author_id)`,
       })
       .from(submissions)
       .innerJoin(prompts, eq(prompts.id, submissions.promptId))
@@ -364,14 +362,6 @@ export async function getPromptForEdit(id: string) {
     .from(prompts)
     .where(eq(prompts.id, id));
   return row ?? null;
-}
-
-export async function countOtherRatings(submissionId: string, authorId: number) {
-  const [row] = await db()
-    .select({ n: count() })
-    .from(ratings)
-    .where(and(eq(ratings.submissionId, submissionId), ne(ratings.userId, authorId)));
-  return row.n;
 }
 
 export async function updatePrompt(input: {
@@ -579,7 +569,6 @@ export async function getSubmission(id: string) {
       files: submissions.files,
       notes: submissions.notes,
       content: submissions.content,
-      hasRawLog: submissions.hasRawLog,
       status: submissions.status,
       authorId: submissions.authorId,
     })

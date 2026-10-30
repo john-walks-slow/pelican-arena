@@ -8,12 +8,12 @@ import {
 import type { Route } from "./+types/submit";
 import { SubmissionErrorDialog } from "~/components/submission/submission-error-dialog";
 import { SubmissionForm } from "~/components/submission/submission-form";
-import { BundleError, formatBytes } from "~/lib/bundle";
+import { BundleError } from "~/lib/bundle";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { safeFrom, withFrom } from "~/lib/navigation";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
 import { flashToast } from "~/lib/session.server";
-import { FIELDS, parseSubmissionMeta, RAW_LOG_LIMIT } from "~/lib/submission-input";
+import { parseSubmissionMeta } from "~/lib/submission-input";
 import { createSubmission, readBundleEntries } from "~/lib/submissions.server";
 import { useDialogClose } from "~/lib/use-dialog-close";
 
@@ -43,12 +43,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   const { meta, error } = parseSubmissionMeta(form);
   if (!meta) return data({ error }, { status: 400 });
 
-  const rawLog = form.get(FIELDS.rawLog);
-  const rawLogFile = rawLog instanceof File && rawLog.size > 0 ? rawLog : null;
-  if (rawLogFile && rawLogFile.size > RAW_LOG_LIMIT) {
-    return data({ error: `日志超过 ${formatBytes(RAW_LOG_LIMIT)}` }, { status: 400 });
-  }
-
   try {
     const entries = await readBundleEntries(form);
     const id = await createSubmission({
@@ -57,7 +51,6 @@ export async function action({ request, params }: Route.ActionArgs) {
       kind: prompt.kind,
       entries,
       meta,
-      rawLog: rawLogFile,
     });
     const from = safeFrom(new URL(request.url).searchParams.get("from"));
     return redirect(withFrom(`/s/${id}`, from), {

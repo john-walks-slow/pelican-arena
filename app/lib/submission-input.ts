@@ -11,11 +11,9 @@ export const FIELDS = {
   reasoning: "reasoning",
   notes: "notes",
   logMeta: "logMeta",
-  rawLog: "rawLog",
 } as const;
 
 export const NOTES_LIMIT = 1000;
-export const RAW_LOG_LIMIT = 20 * 1024 * 1024;
 
 export interface SubmissionMeta {
   model: string;

@@ -3,7 +3,6 @@ import {
   Download,
   ExternalLink,
   Eye,
-  FileText,
   Maximize2,
   Pencil,
   Undo2,
@@ -29,7 +28,6 @@ import { origins } from "~/lib/origins.server";
 import { can, denyReason } from "~/lib/permissions";
 import {
   clearRating,
-  countOtherRatings,
   getPrompt,
   getSubmission,
   getUserRating,
@@ -59,15 +57,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   const [prompt, user] = await Promise.all([getPrompt(submission.promptId), getUser(request)]);
   if (!prompt) throw data("Not Found", { status: 404 });
   const myRating = user ? await getUserRating(user.id, submission.id) : null;
-  const otherRatings =
-    user?.id === submission.authorId
-      ? await countOtherRatings(submission.id, submission.authorId)
-      : 0;
   return {
     submission,
     prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
     myRating,
-    otherRatings,
     usercontentOrigin: origins(request).usercontent,
   };
 }
@@ -131,7 +124,7 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
 }
 
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
-  const { submission: s, prompt, myRating, otherRatings, usercontentOrigin } = loaderData;
+  const { submission: s, prompt, myRating, usercontentOrigin } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
   const navigation = useNavigation();
@@ -149,7 +142,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const baseUrl = usercontentUrl(usercontentOrigin, s.id);
   const log = s.logMeta;
   const isAuthor = user?.id === s.author.id;
-  const editable = isAuthor && otherRatings === 0;
+  const editable = isAuthor;
 
   const ratingBlock = !user
     ? "登录后可打分"
@@ -322,16 +315,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                   {log.turns} / {log.toolCalls}
                 </MetaRow>
               </dl>
-              {s.hasRawLog && (
-                <a
-                  href={`/s/${s.id}/log`}
-                  download
-                  className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted hover:text-ink"
-                >
-                  <FileText className="size-3.5" strokeWidth={1.75} />
-                  下载原始日志
-                </a>
-              )}
             </SideSection>
           )}
 
@@ -348,11 +331,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             </div>
             {isAuthor && (
               <div className="mt-2.5 border-t border-rule pt-2.5 text-xs text-muted">
-                {otherRatings > 0 ? (
-                  <p>已有 {otherRatings} 人打分，答案已锁定。</p>
-                ) : (
-                  <p>还没有人打分，你可以编辑内容或撤回。</p>
-                )}
+                <p>可以随时编辑生成信息、日志统计与备注；如需更换作品请撤回后重新提交。</p>
                 <button
                   type="button"
                   onClick={() => setWithdrawOpen(true)}

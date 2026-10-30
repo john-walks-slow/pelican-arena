@@ -259,7 +259,7 @@ function AnswerRowItem({
   onAction: (pending: PendingAction) => void;
 }) {
   const hidden = answer.status === "hidden";
-  const editable = !hidden && answer.otherVotes === 0;
+  const editable = !hidden;
   const title = `${answer.model.name} · ${answer.provider.name}`;
 
   return (

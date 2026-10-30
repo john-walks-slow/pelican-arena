@@ -9,7 +9,6 @@ function isZstd(bytes: Uint8Array): boolean {
 
 export interface SessionLogFile {
   meta: LogMeta;
-  text: string;
   name: string;
 }
 
@@ -32,7 +31,6 @@ export async function readSessionLogFile(file: File): Promise<SessionLogFile> {
   const text = decodeSessionLog(bytes);
   return {
     meta: parseSessionLog(text),
-    text,
     name: compressed ? file.name.replace(/\.zstd$/i, "") || "session.jsonl" : file.name,
   };
 }

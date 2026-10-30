@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "~/db/client.server";
-import { ratings, submissionMods, submissions } from "~/db/schema";
+import { submissionMods, submissions } from "~/db/schema";
 import {
   buildBundle,
   BUNDLE_LIMITS,
@@ -9,16 +9,12 @@ import {
   describeBundle,
   readTextBundle,
   type BundleEntry,
-  type BundleFile,
 } from "./bundle";
 import { newId } from "./ids";
 import type { PromptKind } from "./kinds";
 import { ensureCatalogEntry } from "./queries.server";
-import type { LogMeta } from "./session-log";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
-
-export const rawLogKey = (submissionId: string) => `logs/${submissionId}.jsonl`;
 
 /** Reads the parallel file/path fields the submit page sends. */
 export async function readBundleEntries(form: FormData): Promise<BundleEntry[]> {
@@ -40,7 +36,6 @@ export async function createSubmission(input: {
   kind: PromptKind;
   entries: BundleEntry[];
   meta: SubmissionMeta;
-  rawLog: File | null;
 }) {
   const files = buildBundle(input.entries, input.kind);
   const text = input.kind === "web" ? null : readTextBundle(input.kind, files[0].data);
@@ -62,11 +57,6 @@ export async function createSubmission(input: {
       }),
     ),
   );
-  if (input.rawLog) {
-    await env.FILES.put(rawLogKey(id), input.rawLog.stream(), {
-      httpMetadata: { contentType: "application/x-ndjson" },
-    });
-  }
 
   const manifest = describeBundle(files);
   await db().insert(submissions).values({
@@ -82,7 +72,6 @@ export async function createSubmission(input: {
     notes: meta.notes,
     content,
     logMeta: meta.logMeta,
-    hasRawLog: Boolean(input.rawLog),
   });
   const uniqueMods = [...new Set(modIds)];
   if (uniqueMods.length > 0) {
@@ -93,20 +82,11 @@ export async function createSubmission(input: {
   return id;
 }
 
-export class SubmissionLockedError extends Error {}
-
-/** Updates an answer in place, replacing its bundle only when new entries are given. */
+/** Updates an answer's generation metadata, notes, and parsed session-log stats. */
 export async function updateSubmission(input: {
   id: string;
   authorId: number;
-  kind: PromptKind;
-  currentFiles: BundleFile[];
-  currentContent: string | null;
-  currentLogMeta: LogMeta | null;
-  currentHasRawLog: boolean;
-  entries: BundleEntry[] | null;
   meta: SubmissionMeta;
-  removeRawLog: boolean;
 }) {
   const { meta } = input;
   const [modelId, providerId, harnessId, modIds] = await Promise.all([
@@ -116,22 +96,6 @@ export async function updateSubmission(input: {
     Promise.all(meta.mods.map((m) => ensureCatalogEntry("mods", m))),
   ]);
 
-  let files: BundleFile[] = input.currentFiles;
-  let content = input.currentContent;
-  let entries: BundleEntry[] | null = null;
-  if (input.entries) {
-    entries = buildBundle(input.entries, input.kind);
-    files = describeBundle(entries);
-    content = input.kind === "markdown" ? readTextBundle(input.kind, entries[0].data) : null;
-    await Promise.all(
-      entries.map((f) =>
-        env.FILES.put(bundleKey(input.id, f.path), f.data, {
-          httpMetadata: { contentType: contentTypeFor(f.path) },
-        }),
-      ),
-    );
-  }
-
   const result = await db()
     .update(submissions)
     .set({
@@ -139,12 +103,8 @@ export async function updateSubmission(input: {
       providerId,
       harnessId,
       reasoning: meta.reasoning,
-      files,
-      totalBytes: files.reduce((sum, f) => sum + f.size, 0),
       notes: meta.notes,
-      content,
-      logMeta: input.currentLogMeta,
-      hasRawLog: input.removeRawLog ? false : input.currentHasRawLog,
+      logMeta: meta.logMeta,
       updatedAt: new Date(),
     })
     .where(
@@ -152,19 +112,9 @@ export async function updateSubmission(input: {
         eq(submissions.id, input.id),
         eq(submissions.authorId, input.authorId),
         eq(submissions.status, "active"),
-        sql`not exists (select 1 from ratings where ratings.submission_id = submissions.id and ratings.user_id <> ${input.authorId})`,
       ),
     );
-  if (result.meta.changes === 0) throw new SubmissionLockedError();
-
-  if (entries) {
-    const keep = new Set(files.map((f) => f.path));
-    const stale = input.currentFiles.filter((f) => !keep.has(f.path));
-    await Promise.all(stale.map((f) => env.FILES.delete(bundleKey(input.id, f.path))));
-  }
-  if (input.removeRawLog && input.currentHasRawLog) {
-    await env.FILES.delete(rawLogKey(input.id));
-  }
+  if (result.meta.changes === 0) return false;
 
   await db().delete(submissionMods).where(eq(submissionMods.submissionId, input.id));
   const uniqueMods = [...new Set(modIds)];
@@ -173,6 +123,7 @@ export async function updateSubmission(input: {
       .insert(submissionMods)
       .values(uniqueMods.map((modId) => ({ submissionId: input.id, modId })));
   }
+  return true;
 }
 
 export async function setSubmissionStatus(

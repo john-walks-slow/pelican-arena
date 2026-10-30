@@ -9,7 +9,6 @@ export default [
   route("p/:promptId/submissions", "routes/prompt.submissions.ts"),
   route("s/:submissionId", "routes/submission.tsx", [route("edit", "routes/submission.edit.tsx")]),
   route("s/:submissionId/download", "routes/submission.download.ts"),
-  route("s/:submissionId/log", "routes/submission.log.ts"),
   route("compare", "routes/compare.tsx"),
   route("auth/login", "routes/auth.login.tsx"),
   route("auth/callback", "routes/auth.callback.tsx"),
