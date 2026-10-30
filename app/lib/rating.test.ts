@@ -29,14 +29,18 @@ describe("rating validation", () => {
 describe("rating labels", () => {
   it("formats whole star labels with semantic descriptions", () => {
     expect(formatRatingLabel(1)).toBe("1 星 · 很差");
+    expect(formatRatingLabel(2)).toBe("2 星 · 较差");
     expect(formatRatingLabel(3)).toBe("3 星 · 一般");
+    expect(formatRatingLabel(4)).toBe("4 星 · 不错");
     expect(formatRatingLabel(5)).toBe("5 星 · 惊艳");
   });
 
-  it("formats half star labels cleanly with numbers", () => {
-    expect(formatRatingLabel(0.5)).toBe("0.5 星");
-    expect(formatRatingLabel(3.5)).toBe("3.5 星");
-    expect(formatRatingLabel(4.5)).toBe("4.5 星");
+  it("formats half star labels using ceiling semantic descriptions", () => {
+    expect(formatRatingLabel(0.5)).toBe("0.5 星 · 很差");
+    expect(formatRatingLabel(1.5)).toBe("1.5 星 · 较差");
+    expect(formatRatingLabel(2.5)).toBe("2.5 星 · 一般");
+    expect(formatRatingLabel(3.5)).toBe("3.5 星 · 不错");
+    expect(formatRatingLabel(4.5)).toBe("4.5 星 · 惊艳");
   });
 });
 

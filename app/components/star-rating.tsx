@@ -13,6 +13,7 @@ export function StarRating({
 }) {
   const fetcher = useFetcher<{ stars: number }>();
   const [hover, setHover] = useState(0);
+  const [optimistic, setOptimistic] = useState<number | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isDraggingRef = useRef(false);
@@ -23,14 +24,20 @@ export function StarRating({
     if (!fetcher.data) return;
     if (fetcher.data.stars) toast.success(`已评 ${fetcher.data.stars} 星`);
     else toast("评分已取消");
+    setOptimistic(null);
     setHover(0);
   }, [fetcher.data]);
 
+  useEffect(() => {
+    setOptimistic(null);
+  }, [current]);
+
   const pending = fetcher.formData ? Number(fetcher.formData.get("stars")) : null;
-  const value = pending ?? current ?? 0;
+  const value = optimistic ?? pending ?? current ?? 0;
   const shown = hover || value;
 
   const commitRating = (stars: number) => {
+    setOptimistic(stars);
     setHover(0);
     fetcher.submit({ intent: "rate", stars: String(stars) }, { method: "post" });
   };

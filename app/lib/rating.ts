@@ -18,6 +18,7 @@ export function calculateRatingFromRatio(ratio: number): number {
 }
 
 export function formatRatingLabel(stars: number): string {
-  const desc = RATING_LABELS[stars];
+  const rounded = Math.ceil(stars);
+  const desc = RATING_LABELS[rounded];
   return desc ? `${stars} 星 · ${desc}` : `${stars} 星`;
 }
