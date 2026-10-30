@@ -17,6 +17,7 @@ import { LiveFrame } from "~/components/page-preview";
 import { SourceViewer } from "~/components/source-viewer";
 import { StarRating } from "~/components/star-rating";
 import { StarScore } from "~/components/stars";
+import { isValidRating } from "~/lib/rating";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
 import { formatBytes } from "~/lib/bundle";
@@ -88,7 +89,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const stars = Number(form.get("stars"));
   if (stars === 0) await clearRating(user.id, submission.id);
-  else if (Number.isInteger(stars) && stars >= 1 && stars <= 5) await setRating(user.id, submission.id, stars);
+  else if (isValidRating(stars)) await setRating(user.id, submission.id, stars);
   else throw data("Invalid rating", { status: 400 });
   return { stars };
 }

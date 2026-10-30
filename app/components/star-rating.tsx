@@ -2,8 +2,7 @@ import { Star } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "~/components/ui/toaster";
-
-const LABELS = ["", "很差", "较差", "一般", "不错", "惊艳"];
+import { formatRatingLabel } from "~/lib/rating";
 
 export function StarRating({
   current,
@@ -37,30 +36,69 @@ export function StarRating({
     <fetcher.Form method="post" className="space-y-2">
       <input type="hidden" name="intent" value="rate" />
       <div className="flex items-center gap-2">
-        <div className="flex gap-0.5" onMouseLeave={() => setHover(0)} role="radiogroup" aria-label="打分">
-          {[1, 2, 3, 4, 5].map((n) => (
-            <button
-              key={n}
-              type="submit"
-              name="stars"
-              value={value === n ? 0 : n}
-              role="radio"
-              aria-checked={value === n}
-              aria-label={`${n} 星`}
-              onMouseEnter={() => setHover(n)}
-              className="p-0.5 transition-all active:scale-90 hover:scale-110"
-            >
-              <Star
-                className={`size-7 transition-colors ${
-                  n <= shown ? "fill-accent text-accent" : "text-control"
-                }`}
-                strokeWidth={1.5}
-              />
-            </button>
-          ))}
+        <div
+          className="flex gap-0.5"
+          onMouseLeave={() => setHover(0)}
+          role="radiogroup"
+          aria-label="打分"
+        >
+          {[1, 2, 3, 4, 5].map((n) => {
+            const halfVal = n - 0.5;
+            const fullVal = n;
+            const isFull = shown >= fullVal;
+            const isHalf = !isFull && shown >= halfVal;
+
+            return (
+              <div
+                key={n}
+                className="group relative p-0.5 transition-transform active:scale-90 hover:scale-110"
+              >
+                <div className="relative size-7">
+                  {/* 底层空心星 */}
+                  <Star className="size-7 text-control transition-colors" strokeWidth={1.5} />
+
+                  {/* 顶层实心金色填充 */}
+                  {isFull && (
+                    <div className="pointer-events-none absolute inset-0">
+                      <Star className="size-7 fill-accent text-accent" strokeWidth={1.5} />
+                    </div>
+                  )}
+                  {isHalf && (
+                    <div className="pointer-events-none absolute inset-y-0 left-0 w-1/2 overflow-hidden">
+                      <Star className="size-7 max-w-none fill-accent text-accent" strokeWidth={1.5} />
+                    </div>
+                  )}
+
+                  {/* 左半星交互按钮 (n - 0.5) */}
+                  <button
+                    type="submit"
+                    name="stars"
+                    value={value === halfVal ? 0 : halfVal}
+                    role="radio"
+                    aria-checked={value === halfVal}
+                    aria-label={`${halfVal} 星`}
+                    onMouseEnter={() => setHover(halfVal)}
+                    className="absolute inset-y-0 left-0 z-10 w-1/2 cursor-pointer opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-l"
+                  />
+
+                  {/* 右半星交互按钮 (n) */}
+                  <button
+                    type="submit"
+                    name="stars"
+                    value={value === fullVal ? 0 : fullVal}
+                    role="radio"
+                    aria-checked={value === fullVal}
+                    aria-label={`${fullVal} 星`}
+                    onMouseEnter={() => setHover(fullVal)}
+                    className="absolute inset-y-0 right-0 z-10 w-1/2 cursor-pointer opacity-0 focus-visible:opacity-100 focus-visible:bg-accent/15 focus-visible:outline-none focus-visible:rounded-r"
+                  />
+                </div>
+              </div>
+            );
+          })}
         </div>
         <span className="text-xs font-medium text-muted">
-          {hover ? LABELS[hover] : value ? `${value} 星` : ""}
+          {hover ? formatRatingLabel(hover) : value ? formatRatingLabel(value) : ""}
         </span>
       </div>
       <p className="text-[11px] text-muted">

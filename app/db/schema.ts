@@ -3,6 +3,7 @@ import {
   index,
   integer,
   primaryKey,
+  real,
   sqliteTable,
   text,
 } from "drizzle-orm/sqlite-core";
@@ -143,7 +144,7 @@ export const ratings = sqliteTable(
     submissionId: text("submission_id")
       .notNull()
       .references(() => submissions.id),
-    stars: integer("stars").notNull(),
+    stars: real("stars").notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [
