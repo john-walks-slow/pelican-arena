@@ -21,7 +21,7 @@ const buttonVariants = cva(
         ghost: "font-medium text-muted hover:bg-raised hover:text-ink disabled:text-muted/60",
         link: "h-auto p-0 font-medium text-accent underline-offset-4 hover:underline disabled:text-muted",
         linuxdo:
-          "border border-black/20 bg-[#1c1c1e] font-medium text-white shadow-btn-primary hover:bg-black hover:shadow-btn-primary-hover active:scale-[0.985] active:translate-y-[0.5px] disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none dark:border-white/15 dark:bg-[#1c1c1e] dark:text-white dark:hover:bg-[#26262a]",
+          "border border-black/20 bg-[#1c1c1e] font-medium text-white shadow-xs hover:bg-black active:scale-[0.985] active:translate-y-[0.5px] disabled:border-transparent disabled:bg-raised disabled:text-muted disabled:shadow-none dark:border-transparent dark:bg-[#1c1c1e] dark:text-white dark:hover:bg-[#26262a]",
       },
       size: {
         default: "h-8 px-3.5 text-xs sm:text-sm",
