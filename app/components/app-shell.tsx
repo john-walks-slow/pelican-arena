@@ -2,7 +2,7 @@ import { LayoutGrid, LogOut, PenLine, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
-import { PelicanMark } from "./pelican-mark";
+import { PelicanRide } from "./pelican-ride";
 import { ThemeMenu } from "./theme-menu";
 import { Button } from "./ui/button";
 import { LinuxDoIcon } from "./ui/linuxdo-icon";
@@ -30,9 +30,12 @@ export function baseScreenKey(pathname: string) {
 }
 
 function Brand() {
+  const { pathname } = useLocation();
+
   return (
     <Link to="/" prefetch="intent" className="flex items-center gap-2 px-1.5">
-      <PelicanMark className="size-6 text-accent" />
+      {/* Remount per screen so the ride replays on every page switch. */}
+      <PelicanRide key={pathname} className="brand-mark size-6 text-accent" />
       <span className="text-[15px] font-semibold tracking-tight">Pelican Arena</span>
     </Link>
   );

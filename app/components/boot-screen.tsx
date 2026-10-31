@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PelicanMark } from "./pelican-mark";
+import { PelicanRide } from "./pelican-ride";
 
 /**
  * Shortest time the splash stays up once the page has painted. Hydration
@@ -35,10 +35,7 @@ export function BootScreen() {
 
   return (
     <div className="boot-screen">
-      <PelicanMark className="size-10 text-accent" />
-      <span className="boot-screen-track">
-        <span className="boot-screen-bar" />
-      </span>
+      <PelicanRide className="boot-bike" viewBox="0 6 32 26" road dust />
       <span role="status" className="sr-only">
         正在加载
       </span>

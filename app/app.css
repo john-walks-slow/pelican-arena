@@ -395,7 +395,6 @@ html[data-booting="true"] .shell {
   display: grid;
   place-content: center;
   justify-items: center;
-  gap: 20px;
   background: var(--color-ground);
   visibility: hidden;
 }
@@ -404,21 +403,135 @@ html[data-booting="true"] .boot-screen {
   visibility: visible;
 }
 
-.boot-screen-track {
-  width: 64px;
-  height: 2px;
-  overflow: hidden;
-  border-radius: 999px;
-  background: var(--color-accent-track);
+.boot-bike {
+  width: 84px;
+  height: auto;
+  color: var(--color-accent);
 }
 
-.boot-screen-bar {
-  display: block;
-  width: 100%;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--color-accent);
-  animation: nav-progress 1.05s var(--ease-spatial) infinite;
+.ride-road {
+  stroke: var(--color-control);
+  animation: boot-road 220ms linear infinite;
+}
+
+.ride-dust {
+  stroke: var(--color-control);
+}
+
+.ride-dust line {
+  animation: boot-dust 520ms linear infinite;
+}
+
+.ride-dust line + line {
+  animation-delay: -260ms;
+}
+
+/* Shared rig for the spoked wheels. */
+.pelican-ride-body,
+.pelican-ride-wheel {
+  transform-box: view-box;
+}
+
+.pelican-ride-body {
+  transform-origin: 16px 29.5px;
+}
+
+.pelican-ride-wheel-rear {
+  transform-origin: 9px 23px;
+}
+
+.pelican-ride-wheel-front {
+  transform-origin: 23px 23px;
+}
+
+.boot-bike .pelican-ride-body {
+  animation: boot-ride 600ms ease-in-out infinite;
+}
+
+.boot-bike .pelican-ride-wheel {
+  animation: boot-wheel 1.1s linear infinite;
+}
+
+/* The shell brand waits under the boot screen, then rides as it lifts. The
+   mark is remounted per pathname, so the same ride replays on every switch. */
+.brand-mark .pelican-ride-body {
+  animation: brand-ride 600ms ease-in-out 2;
+  animation-play-state: paused;
+}
+
+.brand-mark .pelican-ride-wheel {
+  animation: boot-wheel 600ms linear 2;
+  animation-play-state: paused;
+}
+
+html:not([data-booting="true"]) .brand-mark .pelican-ride-body,
+html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
+  animation-play-state: running;
+}
+
+@keyframes boot-wheel {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Uneven bounce with a faint pitch, like a bicycle on cobblestones. */
+@keyframes boot-ride {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  18% {
+    transform: translate3d(0, -1.5px, 0) rotate(-1.6deg);
+  }
+  36% {
+    transform: translate3d(0, 0.4px, 0) rotate(0.6deg);
+  }
+  56% {
+    transform: translate3d(0, -1px, 0) rotate(1.2deg);
+  }
+  78% {
+    transform: translate3d(0, 0.2px, 0) rotate(-0.4deg);
+  }
+}
+
+@keyframes brand-ride {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  18% {
+    transform: translate3d(0, -2.6px, 0) rotate(-2.8deg);
+  }
+  36% {
+    transform: translate3d(0, 0.6px, 0) rotate(1deg);
+  }
+  56% {
+    transform: translate3d(0, -1.8px, 0) rotate(2deg);
+  }
+  78% {
+    transform: translate3d(0, 0.3px, 0) rotate(-0.6deg);
+  }
+}
+
+@keyframes boot-road {
+  to {
+    stroke-dashoffset: -7.5;
+  }
+}
+
+@keyframes boot-dust {
+  0% {
+    transform: translateX(0);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-3.5px);
+    opacity: 0;
+  }
 }
 
 /* The shimmer is an overlay: callers own its positioning (`absolute inset-0`
@@ -655,8 +768,10 @@ html[data-booting="true"] .boot-screen {
   .reveal-card {
     animation: none !important;
   }
-  .boot-screen-bar {
-    width: 40%;
+  .pelican-ride-body,
+  .pelican-ride-wheel,
+  .ride-road,
+  .ride-dust line {
     animation: none !important;
   }
   .skeleton-shimmer::after {
