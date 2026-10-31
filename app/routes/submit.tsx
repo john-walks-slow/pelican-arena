@@ -22,12 +22,18 @@ export const meta: Route.MetaFunction = ({ loaderData }) => [
 ];
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  await requirePermission(request, "submit");
-  const prompt = await getPrompt(params.promptId);
+  // The permission check, the prompt and the catalog are independent reads;
+  // running them together keeps the dialog off the critical path of three
+  // serial database round trips.
+  const [, prompt, catalog] = await Promise.all([
+    requirePermission(request, "submit"),
+    getPrompt(params.promptId),
+    getCatalog(),
+  ]);
   if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
   return {
     prompt: { id: prompt.id, title: prompt.title, kind: prompt.kind },
-    catalog: await getCatalog(),
+    catalog,
   };
 }
 

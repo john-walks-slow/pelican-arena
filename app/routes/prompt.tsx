@@ -12,7 +12,15 @@ import {
   X,
 } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
-import { data, Link, Outlet, useFetcher, useLocation, useSearchParams } from "react-router";
+import {
+  data,
+  Link,
+  Outlet,
+  useFetcher,
+  useLocation,
+  useSearchParams,
+  type ShouldRevalidateFunctionArgs,
+} from "react-router";
 import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
@@ -87,6 +95,17 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 
 export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
   return cachedClientLoader(request, serverLoader);
+}
+
+/** The submit dialog is a child route; the gallery behind it must not reload. */
+export function shouldRevalidate({
+  currentUrl,
+  nextUrl,
+  defaultShouldRevalidate,
+}: ShouldRevalidateFunctionArgs) {
+  const withoutDialog = (pathname: string) => pathname.replace(/\/submit$/, "");
+  if (withoutDialog(currentUrl.pathname) === withoutDialog(nextUrl.pathname)) return false;
+  return defaultShouldRevalidate;
 }
 
 type Facets = Route.ComponentProps["loaderData"]["facets"];
@@ -309,6 +328,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                     ? { pathname: `/p/${prompt.id}/submit`, search }
                     : `/auth/login?returnTo=/p/${prompt.id}/submit`
                 }
+                prefetch="intent"
                 preventScrollReset={Boolean(user)}
               >
                 <Upload className="size-4" strokeWidth={1.75} />
