@@ -396,11 +396,18 @@ html[data-booting="true"] .shell {
   place-content: center;
   justify-items: center;
   background: var(--color-ground);
+  opacity: 0;
   visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s linear 200ms;
 }
 
 html[data-booting="true"] .boot-screen {
+  opacity: 1;
   visibility: visible;
+  transition: none;
 }
 
 .boot-bike {
@@ -782,6 +789,9 @@ html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
   .ride-road,
   .ride-dust line {
     animation: none !important;
+  }
+  .boot-screen {
+    transition: none !important;
   }
   .skeleton-shimmer::after {
     animation: none !important;

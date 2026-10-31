@@ -92,8 +92,8 @@ export function shouldRevalidate({
   return false;
 }
 
-/** Flags the first paint as booting; `BootScreen` lifts it once hydration is done. */
-const bootScript = `document.documentElement.dataset.booting="true"`;
+/** Marks the first paint as booting and records when it began. */
+const bootScript = `document.documentElement.dataset.booting="true";document.documentElement.dataset.bootAt=performance.now()`;
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
