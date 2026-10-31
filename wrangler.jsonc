@@ -10,23 +10,27 @@
 	"compatibility_flags": ["nodejs_compat"],
 	"main": "./workers/app.ts",
 	"vars": {
-		"APP_ORIGIN": "http://localhost:5173",
-		"USERCONTENT_ORIGIN": "http://127.0.0.1:5173",
-		"LINUXDO_CLIENT_ID": "",
+		"APP_ORIGIN": "https://pelicanarena.dpdns.org",
+		"USERCONTENT_ORIGIN": "https://elsewhere.dpdns.org",
+		"LINUXDO_CLIENT_ID": "WEeAp0GneHGJhKT3jWhtSnMPAFhs7BH4",
 		"ADMIN_USERNAMES": ""
 	},
-	"d1_databases": [
-		{
-			"binding": "DB",
-			"database_name": "pelican-arena",
-			"database_id": "00000000-0000-0000-0000-000000000000",
-			"migrations_dir": "drizzle"
-		}
+	"routes": [
+		{ "pattern": "pelicanarena.dpdns.org", "custom_domain": true },
+		{ "pattern": "elsewhere.dpdns.org", "custom_domain": true }
 	],
 	"r2_buckets": [
 		{
 			"binding": "FILES",
 			"bucket_name": "pelican-arena-files"
+		}
+	],
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "pelican-arena",
+			"database_id": "370fa710-8714-43c6-9572-6272b9347365",
+			"migrations_dir": "drizzle"
 		}
 	],
 	"observability": {
