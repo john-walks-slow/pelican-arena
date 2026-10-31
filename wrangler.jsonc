@@ -13,7 +13,7 @@
 		"APP_ORIGIN": "https://pelicanarena.dpdns.org",
 		"USERCONTENT_ORIGIN": "https://elsewhere.dpdns.org",
 		"LINUXDO_CLIENT_ID": "WEeAp0GneHGJhKT3jWhtSnMPAFhs7BH4",
-		"ADMIN_USERNAMES": ""
+		"ADMIN_USERNAMES": "JohnnRen"
 	},
 	"routes": [
 		{ "pattern": "pelicanarena.dpdns.org", "custom_domain": true },
