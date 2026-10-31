@@ -1,5 +1,5 @@
 import { FileText, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { Markdown } from "~/components/markdown";
 import { SectionHeading } from "~/components/section-heading";
@@ -8,7 +8,7 @@ import { FileDropZone } from "~/components/submission/file-drop-zone";
 import { InlineWorkPreview } from "~/components/submission/inline-work-preview";
 import { PickedBundleCard } from "~/components/submission/picked-bundle-card";
 import { SessionLogSummary } from "~/components/submission/session-log-summary";
-import { SubmissionMetaFields } from "~/components/submission/meta-fields";
+import { MetaFieldsSkeleton, SubmissionMetaFields } from "~/components/submission/meta-fields";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -53,7 +53,7 @@ export interface SubmissionInitial {
 interface SubmissionFormProps {
   mode: "create" | "edit";
   prompt: { title: string; kind: PromptKind };
-  catalog: Catalog;
+  catalog: Promise<Catalog>;
   initial?: SubmissionInitial;
   open: boolean;
   onClose: () => void;
@@ -292,11 +292,11 @@ export function SubmissionForm({
       setLog({ name: parsed.name, meta: nextMeta });
       const raw = nextMeta.models[0];
       if (raw && !model) {
-        const match = matchModel(raw, catalog.models) ?? (await resolveModelName(raw));
+        const match = matchModel(raw, (await catalog).models) ?? (await resolveModelName(raw));
         setModel(match?.name ?? raw);
       }
       const sourceHarness = LOG_SOURCE_LABELS[nextMeta.source];
-      if (!harness && catalog.harnesses.some((h) => h.name === sourceHarness)) {
+      if (!harness && (await catalog).harnesses.some((h) => h.name === sourceHarness)) {
         setHarness(sourceHarness);
       }
     } catch (e) {
@@ -478,22 +478,24 @@ export function SubmissionForm({
 
               <aside className="border-t border-border px-5 pt-6 pb-5 lg:border-t-0 lg:border-l lg:bg-raised/60 lg:p-5">
                 <SectionHeading title="生成信息" />
-                <SubmissionMetaFields
-                  catalog={catalog}
-                  model={model}
-                  setModel={setModel}
-                  provider={provider}
-                  setProvider={setProvider}
-                  harness={harness}
-                  setHarness={setHarness}
-                  reasoning={reasoning}
-                  setReasoning={setReasoning}
-                  mods={mods}
-                  setMods={setMods}
-                  notes={notes}
-                  setNotes={setNotes}
-                  logModelHint={logModelHint}
-                />
+                <Suspense fallback={<MetaFieldsSkeleton />}>
+                  <SubmissionMetaFields
+                    catalog={catalog}
+                    model={model}
+                    setModel={setModel}
+                    provider={provider}
+                    setProvider={setProvider}
+                    harness={harness}
+                    setHarness={setHarness}
+                    reasoning={reasoning}
+                    setReasoning={setReasoning}
+                    mods={mods}
+                    setMods={setMods}
+                    notes={notes}
+                    setNotes={setNotes}
+                    logModelHint={logModelHint}
+                  />
+                </Suspense>
               </aside>
             </div>
           </DialogBody>

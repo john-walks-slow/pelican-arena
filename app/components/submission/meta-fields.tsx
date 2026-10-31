@@ -1,6 +1,8 @@
 import { AppWindow, Brain, Cpu, Server } from "lucide-react";
+import { use } from "react";
 import { Combobox } from "~/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
+import { Skeleton } from "~/components/ui/skeleton";
 import { Textarea } from "~/components/ui/textarea";
 import { REASONING_LEVELS } from "~/db/schema";
 import type { Catalog } from "~/lib/catalog";
@@ -24,7 +26,7 @@ export function SubmissionMetaFields({
   setNotes,
   logModelHint,
 }: {
-  catalog: Catalog;
+  catalog: Promise<Catalog>;
   model: string;
   setModel: (value: string) => void;
   provider: string;
@@ -39,7 +41,8 @@ export function SubmissionMetaFields({
   setNotes: (value: string) => void;
   logModelHint?: string | null;
 }) {
-  const modOptions = [...new Set([...catalog.mods.map((m) => m.name), ...mods])];
+  const resolved = use(catalog);
+  const modOptions = [...new Set([...resolved.mods.map((m) => m.name), ...mods])];
 
   function addMod(name: string) {
     const clean = name.trim();
@@ -53,7 +56,7 @@ export function SubmissionMetaFields({
         label="模型"
         icon={<Cpu className="size-3.5" strokeWidth={1.75} />}
         kind="models"
-        options={catalog.models}
+        options={resolved.models}
         value={model}
         onChange={setModel}
         placeholder="选择或输入模型"
@@ -66,7 +69,7 @@ export function SubmissionMetaFields({
         label="提供方"
         icon={<Server className="size-3.5" strokeWidth={1.75} />}
         kind="providers"
-        options={catalog.providers}
+        options={resolved.providers}
         value={provider}
         onChange={setProvider}
         placeholder="官方 API、OpenRouter、某中转站…"
@@ -78,7 +81,7 @@ export function SubmissionMetaFields({
         label="客户端"
         icon={<AppWindow className="size-3.5" strokeWidth={1.75} />}
         kind="harnesses"
-        options={catalog.harnesses}
+        options={resolved.harnesses}
         value={harness}
         onChange={setHarness}
         placeholder="Claude Code、Cherry Studio…"
@@ -134,7 +137,7 @@ export function SubmissionMetaFields({
             );
           })}
           <Combobox
-            options={catalog.mods}
+            options={resolved.mods}
             kind="mods"
             value=""
             onChange={addMod}
@@ -159,6 +162,35 @@ export function SubmissionMetaFields({
           className="mt-1.5"
           placeholder="温度、系统提示词、遇到的问题…"
         />
+      </div>
+    </div>
+  );
+}
+
+function FieldSkeleton() {
+  return (
+    <div className="space-y-1.5">
+      <Skeleton className="h-3 w-12" />
+      <Skeleton className="h-8 w-full" />
+    </div>
+  );
+}
+
+/** Reserves the field layout while the catalog arrives behind the dialog. */
+export function MetaFieldsSkeleton() {
+  return (
+    <div className="mt-3.5 space-y-3.5" role="status" aria-label="正在载入生成信息">
+      <FieldSkeleton />
+      <FieldSkeleton />
+      <FieldSkeleton />
+      <FieldSkeleton />
+      <div className="space-y-1.5">
+        <Skeleton className="h-3 w-8" />
+        <Skeleton className="h-7 w-40 rounded-full" />
+      </div>
+      <div className="space-y-1.5">
+        <Skeleton className="h-3 w-8" />
+        <Skeleton className="h-[70px] w-full" />
       </div>
     </div>
   );

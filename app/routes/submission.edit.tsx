@@ -47,7 +47,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       logMeta: submission.logMeta,
     },
     prompt: { id: prompt.id, title: prompt.title, kind: prompt.kind },
-    catalog: await getCatalog(),
+    catalog: getCatalog(),
   };
 }
 
