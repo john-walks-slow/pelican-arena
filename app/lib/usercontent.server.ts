@@ -28,10 +28,23 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   const object = await bucket.get(bundleKey(id, clean));
   if (!object) return new Response("Not Found", { status: 404 });
 
-  // Gallery previews get a short private cache so navigating back reuses the
-  // document instead of flashing the skeleton again. Direct visits and full
-  // submissions stay `no-store`: a retracted answer must take effect at once.
+  // Cache strategy to maximize CDN hits and minimize Worker invocations:
+  // 1. Gallery previews (?preview=1) get public CDN caching so concurrent/repeated visits
+  //    are served by edge CDN directly without invoking the Worker.
+  // 2. Static asset sub-resources (js, css, images, fonts, wasm) are immutable within a bundle
+  //    and can be safely cached on edge and browser.
+  // 3. Entry documents (HTML / root index) without preview stay `no-store` to ensure retracted
+  //    submissions take effect immediately.
   const preview = url.searchParams.has("preview");
+  const isStaticSubResource =
+    clean !== ENTRY_FILE &&
+    /\.(?:js|mjs|css|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf|wasm|map)$/i.test(clean);
+
+  const cacheControl = preview
+    ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+    : isStaticSubResource
+      ? "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+      : "no-store";
 
   const headers = new Headers({
     "Content-Type": contentTypeFor(clean),
@@ -40,9 +53,7 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
     "Access-Control-Allow-Origin": "*",
     "Cross-Origin-Resource-Policy": "cross-origin",
     "Referrer-Policy": "no-referrer",
-    "Cache-Control": preview
-      ? "private, max-age=60, stale-while-revalidate=60"
-      : "no-store",
+    "Cache-Control": cacheControl,
     ETag: object.httpEtag,
   });
   return new Response(request.method === "HEAD" ? null : object.body, { headers });

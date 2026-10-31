@@ -5,7 +5,7 @@ export function cardResponse(svg: string) {
       "Content-Type": "image/svg+xml; charset=utf-8",
       "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control": "public, max-age=300",
+      "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=86400",
     },
   });
 }

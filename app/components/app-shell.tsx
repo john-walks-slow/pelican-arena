@@ -259,7 +259,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
     >
       <NavigationProgress />
 
-      <aside className="shell-aside sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
+      <aside className="sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <Brand />
@@ -273,7 +273,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
       <header
         data-menu={menuOpen}
         data-scrolled={scrolled}
-        className="shell-header shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
+        className="shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
       >
         <Brand />
         <div className="flex items-center">
