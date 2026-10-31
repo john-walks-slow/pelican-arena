@@ -28,8 +28,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "pelican-arena",
-			"database_id": "370fa710-8714-43c6-9572-6272b9347365",
+			"database_name": "pelican-arena-apac",
+			"database_id": "caf789bc-63ed-42dc-afc0-3a34b6930dbd",
 			"migrations_dir": "drizzle"
 		}
 	],

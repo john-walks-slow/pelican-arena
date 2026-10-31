@@ -34,7 +34,7 @@ npm run typecheck
 
 1. 创建资源，把返回的 `database_id` 填进 `wrangler.jsonc`：
    ```bash
-   npx wrangler d1 create pelican-arena
+   npx wrangler d1 create pelican-arena --location apac
    npx wrangler r2 bucket create pelican-arena-files
    ```
 2. 准备两个域名：一个做主站，另一个**可注册域名**（不是主站的子域名）放用户上传的页面。两个域名都绑定到这个 Worker（Custom Domains）。

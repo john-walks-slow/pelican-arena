@@ -10,8 +10,8 @@
 		"typecheck": "wrangler types && react-router typegen && tsc -b",
 		"test": "vitest run",
 		"db:generate": "drizzle-kit generate",
-		"db:migrate": "wrangler d1 migrations apply pelican-arena --local",
-		"db:migrate:remote": "wrangler d1 migrations apply pelican-arena --remote",
+		"db:migrate": "wrangler d1 migrations apply pelican-arena-apac --local",
+		"db:migrate:remote": "wrangler d1 migrations apply pelican-arena-apac --remote",
 		"cf-typegen": "wrangler types",
 		"postinstall": "wrangler types"
 	},
