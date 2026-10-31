@@ -226,6 +226,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
+  const navigating = useNavigation().state !== "idle";
   const menuMounted = usePresence(menuOpen, 150);
 
   useEffect(() => setMenuOpen(false), [pathname]);
@@ -252,7 +253,10 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
   }, [menuOpen]);
 
   return (
-    <div className="shell min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]">
+    <div
+      className="shell min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]"
+      data-navigating={navigating ? "true" : "false"}
+    >
       <NavigationProgress />
 
       <aside className="shell-aside sticky top-0 hidden h-dvh flex-col justify-between px-3 py-5 lg:flex">

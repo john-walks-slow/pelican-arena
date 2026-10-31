@@ -469,6 +469,15 @@ html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
   animation-play-state: running;
 }
 
+/* Keep the wheels turning for the whole wait, not only once the screen lands. */
+.shell[data-navigating="true"] .brand-mark .pelican-ride-body {
+  animation: brand-ride 600ms ease-in-out infinite;
+}
+
+.shell[data-navigating="true"] .brand-mark .pelican-ride-wheel {
+  animation: boot-wheel 600ms linear infinite;
+}
+
 @keyframes boot-wheel {
   to {
     transform: rotate(360deg);
