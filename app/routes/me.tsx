@@ -170,7 +170,7 @@ function PromptRowItem({
           <span>·</span>
           <StarScore starSum={prompt.starSum} votes={prompt.votes} />
           <span>·</span>
-          <span>{formatRelative(prompt.createdAt)}</span>
+          <span suppressHydrationWarning>{formatRelative(prompt.createdAt)}</span>
         </div>
       </div>
 
@@ -327,7 +327,7 @@ function AnswerRowItem({
         <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted">
           <StarScore starSum={answer.starSum} votes={answer.votes} />
           <span>·</span>
-          <span>{formatRelative(answer.createdAt)}</span>
+          <span suppressHydrationWarning>{formatRelative(answer.createdAt)}</span>
           {answer.updatedAt && answer.updatedAt > answer.createdAt && (
             <>
               <span>·</span>

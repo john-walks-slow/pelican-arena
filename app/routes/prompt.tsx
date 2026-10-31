@@ -266,7 +266,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
             <Avatar template={prompt.author.avatarTemplate} username={prompt.author.username} size={18} />
             <span>{prompt.author.username}</span>
             <span>·</span>
-            <span>{formatRelative(prompt.createdAt)}</span>
+            <span suppressHydrationWarning>{formatRelative(prompt.createdAt)}</span>
             {prompt.updatedAt && (
               <>
                 <span>·</span>

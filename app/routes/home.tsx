@@ -312,7 +312,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       />
                       <span className="truncate">{p.author.username}</span>
                       <span className="shrink-0">·</span>
-                      <span className="shrink-0">
+                      <span className="shrink-0" suppressHydrationWarning>
                         {formatRelative(sort === "new" ? p.createdAt : p.lastActivityAt)}
                       </span>
                       <span className="num ml-auto shrink-0">

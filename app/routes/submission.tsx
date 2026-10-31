@@ -367,7 +367,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <Avatar template={s.author.avatarTemplate} username={s.author.username} size={24} />
               <div className="min-w-0">
                 <div className="truncate text-xs font-medium">{s.author.username}</div>
-                <div className="text-[11px] text-muted">
+                <div className="text-[11px] text-muted" suppressHydrationWarning>
                   {formatRelative(s.createdAt)}
                   {s.updatedAt && " · 已编辑"}
                 </div>
