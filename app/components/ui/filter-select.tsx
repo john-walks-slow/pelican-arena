@@ -8,6 +8,7 @@ import {
   CommandList,
 } from "~/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
+import { hasCoarsePointer } from "~/lib/pointer";
 import { cn } from "~/lib/utils";
 
 export interface FilterOption {
@@ -73,6 +74,9 @@ export function FilterSelect({
       <PopoverContent
         className="w-[var(--radix-popover-trigger-width)] max-w-[calc(100vw-2rem)] min-w-56 p-0"
         align="start"
+        onOpenAutoFocus={(event) => {
+          if (hasCoarsePointer()) event.preventDefault();
+        }}
       >
         <Command loop>
           {searchable && (

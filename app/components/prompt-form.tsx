@@ -108,7 +108,6 @@ export function PromptForm({
               onChange={(e) => setTitle(e.target.value)}
               placeholder={mode === "create" ? "骑自行车的鹈鹕" : undefined}
               aria-invalid={Boolean(errors?.title)}
-              autoFocus
               required
             />
             {errors?.title && <p className="mt-1 text-xs text-negative">{errors.title}</p>}
