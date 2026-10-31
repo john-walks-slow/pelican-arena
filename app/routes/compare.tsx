@@ -57,7 +57,7 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
         {submissions.map((s, index) => (
           <section
             key={s.id}
-            style={{ "--stagger": `${index * 20}ms` } as CSSProperties}
+            style={{ "--stagger": `${index * 26}ms` } as CSSProperties}
             className="reveal-card flex flex-col overflow-hidden rounded-card border border-border bg-surface"
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-3.5 py-2.5">

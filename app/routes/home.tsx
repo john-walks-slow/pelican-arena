@@ -275,7 +275,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               return (
                 <li
                   key={p.id}
-                  style={{ "--stagger": `${Math.min(rippleWave, 7) * 22}ms` } as CSSProperties}
+                  style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
                   className="reveal-card"
                 >
                   <Link

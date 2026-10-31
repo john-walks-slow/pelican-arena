@@ -268,7 +268,7 @@ body {
 @keyframes reveal-card-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 10px, 0) scale(0.985);
+    transform: translate3d(0, 12px, 0) scale(0.98);
   }
   to {
     opacity: 1;
@@ -311,7 +311,7 @@ body {
 
 /* Tier 3: Staggered radial ripple gallery */
 .route-stage:not([data-motion="steady"]) .reveal-card {
-  animation: reveal-card-in 280ms var(--ease-spatial) var(--stagger, 0ms);
+  animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms);
 }
 
 /* Tactile card hover & press physics with touch ripple feedback */

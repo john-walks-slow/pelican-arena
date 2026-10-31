@@ -351,7 +351,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                 return (
                   <li
                     key={s.id}
-                    style={{ "--stagger": `${Math.min(rippleWave, 7) * 22}ms` } as CSSProperties}
+                    style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
                     className={`reveal-card arena-card overflow-hidden rounded-card border bg-surface ${
                       isSelected ? "border-accent" : "border-border hover:border-control"
                     }`}
