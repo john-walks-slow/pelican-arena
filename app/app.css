@@ -352,6 +352,51 @@ body {
   animation: nav-progress 1.05s var(--ease-spatial) infinite;
 }
 
+/* Boot gate. The inline script in <head> marks the document as booting before
+   the first paint, so the server-rendered page stays hidden until React has
+   hydrated it: a whole page or a loading screen, never a readable page whose
+   scroll effects and controls are still inert. */
+html[data-booting="true"] {
+  overflow: hidden;
+}
+
+html[data-booting="true"] .shell {
+  visibility: hidden;
+}
+
+.boot-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 20px;
+  background: var(--color-ground);
+  visibility: hidden;
+}
+
+html[data-booting="true"] .boot-screen {
+  visibility: visible;
+}
+
+.boot-screen-track {
+  width: 64px;
+  height: 2px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-accent-track);
+}
+
+.boot-screen-bar {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  animation: nav-progress 1.05s var(--ease-spatial) infinite;
+}
+
 /* The shimmer is an overlay: callers own its positioning (`absolute inset-0`
    or `relative`), so this rule never sets `position`. */
 .skeleton-shimmer {
@@ -584,6 +629,10 @@ body {
   .reveal-tier-1,
   .reveal-tier-2,
   .reveal-card {
+    animation: none !important;
+  }
+  .boot-screen-bar {
+    width: 40%;
     animation: none !important;
   }
   .skeleton-shimmer::after {

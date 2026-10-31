@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
+import { BootScreen } from "./components/boot-screen";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
 import { clearRouteCache } from "./lib/route-cache";
@@ -97,6 +98,9 @@ export function shouldRevalidate({
   return false;
 }
 
+/** Flags the first paint as booting; `BootScreen` lifts it once hydration is done. */
+const bootScript = `document.documentElement.dataset.booting="true"`;
+
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
@@ -109,8 +113,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
         {/* Resolve the appearance before the browser paints the first frame. */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: bootScript }} />
       </head>
       <body>
+        <BootScreen />
         {children}
         <Toaster />
         <ScrollRestoration />
