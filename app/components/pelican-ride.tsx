@@ -6,9 +6,10 @@ interface PelicanRideProps {
 }
 
 /**
- * The Pelican-on-a-bicycle mark with spoked wheels, so CSS can visibly turn
- * them. The boot screen adds a road and dust; the shell brand uses the bike on
- * its own.
+ * The Pelican-on-a-bicycle mark with open wheels. Each rim is turned by CSS,
+ * and the only mark that carries the rotation is the hub dot sitting off the
+ * rim's centre: it swings around the axle instead of sitting still. The boot
+ * screen adds a road and dust; the shell brand uses the bike on its own.
  */
 export function PelicanRide({
   className,
@@ -54,14 +55,20 @@ export function PelicanRide({
   );
 }
 
+/** Distance from the rim centre to the hub dot. Big enough to read as motion
+ *  once the wheels shrink to the brand size. */
+const HUB_OFFSET = { x: 1.1, y: -0.35 };
+
 function Wheel({ className, cx }: { className: string; cx: number }) {
   return (
     <g className={`pelican-ride-wheel ${className}`}>
       <circle cx={cx} cy="23" r="5.5" stroke="currentColor" strokeWidth="2" />
-      <line x1={cx} y1="18.6" x2={cx} y2="27.4" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
-      <line x1={cx - 3.81} y1="20.8" x2={cx + 3.81} y2="25.2" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
-      <line x1={cx - 3.81} y1="25.2" x2={cx + 3.81} y2="20.8" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
-      <circle cx={cx} cy="23" r="1.15" fill="currentColor" />
+      <circle
+        cx={cx + HUB_OFFSET.x}
+        cy={23 + HUB_OFFSET.y}
+        r="1.15"
+        fill="currentColor"
+      />
     </g>
   );
 }

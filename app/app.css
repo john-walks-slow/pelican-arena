@@ -614,7 +614,7 @@ html[data-booting="true"] .boot-screen {
   animation-delay: -260ms;
 }
 
-/* Shared rig for the spoked wheels. */
+/* Shared rig for the open wheels. */
 .pelican-ride-body,
 .pelican-ride-wheel {
   transform-box: view-box;
