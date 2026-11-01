@@ -33,15 +33,3 @@ export function backTarget(
       : fallback.label;
   return { label, to: target, explicit: true };
 }
-
-/**
- * The screen a URL belongs to. Dialog routes (submit, edit) paint over their
- * parent, so they must not count as a new screen or replay page motion.
- */
-export function screenKey(pathname: string) {
-  return (
-    pathname
-      .replace(/^(\/p\/[^/]+)\/submit$/, "$1")
-      .replace(/^(\/s\/[^/]+)\/edit$/, "$1") || "/"
-  );
-}
