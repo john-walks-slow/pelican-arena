@@ -29,9 +29,27 @@ const PRIOR = {
   prompt: 5,
   voter: 5,
   answer: 3,
-  /** Pulls an entry toward the site average until it has covered several prompts. */
-  promptCoverage: 1,
+  /**
+   * Pulls an entry toward the site average until the evidence adds up, counted
+   * in the same weight units as the votes below: at 9, an entry needs about
+   * nine votes of evidence before half of its edge is believed.
+   */
+  evidence: 9,
 } as const;
+
+/**
+ * How much weight one prompt can contribute. Votes beyond this stop counting,
+ * so a single busy prompt cannot speak for an entry on its own.
+ */
+const PROMPT_WEIGHT_CAP = 5;
+
+/**
+ * Rough spread of a single star rating. Used only to size the uncertainty of a
+ * score, so a plain number is enough.
+ */
+const STAR_SD = 1.1;
+
+
 
 const ITERATIONS = 12;
 const NEUTRAL_SCORE = 3;
@@ -68,6 +86,12 @@ export interface LeaderboardEntry {
   prompts: number;
   best: { submissionId: string; promptTitle: string } | null;
   ranked: boolean;
+  /** Capped, per-prompt vote weight the score rests on. */
+  evidence: number;
+  /** Standard error of the score, in stars. */
+  se: number;
+  /** Place among the ranked entries, or null when the entry is not ranked. */
+  place: number | null;
 }
 
 export interface Leaderboard {
@@ -194,8 +218,11 @@ export function buildLeaderboard(input: {
     answers: number;
     votes: number;
     starSum: number;
-    /** Answer biases grouped by prompt, so one popular prompt cannot dominate. */
-    byPrompt: Map<string, number[]>;
+    /**
+     * Answer biases grouped by prompt, each carrying the votes behind it, so a
+     * thinly-rated prompt counts for less than a well-rated one.
+     */
+    byPrompt: Map<string, { bias: number; votes: number }[]>;
     best: { submissionId: string; promptTitle: string; bias: number } | null;
   }
 
@@ -217,8 +244,8 @@ export function buildLeaderboard(input: {
 
     const bias = at(answerBias, submission.id);
     const bucket = group.byPrompt.get(submission.promptId);
-    if (bucket) bucket.push(bias);
-    else group.byPrompt.set(submission.promptId, [bias]);
+    if (bucket) bucket.push({ bias, votes: tally.votes });
+    else group.byPrompt.set(submission.promptId, [{ bias, votes: tally.votes }]);
 
     if (!group.best || bias > group.best.bias) {
       group.best = { submissionId: submission.id, promptTitle: submission.promptTitle, bias };
@@ -226,10 +253,19 @@ export function buildLeaderboard(input: {
   }
 
   const entries: LeaderboardEntry[] = [...groups.values()].map((group) => {
-    const perPrompt = [...group.byPrompt.values()].map(mean);
-    const advantage = perPrompt.length
-      ? perPrompt.reduce((a, b) => a + b, 0) / (perPrompt.length + PRIOR.promptCoverage)
-      : 0;
+    // Average within each prompt first, then across prompts weighted by the
+    // (capped) votes behind each one, and finally shrink by the total evidence.
+    let weighted = 0;
+    let weight = 0;
+    for (const answers of group.byPrompt.values()) {
+      const promptWeight = Math.min(
+        answers.reduce((sum, a) => sum + a.votes, 0),
+        PROMPT_WEIGHT_CAP,
+      );
+      weighted += mean(answers.map((a) => a.bias)) * promptWeight;
+      weight += promptWeight;
+    }
+    const advantage = weight > 0 ? weighted / (weight + PRIOR.evidence) : 0;
     return {
       key: group.key,
       name: group.name,
@@ -245,6 +281,11 @@ export function buildLeaderboard(input: {
         ? { submissionId: group.best.submissionId, promptTitle: group.best.promptTitle }
         : null,
       ranked: group.votes >= MIN_VOTES,
+      evidence: weight,
+      // Posterior SD of the entry's true quality: the prior counts as
+      // `PRIOR.evidence` extra votes, so more evidence narrows the band.
+      se: STAR_SD / Math.sqrt(weight + PRIOR.evidence),
+      place: null,
     };
   });
 
@@ -255,6 +296,15 @@ export function buildLeaderboard(input: {
     if (a.answers !== b.answers) return b.answers - a.answers;
     return a.name.localeCompare(b.name, "zh-CN");
   });
+
+  // Strict order: the place follows the score. How much of the gap is real is
+  // left to `se`, which the list shows rather than hides.
+  let position = 0;
+  for (const entry of entries) {
+    if (!entry.ranked) continue;
+    position += 1;
+    entry.place = position;
+  }
 
   return {
     entries,

@@ -83,21 +83,43 @@ function Rank({ place }: { place: number | null }) {
   return <span className="num text-sm text-muted">{place}</span>;
 }
 
-/** The calibrated score, with a track showing where it sits on the five-star scale. */
-function ScoreBar({ score, ranked }: { score: number | null; ranked: boolean }) {
+/**
+ * The calibrated score on the five-star axis, with the band its evidence
+ * supports. Overlapping bands mean the order between two rows is not settled.
+ */
+function ScoreBar({ score, se, ranked }: { score: number | null; se: number; ranked: boolean }) {
   if (score === null) {
     return <span className="num text-sm text-control">—</span>;
   }
-  const fill = Math.max(0, Math.min(1, (score - 1) / 4));
+  const position = (value: number) => {
+    const pct = ((value - 1) / 4) * 100;
+    return Math.max(0, Math.min(100, pct));
+  };
+  const center = position(score);
+  const low = position(score - se);
+  const high = position(score + se);
+
   return (
     <div className="flex items-center justify-end gap-2.5">
       <div
         aria-hidden
-        className="hidden h-1 w-16 overflow-hidden rounded-full bg-accent-track/60 sm:block"
+        title={`±${se.toFixed(2)} 星`}
+        className="relative hidden h-3 w-16 sm:block"
       >
+        <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-control/60" />
         <div
-          className={cn("h-full rounded-full", ranked ? "bg-accent" : "bg-control")}
-          style={{ width: `${Math.max(fill * 100, 3)}%` }}
+          className={cn(
+            "absolute top-1/2 h-1 -translate-y-1/2 rounded-full",
+            ranked ? "bg-accent/35" : "bg-control/40",
+          )}
+          style={{ left: `${low}%`, width: `${Math.max(high - low, 1)}%` }}
+        />
+        <div
+          className={cn(
+            "absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+            ranked ? "bg-accent" : "bg-control",
+          )}
+          style={{ left: `${center}%` }}
         />
       </div>
       <span
@@ -112,22 +134,14 @@ function ScoreBar({ score, ranked }: { score: number | null; ranked: boolean }) 
   );
 }
 
-function Row({
-  entry,
-  place,
-  index,
-}: {
-  entry: LeaderboardEntry;
-  place: number | null;
-  index: number;
-}) {
+function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
   return (
     <tr
       style={{ "--stagger": `${Math.min(index, 12) * 18}ms` } as CSSProperties}
       className="reveal-card border-t border-rule first:border-t-0 hover:bg-raised/45"
     >
-      <td className="w-12 py-2.5 pl-3 pr-1 align-middle sm:pl-4">
-        <Rank place={place} />
+      <td className="w-10 py-2.5 pl-3 pr-1 align-middle sm:w-12 sm:pl-4">
+        <Rank place={entry.place} />
       </td>
 
       <td className="min-w-0 py-2.5 pr-3 align-middle">
@@ -148,11 +162,9 @@ function Row({
         {entry.sublabel && (
           <div className="mt-0.5 truncate text-[11px] text-muted">{entry.sublabel}</div>
         )}
-        {!entry.ranked && (
-          <div className="mt-0.5 text-[11px] text-muted sm:hidden">
-            样本不足 {MIN_VOTES} 票
-          </div>
-        )}
+        <div className="num mt-0.5 text-[11px] text-muted sm:hidden">
+          {entry.ranked ? `${entry.votes} 票 · ${entry.prompts} 题` : `样本不足 ${MIN_VOTES} 票`}
+        </div>
       </td>
 
       <td className="hidden w-24 py-2.5 pr-3 text-right align-middle md:table-cell">
@@ -161,19 +173,19 @@ function Row({
         </span>
       </td>
 
-      <td className="w-20 py-2.5 pr-3 text-right align-middle sm:w-24">
+      <td className="hidden w-24 py-2.5 pr-3 text-right align-middle sm:table-cell">
         <span className="num text-xs text-muted">
           {entry.answers}
           <span className="hidden sm:inline"> / {entry.prompts}</span>
         </span>
       </td>
 
-      <td className="w-14 py-2.5 pr-3 text-right align-middle">
+      <td className="hidden w-14 py-2.5 pr-3 text-right align-middle sm:table-cell">
         <span className="num text-xs text-muted">{entry.votes}</span>
       </td>
 
-      <td className="w-28 py-2.5 pr-3 pl-1 text-right align-middle sm:pr-4">
-        <ScoreBar score={entry.score} ranked={entry.ranked} />
+      <td className="w-16 py-2.5 pr-3 pl-1 text-right align-middle sm:w-28 sm:pr-4">
+        <ScoreBar score={entry.score} se={entry.se} ranked={entry.ranked} />
       </td>
     </tr>
   );
@@ -207,11 +219,13 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
       <PageHeader
         title="排名"
         subtitle={
-          <>
-            <span className="num">{board.rankedCount}</span> {UNIT_LABELS[dimension]}进榜 ·{" "}
-            <span className="num">{answers}</span> 份答案 ·{" "}
-            <span className="num">{board.votes}</span> 次打分
-          </>
+          answers > 0 ? (
+            <>
+              <span className="num">{board.rankedCount}</span> {UNIT_LABELS[dimension]}进榜 ·{" "}
+              <span className="num">{answers}</span> 份答案 ·{" "}
+              <span className="num">{board.votes}</span> 次打分
+            </>
+          ) : undefined
         }
       />
 
@@ -262,7 +276,10 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
               </caption>
               <thead>
                 <tr className="bg-raised/55 text-[11px] font-medium text-muted">
-                  <th scope="col" className="w-12 py-2 pl-3 text-left font-medium sm:pl-4">
+                  <th
+                    scope="col"
+                    className="w-10 py-2 pl-3 text-left font-medium sm:w-12 sm:pl-4"
+                  >
                     #
                   </th>
                   <th scope="col" className="py-2 pr-3 text-left font-medium">
@@ -274,28 +291,29 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
                   >
                     原始均分
                   </th>
-                  <th scope="col" className="w-20 py-2 pr-3 text-right font-medium sm:w-24">
-                    答案<span className="hidden sm:inline"> / 题目</span>
+                  <th
+                    scope="col"
+                    className="hidden w-24 py-2 pr-3 text-right font-medium sm:table-cell"
+                  >
+                    答案 / 题目
                   </th>
-                  <th scope="col" className="w-14 py-2 pr-3 text-right font-medium">
+                  <th
+                    scope="col"
+                    className="hidden w-14 py-2 pr-3 text-right font-medium sm:table-cell"
+                  >
                     打分
                   </th>
                   <th
                     scope="col"
-                    className="w-28 py-2 pr-3 pl-1 text-right font-medium sm:pr-4"
+                    className="w-16 py-2 pr-3 pl-1 text-right font-medium sm:w-28 sm:pr-4"
                   >
-                    校准分
+                    <span title="按题目难度、打分习惯与样本量校准后的分数">校准分</span>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 {shown.map((entry, index) => (
-                  <Row
-                    key={entry.key}
-                    entry={entry}
-                    place={entry.ranked ? index + 1 : null}
-                    index={index}
-                  />
+                  <Row key={entry.key} entry={entry} index={index} />
                 ))}
               </tbody>
             </table>

@@ -124,6 +124,90 @@ describe("buildLeaderboard", () => {
     expect(gap).toBeLessThan(rawGap);
   });
 
+  it("does not let thin evidence strictly outrank broad evidence", () => {
+    // `thin` is perfect on the one prompt it shares with `broad`, but that is
+    // three votes against thirty spread over five prompts. The edge must not
+    // survive as a separate place.
+    const submissions = [
+      answer("t1", "q1", "thin"),
+      ...Array.from({ length: 5 }, (_, i) => answer(`b${i}`, `q${i}`, "broad")),
+    ];
+    const ratings = [
+      ...votes("t1", 5, [1, 2, 3]),
+      ...Array.from({ length: 5 }, (_, i) =>
+        votes(`b${i}`, 4.5, [1, 2, 3, 4, 5, 6]),
+      ).flat(),
+    ];
+    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
+
+    const thin = find(board, "thin");
+    const broad = find(board, "broad");
+    expect(thin.ranked).toBe(true);
+    expect(broad.ranked).toBe(true);
+    // Raw stars still favour `thin`, so the compressed edge is the calibration
+    // at work: most of a half-star raw gap does not survive.
+    expect(thin.raw!).toBeGreaterThan(broad.raw!);
+    expect(thin.score! - broad.score!).toBeLessThan((thin.raw! - broad.raw!) * 0.5);
+  });
+
+  it("trusts the same per-answer edge more when it covers more prompts", () => {
+    // Both models beat a shared baseline by the same margin per prompt; the one
+    // that showed it on three prompts keeps more of that edge than the one that
+    // showed it once.
+    const submissions = [
+      answer("n1", "q1", "narrow"),
+      answer("n2", "q1", "control"),
+      answer("w1", "w1", "wide"),
+      answer("w2", "w1", "control"),
+      answer("w3", "w2", "wide"),
+      answer("w4", "w2", "control"),
+      answer("w5", "w3", "wide"),
+      answer("w6", "w3", "control"),
+    ];
+    const ratings = [
+      ...votes("n1", 5, [1, 2, 3]),
+      ...votes("n2", 2.5, [1, 2, 3]),
+      ...["w1", "w3", "w5"].flatMap((id) => votes(id, 5, [1, 2, 3])),
+      ...["w2", "w4", "w6"].flatMap((id) => votes(id, 2.5, [1, 2, 3])),
+    ];
+    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
+
+    const narrow = find(board, "narrow");
+    const wide = find(board, "wide");
+    expect(wide.score!).toBeGreaterThan(narrow.score!);
+  });
+
+  it("numbers every ranked entry in order", () => {
+    const submissions = ["top", "mid", "low"].map((m, i) => answer(`a${i}`, "q1", m));
+    const ratings = [
+      ...votes("a0", 5, [1, 2, 3, 4, 5]),
+      ...votes("a1", 2.5, [1, 2, 3, 4, 5]),
+      ...votes("a2", 1, [1, 2, 3, 4, 5]),
+    ];
+    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
+
+    expect(find(board, "top").place).toBe(1);
+    expect(find(board, "mid").place).toBe(2);
+    expect(find(board, "low").place).toBe(3);
+  });
+
+  it("reports a wider uncertainty for thin evidence", () => {
+    const submissions = [
+      answer("t1", "q1", "thin"),
+      ...Array.from({ length: 5 }, (_, i) => answer(`b${i}`, `q${i}`, "broad")),
+    ];
+    const ratings = [
+      ...votes("t1", 5, [1, 2, 3]),
+      ...Array.from({ length: 5 }, (_, i) =>
+        votes(`b${i}`, 4.5, [1, 2, 3, 4, 5, 6]),
+      ).flat(),
+    ];
+    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
+
+    expect(find(board, "thin").se).toBeGreaterThan(find(board, "broad").se);
+    expect(find(board, "broad").se).toBeGreaterThan(0);
+  });
+
   it("counts answers without votes but leaves them unranked", () => {
     const board = buildLeaderboard({
       submissions: [answer("a1", "q1", "quiet")],
