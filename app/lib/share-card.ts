@@ -109,7 +109,7 @@ function header(kind: PromptKind) {
   return [
     `<g transform="translate(${PADDING} 22) scale(0.75)" fill="none" stroke="${COLOR.ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`,
     `<circle cx="9" cy="23" r="5.5"/><circle cx="23" cy="23" r="5.5"/>`,
-    `<path d="M9 23l5-8h5.5l3.5 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.5 2-5 2.6-8 1.8"/>`,
+    `<path d="M9 23l5-8h7l2 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.5 2-5 2.9-8 2.5"/>`,
     `</g>`,
     text(PADDING + 30, 40, "Pelican Arena", { size: 14, fill: COLOR.ink, weight: 600 }),
     `<rect x="${CARD_WIDTH - PADDING - pillWidth}" y="24" width="${pillWidth}" height="22" rx="11" fill="${COLOR.raised}"/>`,
