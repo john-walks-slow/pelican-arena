@@ -24,7 +24,7 @@ import {
   submissions,
   users,
 } from "~/db/schema";
-import type { Catalog, CatalogEntry, CatalogKind } from "./catalog";
+import { CatalogError, type Catalog, type CatalogEntry, type CatalogKind } from "./catalog";
 import { slugify } from "./ids";
 import type { PromptKind } from "./kinds";
 import { matchModel } from "./model-match";
@@ -36,7 +36,9 @@ const SORT_PRIOR = 3;
 const priorStars = sql.raw(String(SORT_PRIOR * PRIOR_VOTES));
 const priorVotes = sql.raw(String(PRIOR_VOTES));
 
-const CATALOG_TABLES = { models, providers, harnesses, mods };
+/** Free-text catalogs. Models are kept out: they come from the synced source. */
+const EDITABLE_TABLES = { providers, harnesses, mods };
+export type EditableCatalogKind = keyof typeof EDITABLE_TABLES;
 
 /** Escapes LIKE wildcards so a literal "%" in a search does not match everything. */
 function likePattern(query: string) {
@@ -75,29 +77,66 @@ export async function searchCatalog(kind: CatalogKind, query = "", limit = 20) {
     return { items: rows, total: total.n };
   }
 
-  const table = kind === "models" ? models : kind === "providers" ? providers : harnesses;
-  const usedBy =
-    kind === "models"
-      ? submissions.modelId
-      : kind === "providers"
-        ? submissions.providerId
-        : submissions.harnessId;
+  if (kind === "models") {
+    const where = query
+      ? and(eq(models.hidden, false), nameLike(models.name, query))
+      : eq(models.hidden, false);
+    const [rows, [total]] = await Promise.all([
+      d
+        .select({ id: models.id, name: models.name, uses: count(submissions.id) })
+        .from(models)
+        .leftJoin(
+          submissions,
+          and(eq(submissions.modelId, models.id), eq(submissions.status, "active")),
+        )
+        .where(where)
+        .groupBy(models.id, models.name)
+        .orderBy(
+          desc(sql`coalesce(${models.releaseDate}, '')`),
+          desc(count(submissions.id)),
+          asc(models.name),
+        )
+        .limit(limit),
+      d.select({ n: count() }).from(models).where(where),
+    ]);
+    return { items: rows, total: total.n };
+  }
+
+  if (kind === "providers") {
+    const where = query ? nameLike(providers.name, query) : undefined;
+    const [rows, [total]] = await Promise.all([
+      d
+        .select({ id: providers.id, name: providers.name, uses: count(submissions.id) })
+        .from(providers)
+        .leftJoin(
+          submissions,
+          and(eq(submissions.providerId, providers.id), eq(submissions.status, "active")),
+        )
+        .where(where)
+        .groupBy(providers.id, providers.name, providers.rank)
+        .orderBy(asc(providers.rank), desc(count(submissions.id)), asc(providers.name))
+        .limit(limit),
+      d.select({ n: count() }).from(providers).where(where),
+    ]);
+    return { items: rows, total: total.n };
+  }
+
   const [rows, [total]] = await Promise.all([
     d
-      .select({ id: table.id, name: table.name, uses: count(submissions.id) })
-      .from(table)
+      .select({ id: harnesses.id, name: harnesses.name, uses: count(submissions.id) })
+      .from(harnesses)
       .leftJoin(
         submissions,
-        and(eq(usedBy, table.id), eq(submissions.status, "active")),
+        and(eq(submissions.harnessId, harnesses.id), eq(submissions.status, "active")),
       )
-      .where(query ? nameLike(table.name, query) : undefined)
-      .groupBy(table.id, table.name)
-      .orderBy(desc(count(submissions.id)), asc(table.name))
+      .where(query ? nameLike(harnesses.name, query) : undefined)
+      .groupBy(harnesses.id, harnesses.name)
+      .orderBy(desc(count(submissions.id)), asc(harnesses.name))
       .limit(limit),
     d
       .select({ n: count() })
-      .from(table)
-      .where(query ? nameLike(table.name, query) : undefined),
+      .from(harnesses)
+      .where(query ? nameLike(harnesses.name, query) : undefined),
   ]);
   return { items: rows, total: total.n };
 }
@@ -110,9 +149,12 @@ export async function resolveModel(rawId: string) {
 
 /** Popular entries for the submit form, without pulling the whole catalog. */
 export async function getCatalog(): Promise<Catalog> {
-  const [m, p, h, md] = await Promise.all(
-    (Object.keys(CATALOG_TABLES) as CatalogKind[]).map((kind) => searchCatalog(kind, "", 20)),
-  );
+  const [m, p, h, md] = await Promise.all([
+    searchCatalog("models", "", 20),
+    searchCatalog("providers", "", 30),
+    searchCatalog("harnesses", "", 20),
+    searchCatalog("mods", "", 20),
+  ]);
   return {
     models: m.items.map(({ id, name }) => ({ id, name })),
     providers: p.items.map(({ id, name }) => ({ id, name })),
@@ -122,12 +164,27 @@ export async function getCatalog(): Promise<Catalog> {
 }
 
 /** Resolves a user-typed catalog name to an id, creating the entry when new. */
-export async function ensureCatalogEntry(kind: CatalogKind, name: string) {
+export async function ensureCatalogEntry(kind: EditableCatalogKind, name: string) {
   const clean = name.trim().slice(0, 60);
   const id = slugify(clean);
   if (!id) throw new Error(`invalid ${kind} name`);
-  await db().insert(CATALOG_TABLES[kind]).values({ id, name: clean }).onConflictDoNothing();
+  await db().insert(EDITABLE_TABLES[kind]).values({ id, name: clean }).onConflictDoNothing();
   return id;
+}
+
+/** Models are synced, not typed: the submitted name must already be in the catalog. */
+export async function requireCatalogModel(name: string) {
+  const clean = name.trim().slice(0, 60);
+  const id = slugify(clean);
+  if (!id) throw new CatalogError("请选择模型");
+
+  const [row] = await db()
+    .select({ id: models.id })
+    .from(models)
+    .where(eq(models.id, id))
+    .limit(1);
+  if (!row) throw new CatalogError("该模型不在目录中，请从列表选择");
+  return row.id;
 }
 
 export async function countSince(

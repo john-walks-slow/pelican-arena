@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `rank` integer DEFAULT 1000 NOT NULL;

@@ -8,6 +8,7 @@ import {
 import type { Route } from "./+types/submission.edit";
 import { SubmissionErrorDialog } from "~/components/submission/submission-error-dialog";
 import { SubmissionForm } from "~/components/submission/submission-form";
+import { CatalogError } from "~/lib/catalog";
 import { safeFrom } from "~/lib/navigation";
 import {
   getCatalog,
@@ -65,13 +66,18 @@ export async function action({ params, request }: Route.ActionArgs) {
   const { meta, error } = parseSubmissionMeta(form);
   if (!meta) return data({ error }, { status: 400 });
 
-  const updated = await updateSubmission({
-    id: submission.id,
-    authorId: user.id,
-    meta,
-  });
-  if (!updated) {
-    return data({ error: "答案状态已变更，请刷新后再试" }, { status: 409 });
+  try {
+    const updated = await updateSubmission({
+      id: submission.id,
+      authorId: user.id,
+      meta,
+    });
+    if (!updated) {
+      return data({ error: "答案状态已变更，请刷新后再试" }, { status: 409 });
+    }
+  } catch (e) {
+    if (e instanceof CatalogError) return data({ error: e.message }, { status: 400 });
+    throw e;
   }
 
   const from = safeFrom(new URL(request.url).searchParams.get("from"));

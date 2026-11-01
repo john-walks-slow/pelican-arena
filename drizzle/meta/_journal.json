@@ -36,6 +36,20 @@
       "when": 1793455906745,
       "tag": "0004_panoramic_corsair",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1793502960078,
+      "tag": "0005_purple_whiplash",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1793503547726,
+      "tag": "0006_mute_green_goblin",
+      "breakpoints": true
     }
   ]
 }

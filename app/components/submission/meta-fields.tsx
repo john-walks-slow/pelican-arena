@@ -59,7 +59,9 @@ export function SubmissionMetaFields({
         options={resolved.models}
         value={model}
         onChange={setModel}
-        placeholder="选择或输入模型"
+        searchPlaceholder="搜索模型..."
+        placeholder="选择模型"
+        creatable={false}
         required
         hint={logModelHint ? `日志记录：${logModelHint}` : undefined}
       />

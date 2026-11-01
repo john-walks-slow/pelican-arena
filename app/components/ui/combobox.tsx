@@ -34,6 +34,8 @@ interface ComboboxProps {
   icon?: React.ReactNode;
   /** field: full-width form control. chip: inline pill that sits with other tags. */
   trigger?: "field" | "chip";
+  /** Adds an entry for text that is not in the list. Models are picked from the synced catalog only. */
+  creatable?: boolean;
   className?: string;
 }
 
@@ -51,6 +53,7 @@ export function Combobox({
   required,
   icon,
   trigger = "field",
+  creatable = true,
   className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
@@ -101,6 +104,7 @@ export function Combobox({
   const showSelected = Boolean(value && !selectedEntry);
   const isChip = trigger === "chip";
   const isCustomNew =
+    creatable &&
     query.trim().length > 0 &&
     !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
 

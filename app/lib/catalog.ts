@@ -6,3 +6,6 @@ export interface CatalogEntry {
 }
 
 export type Catalog = Record<CatalogKind, CatalogEntry[]>;
+
+/** A submission named a catalog entry that does not exist or was not selectable. */
+export class CatalogError extends Error {}

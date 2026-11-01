@@ -9,6 +9,7 @@ import type { Route } from "./+types/submit";
 import { SubmissionErrorDialog } from "~/components/submission/submission-error-dialog";
 import { SubmissionForm } from "~/components/submission/submission-form";
 import { BundleError } from "~/lib/bundle";
+import { CatalogError } from "~/lib/catalog";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { safeFrom, withFrom } from "~/lib/navigation";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
@@ -62,7 +63,8 @@ export async function action({ request, params }: Route.ActionArgs) {
       headers: { "Set-Cookie": await flashToast(request, "已提交，感谢你的参与") },
     });
   } catch (e) {
-    if (e instanceof BundleError) return data({ error: e.message }, { status: 400 });
+    if (e instanceof BundleError || e instanceof CatalogError)
+      return data({ error: e.message }, { status: 400 });
     throw e;
   }
 }

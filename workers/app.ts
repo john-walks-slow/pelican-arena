@@ -1,4 +1,5 @@
 import { createRequestHandler } from "react-router";
+import { syncModelCatalog } from "~/lib/catalog-sync.server";
 import { serveUsercontent } from "~/lib/usercontent.server";
 
 const requestHandler = createRequestHandler(
@@ -25,5 +26,11 @@ export default {
     }
 
     return requestHandler(request);
+  },
+
+  async scheduled(_controller, _env, ctx) {
+    ctx.waitUntil(
+      syncModelCatalog().catch((error) => console.error("catalog sync failed", error)),
+    );
   },
 } satisfies ExportedHandler<Env>;

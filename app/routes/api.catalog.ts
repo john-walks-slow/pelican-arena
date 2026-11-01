@@ -17,7 +17,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 60);
-  const requested = Number(url.searchParams.get("limit") ?? 20);
-  const limit = Math.min(Math.max(Number.isFinite(requested) ? requested : 20, 1), 50);
+  const requested = Number(url.searchParams.get("limit") ?? (kind === "providers" ? 30 : 20));
+  const fallback = kind === "providers" ? 30 : 20;
+  const limit = Math.min(Math.max(Number.isFinite(requested) ? requested : fallback, 1), 50);
   return searchCatalog(kind, query, limit);
 }

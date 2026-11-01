@@ -71,8 +71,26 @@ const catalog = <TName extends string>(name: TName) =>
     createdAt: createdAt(),
   });
 
-export const models = catalog("models");
-export const providers = catalog("providers");
+/** Models are synced from models.dev; see `app/lib/catalog-source.ts`. */
+export const models = sqliteTable("models", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  family: text("family"),
+  releaseDate: text("release_date"),
+  source: text("source").notNull().default("manual"),
+  hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+  syncedAt: integer("synced_at", { mode: "timestamp_ms" }),
+  createdAt: createdAt(),
+});
+
+/** Providers are curated: rank keeps the picker ordered by how people actually use them. */
+export const providers = sqliteTable("providers", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  rank: integer("rank").notNull().default(1000),
+  createdAt: createdAt(),
+});
+
 export const harnesses = catalog("harnesses");
 export const mods = catalog("mods");
 

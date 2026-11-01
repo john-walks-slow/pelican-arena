@@ -12,7 +12,7 @@ import {
 } from "./bundle";
 import { newId } from "./ids";
 import type { PromptKind } from "./kinds";
-import { ensureCatalogEntry } from "./queries.server";
+import { ensureCatalogEntry, requireCatalogModel } from "./queries.server";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
 
@@ -44,7 +44,7 @@ export async function createSubmission(input: {
   const { meta } = input;
 
   const [modelId, providerId, harnessId, modIds] = await Promise.all([
-    ensureCatalogEntry("models", meta.model),
+    requireCatalogModel(meta.model),
     ensureCatalogEntry("providers", meta.provider),
     meta.harness ? ensureCatalogEntry("harnesses", meta.harness) : null,
     Promise.all(meta.mods.map((m) => ensureCatalogEntry("mods", m))),
@@ -90,7 +90,7 @@ export async function updateSubmission(input: {
 }) {
   const { meta } = input;
   const [modelId, providerId, harnessId, modIds] = await Promise.all([
-    ensureCatalogEntry("models", meta.model),
+    requireCatalogModel(meta.model),
     ensureCatalogEntry("providers", meta.provider),
     meta.harness ? ensureCatalogEntry("harnesses", meta.harness) : null,
     Promise.all(meta.mods.map((m) => ensureCatalogEntry("mods", m))),
