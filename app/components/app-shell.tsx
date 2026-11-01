@@ -1,11 +1,12 @@
 import { LayoutGrid, LogOut, PenLine, ShieldCheck, Trophy, UserRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
 import { PelicanRide } from "./pelican-ride";
 import { ThemeMenu } from "./theme-menu";
 import { Button } from "./ui/button";
 import { LinuxDoIcon } from "./ui/linuxdo-icon";
+import { screenKey } from "~/lib/navigation";
 
 export interface ShellUser {
   id: number;
@@ -24,21 +25,10 @@ const NAV = [
 
 const ADMIN_NAV = { to: "/admin", label: "审核", icon: ShieldCheck, end: false };
 
-export function baseScreenKey(pathname: string) {
-  return (
-    pathname
-      .replace(/^(\/p\/[^/]+)\/submit$/, "$1")
-      .replace(/^(\/s\/[^/]+)\/edit$/, "$1") || "/"
-  );
-}
-
 function Brand() {
-  const { pathname } = useLocation();
-
   return (
     <Link to="/" prefetch="intent" className="flex items-center gap-2 px-1.5">
-      {/* Remount per screen so the ride replays on every page switch. */}
-      <PelicanRide key={pathname} className="brand-mark size-6 text-accent" />
+      <PelicanRide className="brand-mark size-6 text-accent" />
       <span className="text-[15px] font-semibold tracking-tight">Pelican Arena</span>
     </Link>
   );
@@ -200,7 +190,7 @@ function NavigationProgress() {
   const isScreenLoad =
     navigation.state === "loading" &&
     navigation.location != null &&
-    baseScreenKey(navigation.location.pathname) !== baseScreenKey(location.pathname);
+    screenKey(navigation.location.pathname) !== screenKey(location.pathname);
 
   useEffect(() => {
     if (isScreenLoad) {
@@ -248,14 +238,9 @@ export function AppShell({
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
   const navigating = useNavigation().state !== "idle";
-  const [navigated, setNavigated] = useState(false);
-  const firstPath = useRef(pathname);
   const menuMounted = usePresence(menuOpen, 150);
 
-  useEffect(() => {
-    setMenuOpen(false);
-    if (pathname !== firstPath.current) setNavigated(true);
-  }, [pathname]);
+  useEffect(() => setMenuOpen(false), [pathname]);
 
   useEffect(() => {
     const sync = () => setScrolled(window.scrollY > 6);
@@ -264,16 +249,17 @@ export function AppShell({
     return () => window.removeEventListener("scroll", sync);
   }, [pathname]);
 
-  // Freeze the page behind the panel without a scrollbar-driven shift.
+  // Lock the viewport, not <body>: with `html` clipping horizontally, a
+  // `body { overflow: hidden }` lock turns body into a scroll container and
+  // the sticky bars drop off-screen. Locking the document keeps them in place.
   useEffect(() => {
-    const body = document.body;
     if (!menuOpen) return;
-    const previous = body.style.overflow;
-    body.style.overflow = "hidden";
+    const root = document.documentElement;
+    root.dataset.menuOpen = "true";
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
     window.addEventListener("keydown", onKey);
     return () => {
-      body.style.overflow = previous;
+      delete root.dataset.menuOpen;
       window.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
@@ -282,7 +268,6 @@ export function AppShell({
     <div
       className="shell min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]"
       data-navigating={navigating ? "true" : "false"}
-      data-navigated={navigated ? "true" : "false"}
     >
       <NavigationProgress />
 
@@ -298,9 +283,8 @@ export function AppShell({
       </aside>
 
       <header
-        data-menu={menuOpen}
         data-scrolled={scrolled}
-        className="shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
+        className="shell-bar fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
       >
         <Brand />
         <div className="flex items-center">
@@ -325,7 +309,7 @@ export function AppShell({
         </div>
       )}
 
-      <main className="main-column @container/main min-w-0 px-5 pt-6 pb-16 sm:px-6 lg:px-8 lg:pt-8">
+      <main className="main-column @container/main min-w-0 px-5 pt-[72px] pb-16 sm:px-6 lg:px-8 lg:pt-8">
         {children}
       </main>
     </div>

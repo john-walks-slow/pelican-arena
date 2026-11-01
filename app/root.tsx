@@ -9,45 +9,20 @@ import {
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
-import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from "react";
+import { useEffect, useLayoutEffect, useRef, ViewTransition } from "react";
 import { useLocation, useNavigationType } from "react-router";
 import type { Route } from "./+types/root";
-import { AppShell, baseScreenKey } from "./components/app-shell";
+import { AppShell } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
 import { moderationCounts } from "./lib/moderation.server";
 import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
+import { screenKey } from "./lib/navigation";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
 import { themeScript } from "./lib/theme";
 import "./app.css";
-
-type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up";
-
-function screenRank(key: string): { depth: number; slot: number } {
-  if (key === "/") return { depth: 0, slot: 0 };
-  if (key.startsWith("/leaderboard")) return { depth: 0, slot: 1 };
-  if (key === "/prompts/new") return { depth: 0, slot: 2 };
-  if (key.startsWith("/me")) return { depth: 0, slot: 3 };
-  if (key.startsWith("/auth")) return { depth: 0, slot: 4 };
-  if (/^\/p\/[^/]+\/edit$/.test(key)) return { depth: 2, slot: 0 };
-  if (key.startsWith("/p/")) return { depth: 1, slot: 0 };
-  if (key.startsWith("/s/") || key.startsWith("/compare")) return { depth: 2, slot: 0 };
-  return { depth: 1, slot: 0 };
-}
-
-function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
-  if (prevKey === nextKey) return "steady";
-  const prev = screenRank(prevKey);
-  const next = screenRank(nextKey);
-  if (next.depth > prev.depth) return "forward";
-  if (next.depth < prev.depth) return "back";
-  if (next.depth === 0 && prev.depth === 0) {
-    return next.slot >= prev.slot ? "lateral-down" : "lateral-up";
-  }
-  return "forward";
-}
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
@@ -136,37 +111,31 @@ export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
   const location = useLocation();
   const navigationType = useNavigationType();
-  const screenKey = baseScreenKey(location.pathname);
-  const prevScreenRef = useRef(screenKey);
-  const [motion, setMotion] = useState<RouteMotion>("steady");
-
-  if (prevScreenRef.current !== screenKey) {
-    const direction = resolveMotion(prevScreenRef.current, screenKey);
-    // A history entry restores the same screen, so replaying the entrance
-    // animation reads as a flash. The snapshot pipeline already suppresses it;
-    // the keyframe fallback has no snapshot and has to skip it here.
-    prevScreenRef.current = screenKey;
-    setMotion(navigationType === "POP" ? "steady" : direction);
-    if (typeof document !== "undefined") {
-      // Direction still steers the view-transition rail on history navigation.
-      document.documentElement.dataset.navDir = direction;
-    }
-  }
-
-  // The snapshot React takes for the incoming screen is captured after layout
-  // effects, so the viewport has to be back at the top of the new page by then.
-  // Restoring a history entry keeps its own scroll position.
+  const key = screenKey(location.pathname);
+  const restoring = navigationType === "POP";
+  // The router commits several times per navigation (pending, data, Suspense
+  // reveals). Only the commit that actually changes the screen may animate;
+  // otherwise each intermediate commit replays the page cross-fade.
+  const lastScreen = useRef(key);
+  const screenChanged = lastScreen.current !== key;
   useLayoutEffect(() => {
-    if (navigationType === "POP") return;
+    lastScreen.current = key;
+  }, [key]);
+
+  // React captures the incoming screen after layout effects, so the viewport
+  // has to be back at the top before that snapshot is measured. A history
+  // entry keeps its own scroll position.
+  useLayoutEffect(() => {
+    if (restoring) return;
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [screenKey, navigationType]);
+  }, [key, restoring]);
 
   return (
     <>
       <FlashToasts flash={loaderData.toast} />
       <AppShell user={loaderData.user} reviewCount={loaderData.review?.total}>
-        <ViewTransition update="page-fade" default="none">
-          <div data-motion={motion} className="route-stage">
+        <ViewTransition update={screenChanged ? "page" : "none"} default="none">
+          <div className="route-stage">
             <Outlet />
           </div>
         </ViewTransition>

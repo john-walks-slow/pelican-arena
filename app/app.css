@@ -218,6 +218,12 @@ html {
   overflow-anchor: none;
 }
 
+/* The drawer is a viewport-sized sheet; locking the document keeps every
+   sticky bar on screen, unlike a body overflow lock (see below). */
+html[data-menu-open] {
+  overflow: hidden;
+}
+
 /* Radix overlays (select, menu, dialog) lock the page by removing its scrollbar
    and compensating with a body margin. The gutter above already holds that
    space, so the compensation would narrow the page by one scrollbar. */
@@ -254,110 +260,6 @@ body {
   }
 }
 
-/* Soft fade with micro-spatial lift: the title rail moves, content stays put */
-@keyframes stage-forward {
-  from {
-    opacity: 0;
-    transform: translate3d(14px, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes stage-back {
-  from {
-    opacity: 0;
-    transform: translate3d(-14px, 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes stage-down {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes stage-up {
-  from {
-    opacity: 0;
-    transform: translate3d(0, -12px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes reveal-rise {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 8px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Cascade Ripple entrance: delicate scale bloom with glide */
-@keyframes reveal-card-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 12px, 0) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-/* Skeleton shimmer sweep */
-@keyframes skeleton-shimmer {
-  0% {
-    transform: translateX(-100%);
-  }
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-/* Keyframe fallback for browsers without the View Transitions API. Where it is
-   supported the snapshot pipeline owns every navigation animation below. */
-@supports not (view-transition-name: none) {
-  .route-stage[data-motion="forward"] .page-header {
-    animation: stage-forward 260ms var(--ease-spatial);
-  }
-  .route-stage[data-motion="back"] .page-header {
-    animation: stage-back 250ms var(--ease-spatial);
-  }
-  .route-stage[data-motion="lateral-down"] .page-header {
-    animation: stage-down 240ms var(--ease-spatial);
-  }
-  .route-stage[data-motion="lateral-up"] .page-header {
-    animation: stage-up 240ms var(--ease-spatial);
-  }
-  .route-stage:not([data-motion="steady"]) .reveal-tier-1 {
-    animation: reveal-rise 260ms var(--ease-spatial);
-  }
-  .route-stage:not([data-motion="steady"]) .reveal-tier-2 {
-    animation: reveal-rise 280ms var(--ease-spatial);
-  }
-  .route-stage:not([data-motion="steady"]) .reveal-card {
-    animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms);
-  }
-}
-
 /* ---- View transition choreography -------------------------------------- */
 
 /* The overlay lives in the top layer, outside the root's horizontal clip, so
@@ -367,9 +269,8 @@ body {
   overflow: clip;
 }
 
-/* The app shell is identical on both sides of a navigation, so it must not be
-   part of any cross-fade: freeze the root snapshot and let the named regions
-   below carry all the motion. */
+/* The app shell is identical on both sides of a navigation: freeze it and let
+   the screen boundary carry the motion. */
 ::view-transition-group(root),
 ::view-transition-image-pair(root),
 ::view-transition-old(root),
@@ -379,54 +280,39 @@ body {
   overflow: clip;
 }
 
-/* Screen body: Material fade-through, no lateral travel. */
-::view-transition-group(.page-fade) {
-  animation-duration: 240ms;
+/* Screens cross-fade with a small upward drift. The outgoing screen keeps its
+   weight while the incoming one rises, so the content is never gone and the
+   ground can never flash through a blank frame. */
+::view-transition-group(.page) {
+  animation-duration: 280ms;
   animation-timing-function: var(--ease-spatial);
+  overflow: clip;
 }
-/* Fade through, not a cross-fade: the outgoing screen is gone before the
-   incoming one appears, so the two layouts never sit on top of each other. */
-::view-transition-old(.page-fade) {
-  animation: page-fade-out 90ms ease-out both;
+::view-transition-old(.page),
+::view-transition-new(.page) {
+  /* Normal blending keeps overlapping identical pixels from doubling up. The
+     asymmetric opacity curves below keep the ground from showing through. */
+  mix-blend-mode: normal;
 }
-::view-transition-new(.page-fade) {
-  animation: page-fade-in 210ms var(--ease-spatial) 90ms both;
+::view-transition-old(.page) {
+  animation: page-out 160ms ease-out 120ms both;
 }
-
-/* Title rail: the one region that slides, because it carries hierarchy. */
-::view-transition-group(.page-rail) {
-  animation-duration: 300ms;
-  animation-timing-function: var(--ease-spatial);
-}
-::view-transition-old(.page-rail) {
-  animation: rail-out 140ms ease-out both;
-}
-::view-transition-new(.page-rail) {
-  animation: rail-in 280ms var(--ease-spatial) both;
+::view-transition-new(.page) {
+  animation: page-in 150ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 
-html[data-nav-dir="back"]::view-transition-old(.page-rail) {
-  animation-name: rail-out-back;
-}
-html[data-nav-dir="back"]::view-transition-new(.page-rail) {
-  animation-name: rail-in-back;
-}
-html[data-nav-dir="lateral-down"]::view-transition-new(.page-rail) {
-  animation-name: rail-in-down;
-}
-html[data-nav-dir="lateral-up"]::view-transition-new(.page-rail) {
-  animation-name: rail-in-up;
-}
-
-/* The mobile brand bar is shell furniture, but on small screens the page
-   header's sheet deliberately reaches up behind it. If that sheet travels with
-   the page snapshot it paints over the bar, so the bar gets its own frozen
-   layer above the fade. */
+/* The mobile brand bar is shell furniture, but the page header's sheet reaches
+   up behind it. If that sheet travels with the page snapshot it paints over the
+   bar, so the bar gets its own frozen layer above the cross-fade. */
 ::view-transition-group(shell-bar) {
   animation: none;
   z-index: 60;
 }
-::view-transition-old(shell-bar),
+/* Only the new bar is drawn: with a translucent scrolled state the old copy
+   would show through and double the brand mark. */
+::view-transition-old(shell-bar) {
+  display: none;
+}
 ::view-transition-new(shell-bar) {
   animation: none;
   mix-blend-mode: normal;
@@ -434,10 +320,11 @@ html[data-nav-dir="lateral-up"]::view-transition-new(.page-rail) {
 
 /* Card ↔ detail container transform. */
 ::view-transition-group(.morph) {
-  animation-duration: 420ms;
+  animation-duration: 340ms;
   animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
   border-radius: var(--radius-card);
   overflow: hidden;
+  z-index: 10;
 }
 ::view-transition-image-pair(.morph) {
   animation-name: morph-soften;
@@ -446,77 +333,27 @@ html[data-nav-dir="lateral-up"]::view-transition-new(.page-rail) {
 /* The nav pill is a shell element, so it gets its own snapshot pair to glide
    between menu entries instead of snapping with the frozen shell. */
 ::view-transition-group(nav-active-pill) {
-  animation-duration: 260ms;
+  animation-duration: 240ms;
   animation-timing-function: var(--ease-spatial);
 }
 
-html:active-view-transition .route-stage .page-header,
-html:active-view-transition .route-stage .reveal-tier-1,
-html:active-view-transition .route-stage .reveal-tier-2,
-html:active-view-transition .route-stage .reveal-card {
-  animation: none !important;
-}
-
-@keyframes page-fade-out {
+@keyframes page-out {
   to {
     opacity: 0;
   }
 }
 
-@keyframes page-fade-in {
+@keyframes page-in {
   from {
     opacity: 0;
+    transform: translate3d(0, 8px, 0);
   }
 }
 
-@keyframes rail-in {
-  from {
-    opacity: 0;
-    transform: translate3d(18px, 0, 0);
-  }
-}
-
-@keyframes rail-out {
-  to {
-    opacity: 0;
-    transform: translate3d(-10px, 0, 0);
-  }
-}
-
-@keyframes rail-in-back {
-  from {
-    opacity: 0;
-    transform: translate3d(-18px, 0, 0);
-  }
-}
-
-@keyframes rail-out-back {
-  to {
-    opacity: 0;
-    transform: translate3d(10px, 0, 0);
-  }
-}
-
-@keyframes rail-in-down {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 14px, 0);
-  }
-}
-
-@keyframes rail-in-up {
-  from {
-    opacity: 0;
-    transform: translate3d(0, -14px, 0);
-  }
-}
-
-/* A mid-flight blur hides the pixel interpolation between two unrelated
-   layouts, which is what makes a container transform read as one object. */
-@keyframes morph-soften {
-  35% {
-    filter: blur(2px);
-  }
+/* Opaque so each screen snapshot composites as one surface during the page
+   cross-fade instead of letting the ground show through. */
+.route-stage {
+  background: var(--color-ground);
 }
 
 /* Tactile card hover & press physics with touch ripple feedback */
@@ -640,18 +477,7 @@ html[data-booting="true"] .boot-screen {
   animation: boot-wheel 1.1s linear infinite;
 }
 
-/* The brand mark is remounted per pathname, so this arrival ride replays on
-   every switch. It stays out of the first screen: the splash already carries
-   the loading animation there. */
-.shell[data-navigated="true"] .brand-mark .pelican-ride-body {
-  animation: brand-ride 600ms ease-in-out 2;
-}
-
-.shell[data-navigated="true"] .brand-mark .pelican-ride-wheel {
-  animation: boot-wheel 600ms linear 2;
-}
-
-/* Keep the wheels turning for the whole wait, not only once the screen lands. */
+/* Keep the wheels turning while a screen is loading. */
 .shell[data-navigating="true"] .brand-mark .pelican-ride-body {
   animation: brand-ride 600ms ease-in-out infinite;
 }
@@ -763,11 +589,10 @@ html[data-booting="true"] .boot-screen {
   }
 }
 
-/* Mobile brand bar. It carries no surface of its own on screens with a
-   PageHeader — that header's sheet already runs up behind the bar — and grows
-   its own frosted one only when scrolled on screens that have none. */
+/* Mobile brand bar. It owns an opaque surface so it never depends on the page
+   underneath, and its own view-transition layer keeps it above the page
+   snapshot while the page header's sheet slides up behind it. */
 .shell-bar {
-  /* Its own layer keeps it above the page fade; see the transition block. */
   view-transition-name: shell-bar;
   background: var(--color-ground);
   border-bottom: 1px solid transparent;
@@ -777,20 +602,6 @@ html[data-booting="true"] .boot-screen {
   background: color-mix(in srgb, var(--color-ground) 88%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(1.6);
   backdrop-filter: blur(20px) saturate(1.6);
-  border-bottom-color: var(--color-border);
-}
-
-.shell:has(.page-header) > .shell-bar:not([data-menu="true"]) {
-  background: transparent;
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
-  border-bottom-color: transparent;
-}
-
-.shell-bar[data-menu="true"] {
-  background: var(--color-ground);
-  -webkit-backdrop-filter: none;
-  backdrop-filter: none;
   border-bottom-color: var(--color-border);
 }
 
@@ -960,10 +771,7 @@ html[data-booting="true"] .boot-screen {
     animation: none !important;
   }
   .nav-progress-bar,
-  .route-stage,
-  .reveal-tier-1,
-  .reveal-tier-2,
-  .reveal-card {
+  .route-stage {
     animation: none !important;
   }
   .pelican-ride-body,
