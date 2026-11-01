@@ -208,6 +208,13 @@ html {
    space, so the compensation would narrow the page by one scrollbar. */
 html body[data-scroll-locked] {
   margin-right: 0 !important;
+  /* The lock sets `body { overflow: hidden }`. Because html already clips on
+     the x axis, that overflow no longer propagates to the viewport, so body
+     turns into a scroll container of its own: sticky bars inside it stop
+     tracking the viewport and jump off-screen while the page is scrolled.
+     `clip` blocks the overflow without creating a scroll container; the
+     library's JS handlers still keep the page itself from scrolling. */
+  overflow: clip !important;
 }
 
 body {
