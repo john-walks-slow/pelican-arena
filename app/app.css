@@ -348,14 +348,23 @@ body {
 
 /* ---- View transition choreography -------------------------------------- */
 
+/* The overlay lives in the top layer, outside the root's horizontal clip, so
+   translated snapshots can widen the layout viewport for a frame and flash a
+   horizontal scrollbar. Keep the whole overlay inside the viewport. */
+::view-transition {
+  overflow: clip;
+}
+
 /* The app shell is identical on both sides of a navigation, so it must not be
    part of any cross-fade: freeze the root snapshot and let the named regions
    below carry all the motion. */
 ::view-transition-group(root),
+::view-transition-image-pair(root),
 ::view-transition-old(root),
 ::view-transition-new(root) {
   animation: none;
   mix-blend-mode: normal;
+  overflow: clip;
 }
 
 /* Screen body: Material fade-through, no lateral travel. */

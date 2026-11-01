@@ -267,7 +267,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
         </div>
       ) : (
         <>
-          <ul className="mt-6 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+          <ul className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {items.map((p, index) => {
               const row = Math.floor(index / 3);
               const col = index % 3;
@@ -276,7 +276,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                 <li
                   key={p.id}
                   style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
-                  className="reveal-card"
+                  className="reveal-card min-w-0"
                 >
                   <ViewTransition
                     name={`prompt-card-${p.id}`}

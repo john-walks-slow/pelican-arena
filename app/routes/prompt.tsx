@@ -404,7 +404,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           </div>
         ) : (
           <>
-            <ul className="mt-4 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            <ul className="mt-4 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {items.map((s, index) => {
                 const isSelected = selected.includes(s.id);
                 const row = Math.floor(index / 3);
@@ -414,7 +414,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                   <li
                     key={s.id}
                     style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
-                    className="reveal-card"
+                    className="reveal-card min-w-0"
                   >
                   <ViewTransition
                     name={`submission-card-${s.id}`}

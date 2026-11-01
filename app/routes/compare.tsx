@@ -53,12 +53,12 @@ export default function Compare({ loaderData }: Route.ComponentProps) {
         title="并排对比"
       />
 
-      <div className={`mt-2.5 grid gap-4 ${COLS[submissions.length]}`}>
+      <div className={`mt-2.5 grid grid-cols-1 gap-4 ${COLS[submissions.length]}`}>
         {submissions.map((s, index) => (
           <section
             key={s.id}
             style={{ "--stagger": `${index * 26}ms` } as CSSProperties}
-            className="reveal-card flex flex-col overflow-hidden rounded-card border border-border bg-surface"
+            className="reveal-card flex min-w-0 flex-col overflow-hidden rounded-card border border-border bg-surface"
           >
             <div className="flex items-start justify-between gap-3 border-b border-border px-3.5 py-2.5">
               <div className="min-w-0">
