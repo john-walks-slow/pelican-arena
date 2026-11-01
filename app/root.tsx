@@ -9,8 +9,8 @@ import {
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "react-router";
+import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from "react";
+import { useLocation, useNavigationType } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
@@ -135,6 +135,7 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
 export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
   const location = useLocation();
+  const navigationType = useNavigationType();
   const screenKey = baseScreenKey(location.pathname);
   const prevScreenRef = useRef(screenKey);
   const [motion, setMotion] = useState<RouteMotion>("steady");
@@ -143,15 +144,28 @@ export default function App({ loaderData }: Route.ComponentProps) {
     const nextMotion = resolveMotion(prevScreenRef.current, screenKey);
     prevScreenRef.current = screenKey;
     setMotion(nextMotion);
+    if (typeof document !== "undefined") {
+      document.documentElement.dataset.navDir = nextMotion;
+    }
   }
+
+  // The snapshot React takes for the incoming screen is captured after layout
+  // effects, so the viewport has to be back at the top of the new page by then.
+  // Restoring a history entry keeps its own scroll position.
+  useLayoutEffect(() => {
+    if (navigationType === "POP") return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [screenKey, navigationType]);
 
   return (
     <>
       <FlashToasts flash={loaderData.toast} />
       <AppShell user={loaderData.user} reviewCount={loaderData.review?.total}>
-        <div key={screenKey} data-motion={motion} className="route-stage">
-          <Outlet />
-        </div>
+        <ViewTransition update="page-fade" default="none">
+          <div data-motion={motion} className="route-stage">
+            <Outlet />
+          </div>
+        </ViewTransition>
       </AppShell>
     </>
   );

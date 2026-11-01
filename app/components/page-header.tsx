@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, ViewTransition } from "react";
 import { Link } from "react-router";
 import { BackLink } from "~/components/back-link";
 import { cn } from "~/lib/utils";
@@ -193,78 +193,86 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
   }, [back?.to, back?.label, back?.trail?.to, title, Boolean(actions)]);
 
   return (
-    <header
-      ref={headerRef}
-      data-compact="false"
-      data-multiline={multiline ? "true" : "false"}
-      className={cn("page-header sticky z-20 -mt-6 lg:-mt-8", className)}
+    <ViewTransition
+      name="page-header-rail"
+      share="page-rail"
+      enter="page-rail-in"
+      exit="page-rail-out"
+      default="none"
     >
-      {/* Full-bleed tonal glass surface spanning the main column */}
-      <div aria-hidden="true" className="page-header-backdrop pointer-events-none" />
+      <header
+        ref={headerRef}
+        data-compact="false"
+        data-multiline={multiline ? "true" : "false"}
+        className={cn("page-header sticky z-20 -mt-6 lg:-mt-8", className)}
+      >
+        {/* Full-bleed tonal glass surface spanning the main column */}
+        <div aria-hidden="true" className="page-header-backdrop pointer-events-none" />
 
-      <div ref={innerRef} className="relative z-10 pt-6 pb-3 lg:pt-8 lg:pb-3.5">
-        {back && (
-          <div
-            ref={backRowRef}
-            className="page-header-back mb-2 flex items-center gap-2 text-xs text-muted"
-          >
-            <BackLink
-              to={back.to}
-              history={back.history ?? true}
-              aria-label={`返回${back.label}`}
-              className="page-header-back-btn group inline-flex items-center gap-1 rounded-control text-muted transition-colors hover:text-ink"
-            >
-              <span className="page-header-back-icon inline-flex size-7 -ml-1.5 items-center justify-center rounded-control transition-colors group-hover:bg-active/70">
-                <ArrowLeft className="size-3.5 shrink-0" strokeWidth={1.85} />
-              </span>
-              <span className="page-header-back-label truncate">{back.label}</span>
-            </BackLink>
-            {back.trail && (
-              <span className="page-header-back-trail flex min-w-0 items-center gap-2">
-                <span>·</span>
-                <Link to={back.trail.to} className="truncate hover:text-ink">
-                  {back.trail.label}
-                </Link>
-              </span>
-            )}
-          </div>
-        )}
-
-        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2.5">
-          <div className="min-w-0 flex-1 basis-60">
-            <h1
-              ref={titleRef}
-              className="page-header-title w-fit max-w-full text-title font-bold tracking-tight text-ink"
-            >
-              {title}
-            </h1>
-            {subtitle && (
-              <div className="page-header-subtitle mt-1.5 text-sm text-muted">{subtitle}</div>
-            )}
-          </div>
-
-          {actions && (
+        <div ref={innerRef} className="relative z-10 pt-6 pb-3 lg:pt-8 lg:pb-3.5">
+          {back && (
             <div
-              ref={actionsRef}
-              className="page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-1.5"
+              ref={backRowRef}
+              className="page-header-back mb-2 flex items-center gap-2 text-xs text-muted"
             >
-              {actions}
+              <BackLink
+                to={back.to}
+                history={back.history ?? true}
+                aria-label={`返回${back.label}`}
+                className="page-header-back-btn group inline-flex items-center gap-1 rounded-control text-muted transition-colors hover:text-ink"
+              >
+                <span className="page-header-back-icon inline-flex size-7 -ml-1.5 items-center justify-center rounded-control transition-colors group-hover:bg-active/70">
+                  <ArrowLeft className="size-3.5 shrink-0" strokeWidth={1.85} />
+                </span>
+                <span className="page-header-back-label truncate">{back.label}</span>
+              </BackLink>
+              {back.trail && (
+                <span className="page-header-back-trail flex min-w-0 items-center gap-2">
+                  <span>·</span>
+                  <Link to={back.trail.to} className="truncate hover:text-ink">
+                    {back.trail.label}
+                  </Link>
+                </span>
+              )}
+            </div>
+          )}
+
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2.5">
+            <div className="min-w-0 flex-1 basis-60">
+              <h1
+                ref={titleRef}
+                className="page-header-title w-fit max-w-full text-title font-bold tracking-tight text-ink"
+              >
+                {title}
+              </h1>
+              {subtitle && (
+                <div className="page-header-subtitle mt-1.5 text-sm text-muted">{subtitle}</div>
+              )}
+            </div>
+
+            {actions && (
+              <div
+                ref={actionsRef}
+                className="page-header-actions flex shrink-0 flex-wrap items-center justify-end gap-1.5"
+              >
+                {actions}
+              </div>
+            )}
+          </div>
+
+          {/* Relay compact title used only when expanded h1 wraps across multiple lines */}
+          {multiline && (
+            <div
+              aria-hidden="true"
+              className="page-header-compact-relay pointer-events-none absolute inset-x-0 bottom-0 flex items-center"
+            >
+              <span className="truncate text-[16.5px] font-bold tracking-tight text-ink">
+                {title}
+              </span>
             </div>
           )}
         </div>
-
-        {/* Relay compact title used only when expanded h1 wraps across multiple lines */}
-        {multiline && (
-          <div
-            aria-hidden="true"
-            className="page-header-compact-relay pointer-events-none absolute inset-x-0 bottom-0 flex items-center"
-          >
-            <span className="truncate text-[16.5px] font-bold tracking-tight text-ink">
-              {title}
-            </span>
-          </div>
-        )}
-      </div>
-    </header>
+      </header>
+    </ViewTransition>
   );
 }

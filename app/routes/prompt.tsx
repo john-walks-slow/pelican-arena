@@ -11,7 +11,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState, ViewTransition } from "react";
 import {
   data,
   Link,
@@ -379,12 +379,14 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         </PromptStatusBanner>
       )}
 
-      <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
-        <div className="max-h-64 overflow-y-auto scroll-thin">
-          <Markdown>{prompt.body}</Markdown>
-        </div>
-        <OutputRequirements kind={prompt.kind} className="mt-3" />
-      </section>
+      <ViewTransition name={`prompt-card-${prompt.id}`} share="morph" default="none">
+        <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
+          <div className="max-h-64 overflow-y-auto scroll-thin">
+            <Markdown>{prompt.body}</Markdown>
+          </div>
+          <OutputRequirements kind={prompt.kind} className="mt-3" />
+        </section>
+      </ViewTransition>
 
       <section className="mt-8">
         <div className="reveal-tier-2 flex items-baseline gap-2">
@@ -412,7 +414,15 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                   <li
                     key={s.id}
                     style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
-                    className={`reveal-card arena-card overflow-hidden rounded-card border bg-surface ${
+                    className="reveal-card"
+                  >
+                  <ViewTransition
+                    name={`submission-card-${s.id}`}
+                    share="morph"
+                    default="none"
+                  >
+                  <div
+                    className={`arena-card overflow-hidden rounded-card border bg-surface ${
                       isSelected ? "border-accent" : "border-border hover:border-control"
                     }`}
                   >
@@ -464,6 +474,8 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                         </button>
                       </div>
                     </div>
+                  </div>
+                  </ViewTransition>
                   </li>
                 );
               })}

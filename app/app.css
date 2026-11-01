@@ -317,32 +317,182 @@ body {
   }
 }
 
-/* Directional entrance belongs to the page title rail only: the body of the
-   screen swaps instantly so the reading position never slides. */
-.route-stage[data-motion="forward"] .page-header {
-  animation: stage-forward 260ms var(--ease-spatial);
-}
-.route-stage[data-motion="back"] .page-header {
-  animation: stage-back 250ms var(--ease-spatial);
-}
-.route-stage[data-motion="lateral-down"] .page-header {
-  animation: stage-down 240ms var(--ease-spatial);
-}
-.route-stage[data-motion="lateral-up"] .page-header {
-  animation: stage-up 240ms var(--ease-spatial);
+/* Keyframe fallback for browsers without the View Transitions API. Where it is
+   supported the snapshot pipeline owns every navigation animation below. */
+@supports not (view-transition-name: none) {
+  .route-stage[data-motion="forward"] .page-header {
+    animation: stage-forward 260ms var(--ease-spatial);
+  }
+  .route-stage[data-motion="back"] .page-header {
+    animation: stage-back 250ms var(--ease-spatial);
+  }
+  .route-stage[data-motion="lateral-down"] .page-header {
+    animation: stage-down 240ms var(--ease-spatial);
+  }
+  .route-stage[data-motion="lateral-up"] .page-header {
+    animation: stage-up 240ms var(--ease-spatial);
+  }
+  .route-stage:not([data-motion="steady"]) .reveal-tier-1 {
+    animation: reveal-rise 260ms var(--ease-spatial);
+  }
+  .route-stage:not([data-motion="steady"]) .reveal-tier-2 {
+    animation: reveal-rise 280ms var(--ease-spatial);
+  }
+  .route-stage:not([data-motion="steady"]) .reveal-card {
+    animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms);
+  }
 }
 
-/* Tier 2: Subtitle / Filters / Tabs glide */
-.route-stage:not([data-motion="steady"]) .reveal-tier-1 {
-  animation: reveal-rise 260ms var(--ease-spatial);
-}
-.route-stage:not([data-motion="steady"]) .reveal-tier-2 {
-  animation: reveal-rise 280ms var(--ease-spatial);
+/* ---- View transition choreography -------------------------------------- */
+
+/* The app shell is identical on both sides of a navigation, so it must not be
+   part of any cross-fade: freeze the root snapshot and let the named regions
+   below carry all the motion. */
+::view-transition-group(root),
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
-/* Tier 3: Staggered radial ripple gallery */
-.route-stage:not([data-motion="steady"]) .reveal-card {
-  animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms);
+/* Screen body: Material fade-through, no lateral travel. */
+::view-transition-group(.page-fade) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--ease-spatial);
+}
+/* Fade through, not a cross-fade: the outgoing screen is gone before the
+   incoming one appears, so the two layouts never sit on top of each other. */
+::view-transition-old(.page-fade) {
+  animation: page-fade-out 90ms ease-out both;
+}
+::view-transition-new(.page-fade) {
+  animation: page-fade-in 210ms var(--ease-spatial) 90ms both;
+}
+
+/* Title rail: the one region that slides, because it carries hierarchy. */
+::view-transition-group(.page-rail) {
+  animation-duration: 300ms;
+  animation-timing-function: var(--ease-spatial);
+}
+::view-transition-old(.page-rail) {
+  animation: rail-out 140ms ease-out both;
+}
+::view-transition-new(.page-rail) {
+  animation: rail-in 280ms var(--ease-spatial) both;
+}
+
+html[data-nav-dir="back"]::view-transition-old(.page-rail) {
+  animation-name: rail-out-back;
+}
+html[data-nav-dir="back"]::view-transition-new(.page-rail) {
+  animation-name: rail-in-back;
+}
+html[data-nav-dir="lateral-down"]::view-transition-new(.page-rail) {
+  animation-name: rail-in-down;
+}
+html[data-nav-dir="lateral-up"]::view-transition-new(.page-rail) {
+  animation-name: rail-in-up;
+}
+
+/* The mobile brand bar is shell furniture, but on small screens the page
+   header's sheet deliberately reaches up behind it. If that sheet travels with
+   the page snapshot it paints over the bar, so the bar gets its own frozen
+   layer above the fade. */
+::view-transition-group(shell-bar) {
+  animation: none;
+  z-index: 60;
+}
+::view-transition-old(shell-bar),
+::view-transition-new(shell-bar) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* Card ↔ detail container transform. */
+::view-transition-group(.morph) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+::view-transition-image-pair(.morph) {
+  animation-name: morph-soften;
+}
+
+/* The nav pill is a shell element, so it gets its own snapshot pair to glide
+   between menu entries instead of snapping with the frozen shell. */
+::view-transition-group(nav-active-pill) {
+  animation-duration: 260ms;
+  animation-timing-function: var(--ease-spatial);
+}
+
+html:active-view-transition .route-stage .page-header,
+html:active-view-transition .route-stage .reveal-tier-1,
+html:active-view-transition .route-stage .reveal-tier-2,
+html:active-view-transition .route-stage .reveal-card {
+  animation: none !important;
+}
+
+@keyframes page-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes rail-in {
+  from {
+    opacity: 0;
+    transform: translate3d(18px, 0, 0);
+  }
+}
+
+@keyframes rail-out {
+  to {
+    opacity: 0;
+    transform: translate3d(-10px, 0, 0);
+  }
+}
+
+@keyframes rail-in-back {
+  from {
+    opacity: 0;
+    transform: translate3d(-18px, 0, 0);
+  }
+}
+
+@keyframes rail-out-back {
+  to {
+    opacity: 0;
+    transform: translate3d(10px, 0, 0);
+  }
+}
+
+@keyframes rail-in-down {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+}
+
+@keyframes rail-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -14px, 0);
+  }
+}
+
+/* A mid-flight blur hides the pixel interpolation between two unrelated
+   layouts, which is what makes a container transform read as one object. */
+@keyframes morph-soften {
+  35% {
+    filter: blur(2px);
+  }
 }
 
 /* Tactile card hover & press physics with touch ripple feedback */
@@ -466,21 +616,15 @@ html[data-booting="true"] .boot-screen {
   animation: boot-wheel 1.1s linear infinite;
 }
 
-/* The shell brand waits under the boot screen, then rides as it lifts. The
-   mark is remounted per pathname, so the same ride replays on every switch. */
-.brand-mark .pelican-ride-body {
+/* The brand mark is remounted per pathname, so this arrival ride replays on
+   every switch. It stays out of the first screen: the splash already carries
+   the loading animation there. */
+.shell[data-navigated="true"] .brand-mark .pelican-ride-body {
   animation: brand-ride 600ms ease-in-out 2;
-  animation-play-state: paused;
 }
 
-.brand-mark .pelican-ride-wheel {
+.shell[data-navigated="true"] .brand-mark .pelican-ride-wheel {
   animation: boot-wheel 600ms linear 2;
-  animation-play-state: paused;
-}
-
-html:not([data-booting="true"]) .brand-mark .pelican-ride-body,
-html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
-  animation-play-state: running;
 }
 
 /* Keep the wheels turning for the whole wait, not only once the screen lands. */
@@ -599,6 +743,8 @@ html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
    PageHeader — that header's sheet already runs up behind the bar — and grows
    its own frosted one only when scrolled on screens that have none. */
 .shell-bar {
+  /* Its own layer keeps it above the page fade; see the transition block. */
+  view-transition-name: shell-bar;
   background: var(--color-ground);
   border-bottom: 1px solid transparent;
 }
@@ -784,6 +930,11 @@ html:not([data-booting="true"]) .brand-mark .pelican-ride-wheel {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
   .nav-progress-bar,
   .route-stage,
   .reveal-tier-1,

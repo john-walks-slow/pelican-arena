@@ -7,7 +7,7 @@ import {
   Pencil,
   Undo2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, ViewTransition } from "react";
 import { data, Link, Outlet, redirect, useLocation, useNavigation, useSearchParams, useSubmit } from "react-router";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
@@ -307,6 +307,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <ViewTransition name={`submission-card-${s.id}`} share="morph" default="none">
         <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(
@@ -391,6 +392,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             <SourceViewer files={s.files} baseUrl={baseUrl} />
           )}
         </section>
+        </ViewTransition>
 
         <aside className="reveal-tier-2 space-y-5">
           <SideSection title="评分">

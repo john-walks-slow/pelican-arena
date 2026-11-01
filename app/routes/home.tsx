@@ -1,5 +1,5 @@
 import { ArrowUpDown, Code2, PenLine, Search, Shapes, X } from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useState } from "react";
+import { type CSSProperties, useCallback, useEffect, useState, ViewTransition } from "react";
 import { Link, useFetcher, useLocation, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
 import { Avatar } from "~/components/avatar";
@@ -278,49 +278,55 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
                   className="reveal-card"
                 >
-                  <Link
-                    to={`/p/${p.id}`}
-                    prefetch="intent"
-                    className="arena-card group block overflow-hidden rounded-card border border-border bg-surface hover:border-control"
+                  <ViewTransition
+                    name={`prompt-card-${p.id}`}
+                    share="morph"
+                    default="none"
                   >
-                  {p.coverSubmissionId ? (
-                    <SubmissionPreview
-                      kind={p.kind}
-                      submissionId={p.coverSubmissionId}
-                      origin={usercontentOrigin}
-                      title={p.title}
-                      excerpt={p.coverExcerpt}
-                    />
-                  ) : (
-                    <div className="flex aspect-[16/10] items-center justify-center border-b border-rule bg-raised/50 px-6">
-                      <p className="line-clamp-4 text-center text-xs leading-relaxed text-muted">
-                        {p.body}
-                      </p>
-                    </div>
-                  )}
-                  <div className="p-4">
-                    <h2 className="truncate text-[15px] font-semibold group-hover:text-accent-ink">
-                      {p.title}
-                    </h2>
-                    <div className="mt-2 flex items-center gap-1.5 text-[13px] text-muted">
-                      <span className="shrink-0">{KIND_META[p.kind].label}</span>
-                      <span>·</span>
-                      <Avatar
-                        template={p.author.avatarTemplate}
-                        username={p.author.username}
-                        size={16}
+                    <Link
+                      to={`/p/${p.id}`}
+                      prefetch="intent"
+                      className="arena-card group block overflow-hidden rounded-card border border-border bg-surface hover:border-control"
+                    >
+                    {p.coverSubmissionId ? (
+                      <SubmissionPreview
+                        kind={p.kind}
+                        submissionId={p.coverSubmissionId}
+                        origin={usercontentOrigin}
+                        title={p.title}
+                        excerpt={p.coverExcerpt}
                       />
-                      <span className="truncate">{p.author.username}</span>
-                      <span className="shrink-0">·</span>
-                      <span className="shrink-0" suppressHydrationWarning>
-                        {formatRelative(sort === "new" ? p.createdAt : p.lastActivityAt)}
-                      </span>
-                      <span className="num ml-auto shrink-0">
-                        {p.submissions === 0 ? "暂无答案" : `${p.submissions} 份答案`}
-                      </span>
+                    ) : (
+                      <div className="flex aspect-[16/10] items-center justify-center border-b border-rule bg-raised/50 px-6">
+                        <p className="line-clamp-4 text-center text-xs leading-relaxed text-muted">
+                          {p.body}
+                        </p>
+                      </div>
+                    )}
+                    <div className="p-4">
+                      <h2 className="truncate text-[15px] font-semibold group-hover:text-accent-ink">
+                        {p.title}
+                      </h2>
+                      <div className="mt-2 flex items-center gap-1.5 text-[13px] text-muted">
+                        <span className="shrink-0">{KIND_META[p.kind].label}</span>
+                        <span>·</span>
+                        <Avatar
+                          template={p.author.avatarTemplate}
+                          username={p.author.username}
+                          size={16}
+                        />
+                        <span className="truncate">{p.author.username}</span>
+                        <span className="shrink-0">·</span>
+                        <span className="shrink-0" suppressHydrationWarning>
+                          {formatRelative(sort === "new" ? p.createdAt : p.lastActivityAt)}
+                        </span>
+                        <span className="num ml-auto shrink-0">
+                          {p.submissions === 0 ? "暂无答案" : `${p.submissions} 份答案`}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
+                  </Link>
+                </ViewTransition>
               </li>
             );
           })}

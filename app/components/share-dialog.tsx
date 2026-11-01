@@ -31,7 +31,11 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
 
   useEffect(() => setCanNativeShare(typeof navigator.share === "function"), []);
 
-  const origin = appOrigin.replace(/\/+$/, "");
+  // A preview proxy may rewrite the host, so trust the address the reader is
+  // actually on once we are in the browser.
+  const [origin, setOrigin] = useState(appOrigin.replace(/\/+$/, ""));
+  useEffect(() => setOrigin(window.location.origin), []);
+
   const pageUrl = `${origin}${path}`;
   const cardUrl = `${pageUrl}/card.svg`;
   const snippet = shareSnippet({ pageUrl, cardUrl, title }, format);

@@ -1,5 +1,5 @@
 import { LayoutGrid, LogOut, PenLine, ShieldCheck, Trophy, UserRound } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
 import { PelicanRide } from "./pelican-ride";
@@ -70,7 +70,10 @@ function NavItems({
       {slidingPill && activeIndex >= 0 && (
         <span
           aria-hidden="true"
-          style={{ transform: `translate3d(0, ${activeIndex * 38}px, 0)` }}
+          style={{
+            transform: `translate3d(0, ${activeIndex * 38}px, 0)`,
+            viewTransitionName: "nav-active-pill",
+          }}
           className="pointer-events-none absolute inset-x-0 top-0 h-9 rounded-control bg-raised transition-transform duration-200 ease-[var(--ease-spatial)] motion-reduce:transition-none"
         />
       )}
@@ -245,9 +248,14 @@ export function AppShell({
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
   const navigating = useNavigation().state !== "idle";
+  const [navigated, setNavigated] = useState(false);
+  const firstPath = useRef(pathname);
   const menuMounted = usePresence(menuOpen, 150);
 
-  useEffect(() => setMenuOpen(false), [pathname]);
+  useEffect(() => {
+    setMenuOpen(false);
+    if (pathname !== firstPath.current) setNavigated(true);
+  }, [pathname]);
 
   useEffect(() => {
     const sync = () => setScrolled(window.scrollY > 6);
@@ -274,6 +282,7 @@ export function AppShell({
     <div
       className="shell min-h-dvh lg:grid lg:grid-cols-[228px_minmax(0,1fr)]"
       data-navigating={navigating ? "true" : "false"}
+      data-navigated={navigated ? "true" : "false"}
     >
       <NavigationProgress />
 
