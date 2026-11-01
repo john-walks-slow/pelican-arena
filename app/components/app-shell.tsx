@@ -264,16 +264,17 @@ export function AppShell({
     return () => window.removeEventListener("scroll", sync);
   }, [pathname]);
 
-  // Freeze the page behind the panel without a scrollbar-driven shift.
+  // Lock the document, not <body>: with `html` clipping horizontally, a
+  // `body { overflow: hidden }` lock turns body into a scroll container and
+  // the sticky bars drop off-screen.
   useEffect(() => {
-    const body = document.body;
     if (!menuOpen) return;
-    const previous = body.style.overflow;
-    body.style.overflow = "hidden";
+    const root = document.documentElement;
+    root.dataset.menuOpen = "true";
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
     window.addEventListener("keydown", onKey);
     return () => {
-      body.style.overflow = previous;
+      delete root.dataset.menuOpen;
       window.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
@@ -300,7 +301,7 @@ export function AppShell({
       <header
         data-menu={menuOpen}
         data-scrolled={scrolled}
-        className="shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
+        className="shell-bar sticky top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color] duration-150 lg:hidden"
       >
         <Brand />
         <div className="flex items-center">

@@ -610,9 +610,7 @@ html[data-booting="true"] .boot-screen {
 }
 
 .shell-bar[data-scrolled="true"] {
-  background: color-mix(in srgb, var(--color-ground) 88%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
+  background: var(--color-ground);
   border-bottom-color: var(--color-border);
 }
 
@@ -665,10 +663,7 @@ html[data-booting="true"] .boot-screen {
   width: calc(100cqw + var(--main-px, 1.25rem) * 2);
   transform: translateX(-50%);
   background: var(--color-ground);
-  transition:
-    background-color 180ms ease,
-    backdrop-filter 180ms ease,
-    -webkit-backdrop-filter 180ms ease;
+  transition: background-color 180ms ease;
   border-bottom: 1px solid
     color-mix(
       in srgb,
@@ -681,9 +676,7 @@ html[data-booting="true"] .boot-screen {
    The tint carries most of the surface (like iOS bars) so light stays foggy-white
    and dark stays deep; the blur only softens what slips through. */
 .page-header[data-compact="true"] .page-header-backdrop {
-  background: color-mix(in srgb, var(--color-ground) 92%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
+  background: var(--color-ground);
 }
 
 .page-header-title {
@@ -964,3 +957,7 @@ html[data-booting="true"] .boot-screen {
 .markdown-card table { margin: 0.5em 0; }
 .markdown-card pre { padding: 8px 10px; }
 .markdown-card table { font-size: 11px; }
+
+html[data-menu-open] {
+  overflow: hidden;
+}
