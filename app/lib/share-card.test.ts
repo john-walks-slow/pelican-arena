@@ -38,6 +38,16 @@ describe("share cards", () => {
     expect(svg).toContain("3 份答案");
   });
 
+  it("keeps a call to action on both empty and answered prompt cards", () => {
+    const empty = renderPromptCard({ title: "空题", body: "正文", kind: "web", answers: 0, author: "bob" });
+    expect(empty).toContain("还没有答案");
+    expect(empty).toContain("来答这道题 →");
+
+    const answered = renderPromptCard({ title: "有答案", body: "正文", kind: "web", answers: 3, author: "bob" });
+    expect(answered).toContain("看看谁画得最好 →");
+    expect(renderAnswerCard(answer)).toContain("你会打几分 →");
+  });
+
   it("strips Markdown from the excerpt", () => {
     expect(plainExcerpt("# 标题\n\n```js\ncode()\n```\n**粗体** [链接](http://x)")).toBe("标题 粗体 链接");
   });

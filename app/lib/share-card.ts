@@ -119,12 +119,25 @@ function header(kind: PromptKind) {
 
 const STAR_PATH = "M8 1.2l2.1 4.5 4.9.6-3.6 3.4.9 4.9L8 12.2l-4.3 2.4.9-4.9L1 6.3l4.9-.6z";
 
+/** Footer copy sits on the same baseline as the call-to-action button. */
+const FOOTER_LINE_Y = 250;
+const FOOTER_BASELINE = 296;
+
 function footer(left: string, ...right: string[]) {
-  const y = CARD_HEIGHT - 28;
   return [
-    `<line x1="${PADDING}" y1="${y - 22}" x2="${CARD_WIDTH - PADDING}" y2="${y - 22}" stroke="${COLOR.border}"/>`,
-    text(PADDING, y, left, { size: 13, fill: COLOR.muted }),
+    `<line x1="${PADDING}" y1="${FOOTER_LINE_Y}" x2="${CARD_WIDTH - PADDING}" y2="${FOOTER_LINE_Y}" stroke="${COLOR.border}"/>`,
+    text(PADDING, FOOTER_BASELINE, left, { size: 13, fill: COLOR.muted }),
     ...right,
+  ].join("");
+}
+
+/** The dark pill shared by both cards, mirroring the in-app preview. */
+function cta(label: string, y: number) {
+  const width = Math.ceil(textWidth(label, 12, true)) + 28;
+  const x = CARD_WIDTH - PADDING - width;
+  return [
+    `<rect x="${x}" y="${y}" width="${width}" height="24" rx="12" fill="${COLOR.ink}"/>`,
+    text(x + width / 2, y + 16, label, { size: 12, fill: "#ffffff", weight: 600, anchor: "middle" }),
   ].join("");
 }
 
@@ -144,16 +157,16 @@ export function renderAnswerCard(d: AnswerCardData) {
   const modelY = 150;
   const subtitleY = modelY + (modelLines.length - 1) * 40 + 30;
 
-  const baseline = CARD_HEIGHT - 28;
-  let score = text(CARD_WIDTH - PADDING, baseline, "暂无评分", { size: 13, fill: COLOR.muted, anchor: "end" });
+  const scoreY = 272;
+  let score = text(CARD_WIDTH - PADDING, scoreY, "暂无评分", { size: 13, fill: COLOR.muted, anchor: "end" });
   if (average !== null) {
     const votesLabel = `${d.votes} 票`;
     const averageRight = CARD_WIDTH - PADDING - Math.ceil(textWidth(votesLabel, 13)) - 10;
     const starX = averageRight - Math.ceil(textWidth(average, 20, true)) - 24;
     score = [
-      text(CARD_WIDTH - PADDING, baseline, votesLabel, { size: 13, fill: COLOR.muted, anchor: "end" }),
-      text(averageRight, baseline + 1, average, { size: 20, fill: COLOR.ink, weight: 700, anchor: "end" }),
-      `<path transform="translate(${starX} ${baseline - 16})" d="${STAR_PATH}" fill="${COLOR.accent}"/>`,
+      text(CARD_WIDTH - PADDING, scoreY, votesLabel, { size: 13, fill: COLOR.muted, anchor: "end" }),
+      text(averageRight, scoreY + 1, average, { size: 20, fill: COLOR.ink, weight: 700, anchor: "end" }),
+      `<path transform="translate(${starX} ${scoreY - 16})" d="${STAR_PATH}" fill="${COLOR.accent}"/>`,
     ].join("");
   }
 
@@ -164,7 +177,7 @@ export function renderAnswerCard(d: AnswerCardData) {
       text(PADDING, 104, fit(d.promptTitle, CONTENT_WIDTH, 14), { size: 14, fill: COLOR.muted }),
       lines(PADDING, modelY, modelLines, 34, 40, COLOR.ink, 700),
       subtitle && text(PADDING, subtitleY, fit(subtitle, CONTENT_WIDTH, 16), { size: 16, fill: COLOR.muted }),
-      footer(`提交者 ${fit(d.author, 200, 13)}`, score),
+      footer(`提交者 ${fit(d.author, 200, 13)}`, score, cta("你会打几分 →", 280)),
     ].join(""),
   );
 }
@@ -181,12 +194,12 @@ export function renderPromptCard(d: PromptCardData) {
       lines(PADDING, excerptY + 14, excerptLines, 14, 22, COLOR.muted),
       footer(
         `出题者 ${fit(d.author, 200, 13)}`,
-        text(CARD_WIDTH - PADDING, CARD_HEIGHT - 28, d.answers === 0 ? "还没有答案" : `${d.answers} 份答案`, {
-          size: 13,
-          fill: COLOR.ink,
-          weight: 600,
+        text(CARD_WIDTH - PADDING, 272, d.answers === 0 ? "还没有答案" : `${d.answers} 份答案`, {
+          size: 12,
+          fill: COLOR.muted,
           anchor: "end",
         }),
+        cta(d.answers === 0 ? "来答这道题 →" : "看看谁画得最好 →", 280),
       ),
     ].join(""),
   );
