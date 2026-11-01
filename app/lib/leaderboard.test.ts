@@ -124,10 +124,10 @@ describe("buildLeaderboard", () => {
     expect(gap).toBeLessThan(rawGap);
   });
 
-  it("does not let thin evidence strictly outrank broad evidence", () => {
+  it("compresses a thin edge far below its raw size", () => {
     // `thin` is perfect on the one prompt it shares with `broad`, but that is
-    // three votes against thirty spread over five prompts. The edge must not
-    // survive as a separate place.
+    // three votes against thirty spread over five prompts. The edge survives,
+    // much smaller; the list shows the vote counts rather than hiding them.
     const submissions = [
       answer("t1", "q1", "thin"),
       ...Array.from({ length: 5 }, (_, i) => answer(`b${i}`, `q${i}`, "broad")),
@@ -147,7 +147,7 @@ describe("buildLeaderboard", () => {
     // Raw stars still favour `thin`, so the compressed edge is the calibration
     // at work: most of a half-star raw gap does not survive.
     expect(thin.raw!).toBeGreaterThan(broad.raw!);
-    expect(thin.score! - broad.score!).toBeLessThan((thin.raw! - broad.raw!) * 0.5);
+    expect(thin.score! - broad.score!).toBeLessThan((thin.raw! - broad.raw!) * 0.25);
   });
 
   it("trusts the same per-answer edge more when it covers more prompts", () => {
@@ -191,21 +191,36 @@ describe("buildLeaderboard", () => {
     expect(find(board, "low").place).toBe(3);
   });
 
-  it("reports a wider uncertainty for thin evidence", () => {
-    const submissions = [
-      answer("t1", "q1", "thin"),
-      ...Array.from({ length: 5 }, (_, i) => answer(`b${i}`, `q${i}`, "broad")),
-    ];
-    const ratings = [
-      ...votes("t1", 5, [1, 2, 3]),
-      ...Array.from({ length: 5 }, (_, i) =>
-        votes(`b${i}`, 4.5, [1, 2, 3, 4, 5, 6]),
-      ).flat(),
-    ];
+  it("counts people rather than ballots before ranking", () => {
+    // One account rating three answers of the same model is still one opinion.
+    const submissions = ["a1", "a2", "a3"].map((id, i) => answer(id, `q${i}`, "solo-fan"));
+    const ratings = submissions.flatMap((s) => votes(s.id, 5, [42]));
     const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
 
-    expect(find(board, "thin").se).toBeGreaterThan(find(board, "broad").se);
-    expect(find(board, "broad").se).toBeGreaterThan(0);
+    const entry = find(board, "solo-fan");
+    expect(entry.votes).toBe(3);
+    expect(entry.ranked).toBe(false);
+  });
+
+  it("does not call a single vote the best answer", () => {
+    const submissions = [answer("lucky", "q1", "m"), answer("solid", "q2", "m")];
+    const ratings = [...votes("lucky", 5, [9]), ...votes("solid", 4, [1, 2, 3, 4])];
+    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
+
+    expect(find(board, "m").best?.submissionId).toBe("solid");
+  });
+
+  it("counts prompts an entry answered but was not rated on", () => {
+    const submissions = [answer("a1", "q1", "m"), answer("a2", "q2", "m")];
+    const board = buildLeaderboard({
+      submissions,
+      ratings: votes("a1", 4, [1, 2, 3]),
+      dimension: "model",
+    });
+
+    const entry = find(board, "m");
+    expect(entry.answers).toBe(2);
+    expect(entry.prompts).toBe(2);
   });
 
   it("counts answers without votes but leaves them unranked", () => {

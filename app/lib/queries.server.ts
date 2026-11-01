@@ -682,7 +682,10 @@ export async function leaderboardData(kind?: PromptKind | null) {
       .from(ratings)
       .innerJoin(submissions, eq(submissions.id, ratings.submissionId))
       .innerJoin(prompts, eq(prompts.id, submissions.promptId))
-      .where(active),
+      .innerJoin(users, eq(users.id, ratings.userId))
+      // A silenced or banned account's stars stop counting, so moderation also
+      // settles the leaderboard.
+      .where(and(active, eq(users.silenced, false), eq(users.banned, false))),
   ]);
 
   return {

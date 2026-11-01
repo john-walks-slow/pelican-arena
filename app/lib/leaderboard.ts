@@ -44,14 +44,13 @@ const PRIOR = {
 const PROMPT_WEIGHT_CAP = 5;
 
 /**
- * Rough spread of a single star rating. Used only to size the uncertainty of a
- * score, so a plain number is enough.
+ * Alternating updates stop early once no bias moves more than this, and never
+ * run past the cap. Twelve rounds covers the connected shapes this site
+ * produces; a prompt answered by a single answer stays partly undecidable,
+ * which is the documented cost of the model.
  */
-const STAR_SD = 1.1;
-
-
-
-const ITERATIONS = 12;
+const CONVERGENCE = 1e-3;
+const MAX_ROUNDS = 12;
 const NEUTRAL_SCORE = 3;
 
 /** Below this an entry is listed but not ranked: the sample says too little. */
@@ -86,17 +85,13 @@ export interface LeaderboardEntry {
   prompts: number;
   best: { submissionId: string; promptTitle: string } | null;
   ranked: boolean;
-  /** Capped, per-prompt vote weight the score rests on. */
-  evidence: number;
-  /** Standard error of the score, in stars. */
-  se: number;
   /** Place among the ranked entries, or null when the entry is not ranked. */
   place: number | null;
 }
 
 export interface Leaderboard {
   entries: LeaderboardEntry[];
-  /** The site-wide average the scores are centered on. */
+  /** Average star the current selection is centered on. */
   baseline: number;
   rankedCount: number;
   votes: number;
@@ -170,7 +165,20 @@ export function buildLeaderboard(input: {
   const answerBias = new Map<string, number>();
   const at = <K>(map: Map<K, number>, key: K) => map.get(key) ?? 0;
 
-  for (let round = 0; round < ITERATIONS; round++) {
+  const largestShift = <K>(next: Map<K, number>, previous: Map<K, number>) => {
+    let largest = 0;
+    for (const [key, value] of next) {
+      largest = Math.max(largest, Math.abs(value - (previous.get(key) ?? 0)));
+    }
+    return largest;
+  };
+
+  for (let round = 0; round < MAX_ROUNDS; round++) {
+    const previous = {
+      prompt: new Map(promptBias),
+      voter: new Map(voterBias),
+      answer: new Map(answerBias),
+    };
     fitBias(
       promptOf,
       votes.map(
@@ -198,16 +206,30 @@ export function buildLeaderboard(input: {
       PRIOR.answer,
       answerBias,
     );
+    const shift = Math.max(
+      largestShift(promptBias, previous.prompt),
+      largestShift(voterBias, previous.voter),
+      largestShift(answerBias, previous.answer),
+    );
+    if (shift < CONVERGENCE) break;
   }
 
-  const starSumBySubmission = new Map<string, { stars: number; votes: number }>();
+  const starSumBySubmission = new Map<
+    string,
+    { stars: number; votes: number; voters: number[] }
+  >();
   for (const rating of votes) {
     const bucket = starSumBySubmission.get(rating.submissionId);
     if (bucket) {
       bucket.stars += rating.stars;
       bucket.votes += 1;
+      bucket.voters.push(rating.userId);
     } else {
-      starSumBySubmission.set(rating.submissionId, { stars: rating.stars, votes: 1 });
+      starSumBySubmission.set(rating.submissionId, {
+        stars: rating.stars,
+        votes: 1,
+        voters: [rating.userId],
+      });
     }
   }
 
@@ -218,6 +240,10 @@ export function buildLeaderboard(input: {
     answers: number;
     votes: number;
     starSum: number;
+    /** Everyone who rated any answer here; ranking counts people, not ballots. */
+    voters: Set<number>;
+    /** Every prompt this entry answered, rated or not. */
+    answered: Set<string>;
     /**
      * Answer biases grouped by prompt, each carrying the votes behind it, so a
      * thinly-rated prompt counts for less than a well-rated one.
@@ -232,22 +258,35 @@ export function buildLeaderboard(input: {
     if (!ident) continue;
     let group = groups.get(ident.key);
     if (!group) {
-      group = { ...ident, answers: 0, votes: 0, starSum: 0, byPrompt: new Map(), best: null };
+      group = {
+        ...ident,
+        answers: 0,
+        votes: 0,
+        starSum: 0,
+        voters: new Set(),
+        answered: new Set(),
+        byPrompt: new Map(),
+        best: null,
+      };
       groups.set(ident.key, group);
     }
     group.answers += 1;
+    group.answered.add(submission.promptId);
 
     const tally = starSumBySubmission.get(submission.id);
     if (!tally) continue;
     group.votes += tally.votes;
     group.starSum += tally.stars;
+    for (const voter of tally.voters) group.voters.add(voter);
 
     const bias = at(answerBias, submission.id);
     const bucket = group.byPrompt.get(submission.promptId);
     if (bucket) bucket.push({ bias, votes: tally.votes });
     else group.byPrompt.set(submission.promptId, [{ bias, votes: tally.votes }]);
 
-    if (!group.best || bias > group.best.bias) {
+    // A single five-star vote is not a best answer; require the same sample the
+    // ranking itself demands.
+    if (tally.votes >= MIN_VOTES && (!group.best || bias > group.best.bias)) {
       group.best = { submissionId: submission.id, promptTitle: submission.promptTitle, bias };
     }
   }
@@ -270,21 +309,15 @@ export function buildLeaderboard(input: {
       key: group.key,
       name: group.name,
       sublabel: group.sublabel,
-      score: group.votes
-        ? Math.min(5, Math.max(0.5, baseline + advantage))
-        : null,
+      score: group.votes ? Math.min(5, Math.max(1, baseline + advantage)) : null,
       raw: group.votes ? group.starSum / group.votes : null,
       answers: group.answers,
       votes: group.votes,
-      prompts: group.byPrompt.size,
+      prompts: group.answered.size,
       best: group.best
         ? { submissionId: group.best.submissionId, promptTitle: group.best.promptTitle }
         : null,
-      ranked: group.votes >= MIN_VOTES,
-      evidence: weight,
-      // Posterior SD of the entry's true quality: the prior counts as
-      // `PRIOR.evidence` extra votes, so more evidence narrows the band.
-      se: STAR_SD / Math.sqrt(weight + PRIOR.evidence),
+      ranked: group.voters.size >= MIN_VOTES,
       place: null,
     };
   });
@@ -294,11 +327,13 @@ export function buildLeaderboard(input: {
     if (a.ranked && b.ranked && a.score !== b.score) return (b.score ?? 0) - (a.score ?? 0);
     if (a.votes !== b.votes) return b.votes - a.votes;
     if (a.answers !== b.answers) return b.answers - a.answers;
-    return a.name.localeCompare(b.name, "zh-CN");
+    const byName = a.name.localeCompare(b.name, "zh-CN");
+    const bySublabel = (a.sublabel ?? "").localeCompare(b.sublabel ?? "", "zh-CN");
+    return byName !== 0 ? byName : bySublabel !== 0 ? bySublabel : a.key.localeCompare(b.key);
   });
 
-  // Strict order: the place follows the score. How much of the gap is real is
-  // left to `se`, which the list shows rather than hides.
+  // Strict order: the place follows the score, with the sample size shown next
+  // to it so a thin lead is readable as thin.
   let position = 0;
   for (const entry of entries) {
     if (!entry.ranked) continue;

@@ -43,6 +43,30 @@ const UNIT_LABELS: Record<Dimension, string> = {
   "model-provider": "种组合",
 };
 
+type BoardSource = {
+  data: Awaited<ReturnType<typeof leaderboardData>>;
+  kindCounts: Awaited<ReturnType<typeof answerCountsByKind>>;
+};
+
+/**
+ * The fit reads every active answer and rating, so it is served from a short
+ * isolate-local cache instead of on every visit. Two minutes keeps D1 row reads
+ * far inside the free daily budget, and a vote landing a minute late on a
+ * month-long ranking is not something anyone notices.
+ */
+const CACHE_TTL = 120_000;
+const cache = new Map<string, { at: number; value: BoardSource }>();
+
+async function boardSource(kind: PromptKind | null): Promise<BoardSource> {
+  const key = kind ?? "";
+  const hit = cache.get(key);
+  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
+  const [data, kindCounts] = await Promise.all([leaderboardData(kind), answerCountsByKind()]);
+  const value = { data, kindCounts };
+  cache.set(key, { at: Date.now(), value });
+  return value;
+}
+
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const dimensionParam = params.get("by");
@@ -50,7 +74,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
 
-  const [data, kindCounts] = await Promise.all([leaderboardData(kind), answerCountsByKind()]);
+  const { data, kindCounts } = await boardSource(kind);
   const board = buildLeaderboard({ ...data, dimension });
 
   return {
@@ -66,7 +90,7 @@ export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) 
   return cachedClientLoader(request, serverLoader);
 }
 
-const MEDALS = ["text-[#b4883b]", "text-[#8c929c]", "text-[#a06a43]"];
+const MEDALS = ["text-accent", "text-accent/60", "text-accent/40"];
 
 function Rank({ place }: { place: number | null }) {
   if (place === null) {
@@ -83,55 +107,29 @@ function Rank({ place }: { place: number | null }) {
   return <span className="num text-sm text-muted">{place}</span>;
 }
 
-/**
- * The calibrated score on the five-star axis, with the band its evidence
- * supports. Overlapping bands mean the order between two rows is not settled.
- */
-function ScoreBar({ score, se, ranked }: { score: number | null; se: number; ranked: boolean }) {
+/** The calibrated score. Sample size sits next to it in its own column. */
+function Score({ score, ranked }: { score: number | null; ranked: boolean }) {
   if (score === null) {
     return <span className="num text-sm text-control">—</span>;
   }
-  const position = (value: number) => {
-    const pct = ((value - 1) / 4) * 100;
-    return Math.max(0, Math.min(100, pct));
-  };
-  const center = position(score);
-  const low = position(score - se);
-  const high = position(score + se);
-
   return (
-    <div className="flex items-center justify-end gap-2.5">
-      <div
-        aria-hidden
-        title={`±${se.toFixed(2)} 星`}
-        className="relative hidden h-3 w-16 sm:block"
-      >
-        <div className="absolute top-1/2 right-0 left-0 h-px -translate-y-1/2 bg-control/60" />
-        <div
-          className={cn(
-            "absolute top-1/2 h-1 -translate-y-1/2 rounded-full",
-            ranked ? "bg-accent/35" : "bg-control/40",
-          )}
-          style={{ left: `${low}%`, width: `${Math.max(high - low, 1)}%` }}
-        />
-        <div
-          className={cn(
-            "absolute top-1/2 size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
-            ranked ? "bg-accent" : "bg-control",
-          )}
-          style={{ left: `${center}%` }}
-        />
-      </div>
-      <span
-        className={cn(
-          "num text-sm font-semibold tabular-nums",
-          ranked ? "text-ink" : "text-muted",
-        )}
-      >
-        {score.toFixed(2)}
-      </span>
-    </div>
+    <span
+      className={cn(
+        "num text-sm font-semibold tabular-nums",
+        ranked ? "text-ink" : "text-muted",
+      )}
+    >
+      {score.toFixed(2)}
+    </span>
   );
+}
+
+/** Why there is no ranking yet, worded for the dimension being shown. */
+function emptyReason(entries: number, kind: PromptKind | null, dimension: Dimension) {
+  if (entries > 0) return `还没有条目攒够 ${MIN_VOTES} 票。`;
+  if (dimension === "harness") return "还没有答案填写客户端。";
+  if (kind) return `还没有${KIND_META[kind].label}类答案。`;
+  return "还没有答案。";
 }
 
 function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
@@ -144,7 +142,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
         <Rank place={entry.place} />
       </td>
 
-      <td className="min-w-0 py-2.5 pr-3 align-middle">
+      <th scope="row" className="min-w-0 py-2.5 pr-3 text-left align-middle font-normal">
         <div className="flex min-w-0 items-center gap-2">
           <span className="truncate text-sm font-medium text-ink">{entry.name}</span>
           {entry.best && (
@@ -153,7 +151,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
               prefetch="intent"
               title={`最佳答案：${entry.best.promptTitle}`}
               aria-label={`查看最佳答案：${entry.best.promptTitle}`}
-              className="shrink-0 text-muted transition-colors hover:text-accent"
+              className="-m-1 shrink-0 p-1 text-muted transition-colors hover:text-accent"
             >
               <ArrowUpRight className="size-3.5" strokeWidth={2} />
             </Link>
@@ -165,7 +163,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
         <div className="num mt-0.5 text-[11px] text-muted sm:hidden">
           {entry.ranked ? `${entry.votes} 票 · ${entry.prompts} 题` : `样本不足 ${MIN_VOTES} 票`}
         </div>
-      </td>
+      </th>
 
       <td className="hidden w-24 py-2.5 pr-3 text-right align-middle md:table-cell">
         <span className="num text-xs text-muted">
@@ -185,7 +183,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
       </td>
 
       <td className="w-16 py-2.5 pr-3 pl-1 text-right align-middle sm:w-28 sm:pr-4">
-        <ScoreBar score={entry.score} se={entry.se} ranked={entry.ranked} />
+        <Score score={entry.score} ranked={entry.ranked} />
       </td>
     </tr>
   );
@@ -258,19 +256,34 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
         />
       </div>
 
-      {board.entries.length === 0 ? (
-        <div className="mt-6 rounded-card border border-dashed border-control px-6 py-14 text-center">
+      {board.rankedCount === 0 && !showUnranked ? (
+        <div className="reveal-tier-2 mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center">
           <Trophy className="mx-auto size-5 text-control" strokeWidth={1.75} />
-          <p className="mt-3 text-sm text-muted">
-            {kind
-              ? `还没有${KIND_META[kind].label}类答案。`
-              : "还没有答案可以排名。"}
+          <p className="mt-3 text-sm text-muted">{emptyReason(board.entries.length, kind, dimension)}</p>
+          {board.entries.length > 0 && (
+            <p className="mt-1.5 text-xs text-muted">
+              已有 <span className="num">{answers}</span> 份答案，还差几票就能排出先后。
+            </p>
+          )}
+          {board.entries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setShowUnranked(true)}
+              className="mt-4 rounded-control border border-control px-3 py-1.5 text-xs text-ink transition-colors hover:bg-raised"
+            >
+              先看看这些条目
+            </button>
+          )}
+          <p className="mt-4 text-xs text-muted">
+            <Link to="/" prefetch="intent" className="text-accent hover:underline">
+              {board.entries.length > 0 ? "去题目页面打分" : "去题目页面看看"}
+            </Link>
           </p>
         </div>
       ) : (
         <>
           <div className="reveal-tier-2 mt-4 overflow-hidden rounded-card border border-border bg-surface">
-            <table className="w-full table-fixed border-collapse">
+            <table id="leaderboard-table" className="w-full table-fixed border-collapse">
               <caption className="sr-only">
                 {DIMENSION_LABELS[dimension]}排名，按校准后的平均星级排序
               </caption>
@@ -322,6 +335,8 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
               <div className="border-t border-rule bg-raised/30 px-3 py-2 text-center sm:px-4">
                 <button
                   type="button"
+                  aria-expanded={showUnranked}
+                  aria-controls="leaderboard-table"
                   onClick={() => setShowUnranked((v) => !v)}
                   className="text-xs text-muted transition-colors hover:text-ink"
                 >
@@ -333,7 +348,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
             )}
           </div>
 
-          <ScoreMethod baseline={board.baseline} className="mt-4" />
+          {board.votes > 0 && <ScoreMethod baseline={board.baseline} className="mt-4" />}
         </>
       )}
     </div>
