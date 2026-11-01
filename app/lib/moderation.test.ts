@@ -6,7 +6,10 @@ import {
   canViewPrompt,
   canViewSubmission,
   initialPromptStatus,
+  isReportReason,
   isSubmissionServable,
+  reportOptions,
+  severeReasons,
   PROMPT_TRANSITIONS,
   shouldAutoHide,
 } from "./moderation";
@@ -16,10 +19,15 @@ const author = { id: 2, role: "user" as const, trustLevel: 2 };
 const stranger = { id: 3, role: "user" as const, trustLevel: 1 };
 
 describe("initialPromptStatus", () => {
-  it("holds new prompts from ordinary authors for review", () => {
-    expect(initialPromptStatus(author)).toBe("pending");
-    expect(initialPromptStatus({ role: "user", trustLevel: 3 })).toBe("active");
-    expect(initialPromptStatus(admin)).toBe("active");
+  it("publishes immediately while review is off", () => {
+    expect(initialPromptStatus(author, false)).toBe("active");
+    expect(initialPromptStatus(stranger, false)).toBe("active");
+  });
+
+  it("holds new prompts from ordinary authors when review is on", () => {
+    expect(initialPromptStatus(author, true)).toBe("pending");
+    expect(initialPromptStatus({ role: "user", trustLevel: 3 }, true)).toBe("active");
+    expect(initialPromptStatus(admin, true)).toBe("active");
   });
 });
 
@@ -66,6 +74,27 @@ describe("transitions", () => {
     expect(PROMPT_TRANSITIONS.reject.noteRequired).toBe(true);
     expect(PROMPT_TRANSITIONS.remove.noteRequired).toBe(true);
     expect(PROMPT_TRANSITIONS.approve.noteRequired).toBe(false);
+  });
+});
+
+describe("report reasons", () => {
+  it("offers only the reasons that apply to the target", () => {
+    expect(reportOptions("prompt").map((r) => r.id)).toEqual([
+      "abuse",
+      "spam",
+      "unclear",
+      "duplicate",
+      "unsuitable",
+      "other",
+    ]);
+    expect(isReportReason("metadata", "prompt")).toBe(false);
+    expect(isReportReason("metadata", "submission")).toBe(true);
+    expect(isReportReason("plagiarism", "prompt")).toBe(false);
+  });
+
+  it("marks the same core violations severe for both targets", () => {
+    expect(severeReasons("prompt")).toEqual(["abuse", "spam"]);
+    expect(severeReasons("submission")).toEqual(["malicious", "abuse", "spam"]);
   });
 });
 

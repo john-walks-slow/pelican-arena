@@ -3,6 +3,7 @@ import type { Route } from "./+types/prompt.edit";
 import { PageHeader } from "~/components/page-header";
 import { PromptForm } from "~/components/prompt-form";
 import { initialPromptStatus, PROMPT_STATUS_LABELS } from "~/lib/moderation";
+import { promptReviewEnabled } from "~/lib/moderation.server";
 import { getPromptForEdit, updatePrompt } from "~/lib/queries.server";
 import { requireOwnership } from "~/lib/guards.server";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
@@ -21,7 +22,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   return {
     prompt,
     locked: prompt.answers > 0,
-    reviewed: initialPromptStatus(user) === "pending",
+    reviewed: initialPromptStatus(user, promptReviewEnabled()) === "pending",
     from: safeFrom(new URL(request.url).searchParams.get("from")),
   };
 }
@@ -51,7 +52,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     return data({ errors, values: { title, body, kind } }, { status: locked ? 409 : 400 });
   }
 
-  const reviewed = !locked && initialPromptStatus(user) === "pending";
+  const reviewed = !locked && initialPromptStatus(user, promptReviewEnabled()) === "pending";
   const ok = await updatePrompt({
     id: prompt.id,
     authorId: user.id,

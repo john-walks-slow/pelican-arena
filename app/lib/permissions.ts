@@ -8,17 +8,37 @@ export const TRUST = {
   createPrompt: 2,
 } as const;
 
-/** Trust level at which new prompts are published without review. */
+/** Trust level at which new prompts skip review when prompt review is on. */
 export const SKIP_PROMPT_REVIEW_TRUST = 3;
 
 export type Action = keyof typeof TRUST;
 
-export type LimitedAction = "submit" | "createPrompt" | "report";
+export type LimitedAction = "createPrompt" | "submit" | "rate" | "report";
 
+/** Per-user ceiling in a rolling 24 hours. Rating counts new ratings only. */
 export const DAILY_LIMITS: Record<LimitedAction, number> = {
-  submit: 30,
   createPrompt: 5,
+  submit: 20,
+  rate: 30,
   report: 20,
+};
+
+/** Which table each quota counts. */
+export const LIMIT_TABLES: Record<
+  LimitedAction,
+  "prompts" | "submissions" | "ratings" | "reports"
+> = {
+  createPrompt: "prompts",
+  submit: "submissions",
+  rate: "ratings",
+  report: "reports",
+};
+
+export const LIMIT_NOUNS: Record<LimitedAction, string> = {
+  createPrompt: "出题",
+  submit: "提交",
+  rate: "评分",
+  report: "举报",
 };
 
 export function can(user: Pick<User, "trustLevel" | "silenced" | "role"> | null, action: Action) {

@@ -14,32 +14,60 @@ import {
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
 import {
+  reportOptions,
   REPORT_NOTE_LIMIT,
-  REPORT_REASONS,
   ROUTING_REPORT_TIP,
   type ReportReason,
+  type ReportTarget,
 } from "~/lib/moderation";
+import { cn } from "~/lib/utils";
 
 type Result = { ok: true } | { error: string };
 
-/** Reporting control for one answer; hidden entirely for its author. */
+const COPY: Record<
+  ReportTarget,
+  { trigger: string; title: string; intro: string; done: string; placeholder: string }
+> = {
+  submission: {
+    trigger: "举报此作品",
+    title: "举报作品",
+    intro: "选择最符合的一项。你的反馈有助于维护评测的真实与安全。",
+    done: "已收到反馈，管理团队正在复核。",
+    placeholder: "补充有助于管理团队复核的细节线索",
+  },
+  prompt: {
+    trigger: "举报题目",
+    title: "举报题目",
+    intro: "选择最符合的一项。你的反馈有助于保持题目清晰、可比较。",
+    done: "已收到反馈，管理团队正在复核。",
+    placeholder: "补充你认为有帮助的说明",
+  },
+};
+
+/** Reporting control for one prompt or answer; hidden entirely for its author. */
 export function ReportDialog({
-  submissionId,
+  target,
+  targetId,
   reported,
   disabledReason,
+  className,
 }: {
-  submissionId: string;
+  target: ReportTarget;
+  targetId: string;
   reported: boolean;
   disabledReason?: string;
+  className?: string;
 }) {
   const fetcher = useFetcher<Result>();
   const revalidator = useRevalidator();
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState<ReportReason>("metadata");
+  const options = reportOptions(target);
+  const [reason, setReason] = useState<ReportReason | null>(null);
   const [note, setNote] = useState("");
 
   const busy = fetcher.state !== "idle";
   const handled = useRef<Result | null>(null);
+  const copy = COPY[target];
 
   useEffect(() => {
     const result = fetcher.data;
@@ -56,12 +84,10 @@ export function ReportDialog({
   }, [fetcher.data, revalidator]);
 
   if (reported) {
-    return (
-      <p className="mt-2.5 border-t border-border pt-2.5 text-xs text-muted">
-        已收到反馈，管理团队正在复核。
-      </p>
-    );
+    return <p className={cn("text-xs text-muted", className)}>{copy.done}</p>;
   }
+
+  const action = target === "prompt" ? `/p/${targetId}/report` : `/s/${targetId}/report`;
 
   return (
     <>
@@ -70,25 +96,26 @@ export function ReportDialog({
         disabled={Boolean(disabledReason)}
         title={disabledReason}
         onClick={() => setOpen(true)}
-        className="mt-2.5 inline-flex items-center gap-1.5 border-t border-border pt-2.5 text-xs text-muted transition-colors hover:text-negative disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted"
+        className={cn(
+          "inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-negative disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted",
+          className,
+        )}
       >
         <Flag className="size-3.5" strokeWidth={1.75} />
-        举报此作品
+        {copy.trigger}
       </button>
 
       <Dialog open={open} onOpenChange={(next) => !busy && setOpen(next)}>
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
-            <DialogTitle>举报作品</DialogTitle>
-            <DialogDescription className="text-xs text-muted">
-              选择最符合的一项。你的反馈有助于维护评测的真实与安全。
-            </DialogDescription>
+            <DialogTitle>{copy.title}</DialogTitle>
+            <DialogDescription className="text-xs text-muted">{copy.intro}</DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-4 px-5 py-4">
             <fieldset className="space-y-1.5">
               <legend className="mb-1.5 text-xs font-medium text-muted">选择违规类别</legend>
               <div className="max-h-[260px] space-y-1.5 overflow-y-auto pr-0.5">
-                {REPORT_REASONS.map((r) => (
+                {options.map((r) => (
                   <label
                     key={r.id}
                     className={`flex cursor-pointer items-start gap-2.5 rounded-control border px-3 py-2 text-sm transition-colors ${
@@ -112,7 +139,7 @@ export function ReportDialog({
               </div>
             </fieldset>
 
-            {reason === "metadata" && (
+            {target === "submission" && reason === "metadata" && (
               <div className="flex items-start gap-2 rounded-control bg-raised/60 p-2.5 text-xs text-muted">
                 <Info className="mt-0.5 size-3.5 shrink-0 text-muted" />
                 <p className="leading-relaxed">{ROUTING_REPORT_TIP}</p>
@@ -130,11 +157,11 @@ export function ReportDialog({
                 maxLength={REPORT_NOTE_LIMIT}
                 rows={3}
                 placeholder={
-                  reason === "metadata"
+                  target === "submission" && reason === "metadata"
                     ? "请说明判断实际模型的线索或证据（如响应特征、日志疑点等）"
                     : reason === "other"
                       ? "请详细写明违规情况"
-                      : "补充有助于管理团队复核的细节线索"
+                      : copy.placeholder
                 }
               />
             </label>
@@ -146,13 +173,11 @@ export function ReportDialog({
             <Button
               type="button"
               variant="destructive"
-              disabled={busy || (reason === "other" && !note.trim())}
-              onClick={() =>
-                fetcher.submit(
-                  { reason, note: note.trim() },
-                  { method: "post", action: `/s/${submissionId}/report` },
-                )
-              }
+              disabled={busy || !reason || (reason === "other" && !note.trim())}
+              onClick={() => {
+                if (!reason) return;
+                fetcher.submit({ reason, note: note.trim() }, { method: "post", action });
+              }}
             >
               {busy ? "提交中…" : "提交举报"}
             </Button>

@@ -12,7 +12,7 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const form = await request.formData();
   const reason = form.get("reason");
-  if (!isReportReason(reason)) return data({ error: "请选择举报理由" }, { status: 400 });
+  if (!isReportReason(reason, "submission")) return data({ error: "请选择举报理由" }, { status: 400 });
 
   const note = String(form.get("note") ?? "").trim().slice(0, REPORT_NOTE_LIMIT);
   if (reportNeedsNote(reason) && !note) {
@@ -20,7 +20,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   try {
-    await createReport(user, params.submissionId, reason, note || null);
+    await createReport(user, "submission", params.submissionId, reason, note || null);
   } catch (error) {
     if (error instanceof ModerationValidation) return data({ error: error.message }, { status: 400 });
     if (error instanceof ReportConflict) return data({ error: error.message }, { status: 409 });

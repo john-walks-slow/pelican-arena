@@ -1,7 +1,15 @@
 import { data } from "react-router";
 import type { User } from "~/db/schema";
 import { isAdmin } from "./moderation";
-import { can, DAILY_LIMITS, denyReason, type Action, type LimitedAction } from "./permissions";
+import {
+  can,
+  DAILY_LIMITS,
+  denyReason,
+  LIMIT_NOUNS,
+  LIMIT_TABLES,
+  type Action,
+  type LimitedAction,
+} from "./permissions";
 import { countSince } from "./queries.server";
 import { getUser, requireUser } from "./session.server";
 
@@ -22,14 +30,9 @@ export async function requireAdmin(request: Request): Promise<User> {
 export async function dailyLimitError(user: User, kind: LimitedAction) {
   if (user.role === "admin") return null;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const used = await countSince(
-    kind === "submit" ? "submissions" : kind === "createPrompt" ? "prompts" : "reports",
-    user.id,
-    since,
-  );
+  const used = await countSince(LIMIT_TABLES[kind], user.id, since);
   const limit = DAILY_LIMITS[kind];
-  const noun = kind === "submit" ? "提交" : kind === "createPrompt" ? "出题" : "举报";
-  return used >= limit ? `24 小时内最多${noun} ${limit} 次` : null;
+  return used >= limit ? `24 小时内最多${LIMIT_NOUNS[kind]} ${limit} 次` : null;
 }
 
 /** Author-only actions bypass trust-level gates but never bypass ownership. */

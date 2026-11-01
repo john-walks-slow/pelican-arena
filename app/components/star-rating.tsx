@@ -11,7 +11,7 @@ export function StarRating({
   current: number | null;
   disabledReason?: string;
 }) {
-  const fetcher = useFetcher<{ stars: number }>();
+  const fetcher = useFetcher<{ stars: number } | { error: string }>();
   const [hover, setHover] = useState(0);
   const [optimistic, setOptimistic] = useState<number | null>(null);
 
@@ -21,11 +21,16 @@ export function StarRating({
   const hasMovedRef = useRef(false);
 
   useEffect(() => {
-    if (!fetcher.data) return;
-    if (fetcher.data.stars) toast.success(`已评 ${fetcher.data.stars} 星`);
-    else toast("评分已取消");
+    const result = fetcher.data;
+    if (!result) return;
     setOptimistic(null);
     setHover(0);
+    if ("error" in result) {
+      toast.error(result.error);
+      return;
+    }
+    if (result.stars) toast.success(`已评 ${result.stars} 星`);
+    else toast("评分已取消");
   }, [fetcher.data]);
 
   useEffect(() => {

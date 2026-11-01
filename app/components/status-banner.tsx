@@ -50,19 +50,26 @@ const PROMPT_COPY: Record<Exclude<PromptStatus, "active">, { tone: Tone; title: 
 export function PromptStatusBanner({
   status,
   note,
+  review = true,
   children,
 }: {
   status: Exclude<PromptStatus, "active">;
   note?: string | null;
+  /** With review off, a pending prompt is one hidden after reports. */
+  review?: boolean;
   children?: React.ReactNode;
 }) {
-  const copy = PROMPT_COPY[status];
-  const detail =
+  const copy =
+    status === "pending" && !review
+      ? { tone: "pending" as const, title: "题目暂时隐藏" }
+      : PROMPT_COPY[status];
+  const fallback =
     status === "pending"
-      ? "审核通过后将公开并开放作答。"
-      : note
-        ? `原因：${note}`
-        : undefined;
+      ? review
+        ? "审核通过后将公开并开放作答。"
+        : "管理团队正在复核，通过后恢复公开。"
+      : undefined;
+  const detail = note ? `原因：${note}` : fallback;
   return (
     <StatusBanner tone={copy.tone} title={copy.title} detail={detail}>
       {children}

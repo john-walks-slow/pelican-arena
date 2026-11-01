@@ -19,8 +19,8 @@ import {
   prompts,
   providers,
   ratings,
+  reports,
   submissionMods,
-  submissionReports,
   submissions,
   users,
 } from "~/db/schema";
@@ -46,8 +46,17 @@ function likePattern(query: string) {
 const nameLike = (column: SQLiteColumn, query: string) =>
   sql`${column} like ${likePattern(query)} escape '\\'`;
 
+export interface CatalogSearchResult {
+  items: Array<CatalogEntry & { uses: number }>;
+  total: number;
+}
+
 /** Popular entries only; the full catalog is searched remotely as the user types. */
-export async function searchCatalog(kind: CatalogKind, query = "", limit = 20) {
+export async function searchCatalog(
+  kind: CatalogKind,
+  query = "",
+  limit = 20,
+): Promise<CatalogSearchResult> {
   const d = db();
 
   if (kind === "mods") {
@@ -176,25 +185,31 @@ export async function ensureCatalogEntry(kind: CatalogKind, name: string) {
 }
 
 export async function countSince(
-  table: "prompts" | "submissions" | "reports",
-  authorId: number,
+  table: "prompts" | "submissions" | "ratings" | "reports",
+  userId: number,
   since: Date,
 ) {
-  const [row] =
-    table === "reports"
-      ? await db()
-          .select({ n: count() })
-          .from(submissionReports)
-          .where(
-            and(eq(submissionReports.reporterId, authorId), gte(submissionReports.createdAt, since)),
-          )
-      : await (async () => {
-          const t = table === "prompts" ? prompts : submissions;
-          return db()
-            .select({ n: count() })
-            .from(t)
-            .where(and(eq(t.authorId, authorId), gte(t.createdAt, since)));
-        })();
+  const d = db();
+  if (table === "reports") {
+    const [row] = await d
+      .select({ n: count() })
+      .from(reports)
+      .where(and(eq(reports.reporterId, userId), gte(reports.createdAt, since)));
+    return row.n;
+  }
+  if (table === "ratings") {
+    // Only first-time votes consume the quota; edits keep their original time.
+    const [row] = await d
+      .select({ n: count() })
+      .from(ratings)
+      .where(and(eq(ratings.userId, userId), gte(ratings.createdAt, since)));
+    return row.n;
+  }
+  const t = table === "prompts" ? prompts : submissions;
+  const [row] = await d
+    .select({ n: count() })
+    .from(t)
+    .where(and(eq(t.authorId, userId), gte(t.createdAt, since)));
   return row.n;
 }
 
@@ -481,7 +496,11 @@ export async function deletePrompt(id: string, authorId: number): Promise<Delete
         sql`not exists (select 1 from ${submissions} where submissions.prompt_id = prompts.id)`,
       ),
     );
-  return result.meta.changes > 0 ? "ok" : "has_submissions";
+  if (result.meta.changes === 0) return "has_submissions";
+  await db()
+    .delete(reports)
+    .where(and(eq(reports.targetType, "prompt"), eq(reports.targetId, id)));
+  return "ok";
 }
 
 export interface SubmissionFilters {
@@ -665,7 +684,7 @@ export async function getUserRating(userId: number, submissionId: string) {
 export async function setRating(userId: number, submissionId: string, stars: number) {
   await db()
     .insert(ratings)
-    .values({ userId, submissionId, stars, updatedAt: new Date() })
+    .values({ userId, submissionId, stars, createdAt: new Date(), updatedAt: new Date() })
     .onConflictDoUpdate({
       target: [ratings.userId, ratings.submissionId],
       set: { stars, updatedAt: new Date() },

@@ -8,6 +8,7 @@ import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { newId } from "~/lib/ids";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
 import { initialPromptStatus } from "~/lib/moderation";
+import { promptReviewEnabled } from "~/lib/moderation.server";
 import { cachedClientLoader, clearRouteCache } from "~/lib/route-cache";
 import { flashToast } from "~/lib/session.server";
 
@@ -17,7 +18,7 @@ const LIMITS = { title: 80, body: 8000 };
 
 export async function loader({ request }: Route.LoaderArgs) {
   const user = await requirePermission(request, "createPrompt");
-  return { reviewed: initialPromptStatus(user) === "pending" };
+  return { reviewed: initialPromptStatus(user, promptReviewEnabled()) === "pending" };
 }
 
 export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
@@ -49,7 +50,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const id = newId(10);
-  const status = initialPromptStatus(user);
+  const status = initialPromptStatus(user, promptReviewEnabled());
   await db().insert(prompts).values({ id, authorId: user.id, title, body, kind, status });
   return redirect(`/p/${id}`, {
     headers: {

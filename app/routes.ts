@@ -7,6 +7,7 @@ export default [
   route("me", "routes/me.tsx"),
   route("p/:promptId", "routes/prompt.tsx", [route("submit", "routes/submit.tsx")]),
   route("p/:promptId/edit", "routes/prompt.edit.tsx"),
+  route("p/:promptId/report", "routes/prompt.report.ts"),
   route("p/:promptId/card.svg", "routes/prompt.card.ts"),
   route("p/:promptId/submissions", "routes/prompt.submissions.ts"),
   route("s/:submissionId", "routes/submission.tsx", [route("edit", "routes/submission.edit.tsx")]),

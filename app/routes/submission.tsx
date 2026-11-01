@@ -28,7 +28,7 @@ import { formatBytes } from "~/lib/bundle";
 import { KIND_META } from "~/lib/kinds";
 import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~/lib/format";
 import { backTarget, safeFrom, withFrom } from "~/lib/navigation";
-import { requirePermission } from "~/lib/guards.server";
+import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { origins } from "~/lib/origins.server";
 import { canViewSubmission, isAdmin } from "~/lib/moderation";
 import { can, denyReason } from "~/lib/permissions";
@@ -82,7 +82,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     user?.id === submission.authorId
       ? countOtherRatings(submission.id, submission.authorId)
       : 0,
-    user && !isAuthor ? hasReported(user.id, submission.id) : false,
+    user && !isAuthor ? hasReported(user.id, "submission", submission.id) : false,
     previewGrantFor({ id: submission.id, status: submission.status, promptStatus: prompt.status }),
   ]);
   return {
@@ -135,9 +135,19 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (submission.authorId === user.id) throw data("不能给自己的答案打分", { status: 403 });
 
   const stars = Number(form.get("stars"));
-  if (stars === 0) await clearRating(user.id, submission.id);
-  else if (isValidRating(stars)) await setRating(user.id, submission.id, stars);
-  else throw data("Invalid rating", { status: 400 });
+  if (stars === 0) {
+    await clearRating(user.id, submission.id);
+  } else if (isValidRating(stars)) {
+    // Only first-time votes consume the daily quota; edits stay free.
+    const existing = await getUserRating(user.id, submission.id);
+    if (!existing) {
+      const limitError = await dailyLimitError(user, "rate");
+      if (limitError) return data({ error: limitError }, { status: 429 });
+    }
+    await setRating(user.id, submission.id, stars);
+  } else {
+    throw data("Invalid rating", { status: 400 });
+  }
   return { stars };
 }
 
@@ -467,11 +477,14 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               </p>
             )}
             {showReport && live && (
-              <ReportDialog
-                submissionId={s.id}
-                reported={reported}
-                disabledReason={reportBlock}
-              />
+              <div className="mt-2.5 border-t border-border pt-2.5">
+                <ReportDialog
+                  target="submission"
+                  targetId={s.id}
+                  reported={reported}
+                  disabledReason={reportBlock}
+                />
+              </div>
             )}
           </SideSection>
         </aside>

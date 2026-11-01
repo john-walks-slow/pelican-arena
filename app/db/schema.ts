@@ -15,6 +15,7 @@ import {
   PROMPT_STATUSES,
   REPORT_REASON_IDS,
   REPORT_STATUSES,
+  REPORT_TARGETS,
   SUBMISSION_STATUSES,
 } from "../lib/moderation";
 import type { LogMeta } from "~/lib/session-log";
@@ -176,21 +177,24 @@ export const ratings = sqliteTable(
       .notNull()
       .references(() => submissions.id),
     stars: real("stars").notNull(),
+    /** Set when the vote is first cast; edits keep the original time. */
+    createdAt: integer("created_at", { mode: "timestamp_ms" }),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [
     primaryKey({ columns: [t.userId, t.submissionId] }),
     index("ratings_submission_idx").on(t.submissionId),
+    index("ratings_user_created_idx").on(t.userId, t.createdAt),
   ],
 );
 
-export const submissionReports = sqliteTable(
-  "submission_reports",
+/** Reports on either a prompt or an answer; the target decides what is checked. */
+export const reports = sqliteTable(
+  "reports",
   {
     id: text("id").primaryKey(),
-    submissionId: text("submission_id")
-      .notNull()
-      .references(() => submissions.id),
+    targetType: text("target_type", { enum: REPORT_TARGETS }).notNull(),
+    targetId: text("target_id").notNull(),
     reporterId: integer("reporter_id")
       .notNull()
       .references(() => users.id),
@@ -201,9 +205,10 @@ export const submissionReports = sqliteTable(
     resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
   },
   (t) => [
-    uniqueIndex("submission_reports_unique").on(t.submissionId, t.reporterId),
-    index("submission_reports_open_idx").on(t.status, t.createdAt),
-    index("submission_reports_reporter_idx").on(t.reporterId, t.createdAt),
+    uniqueIndex("reports_unique").on(t.targetType, t.targetId, t.reporterId),
+    index("reports_open_idx").on(t.status, t.createdAt),
+    index("reports_reporter_idx").on(t.reporterId, t.createdAt),
+    index("reports_target_idx").on(t.targetType, t.targetId),
   ],
 );
 

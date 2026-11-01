@@ -17,7 +17,18 @@ export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
 export const REPORT_STATUSES = ["open", "accepted", "dismissed"] as const;
 export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
-export const REPORT_REASONS = [
+export const REPORT_TARGETS = ["prompt", "submission"] as const;
+export type ReportTarget = (typeof REPORT_TARGETS)[number];
+
+export interface ReportOption {
+  id: string;
+  label: string;
+  description: string;
+  /** Severe reports can hide the target automatically once enough pile up. */
+  severe: boolean;
+}
+
+export const SUBMISSION_REPORT_REASONS = [
   {
     id: "metadata",
     label: "模型与实际不符",
@@ -60,12 +71,73 @@ export const REPORT_REASONS = [
     description: "存在其他违反社区准则的情况（需详细说明）",
     severe: false,
   },
-] as const;
-export type ReportReason = (typeof REPORT_REASONS)[number]["id"];
-export const REPORT_REASON_IDS = REPORT_REASONS.map((r) => r.id) as [ReportReason, ...ReportReason[]];
-export const SEVERE_REASONS = REPORT_REASONS.filter((r) => r.severe).map((r) => r.id);
+] as const satisfies readonly ReportOption[];
 
-/** Distinct reporters with open severe reports needed to hide an answer pending review. */
+export const PROMPT_REPORT_REASONS = [
+  {
+    id: "abuse",
+    label: "违规或不良内容",
+    description: "包含违法信息、露骨色情、仇恨言论或人身攻击",
+    severe: true,
+  },
+  {
+    id: "spam",
+    label: "垃圾信息或广告",
+    description: "与作答无关的推广、引流链接或无意义灌水",
+    severe: true,
+  },
+  {
+    id: "unclear",
+    label: "描述不清",
+    description: "缺少目标或约束，无法据此产出可比较的作品",
+    severe: false,
+  },
+  {
+    id: "duplicate",
+    label: "与已有题目重复",
+    description: "与其他题目实质相同",
+    severe: false,
+  },
+  {
+    id: "unsuitable",
+    label: "不适合作答",
+    description: "需要外部资源，或结果无法横向比较",
+    severe: false,
+  },
+  {
+    id: "other",
+    label: "其他问题",
+    description: "存在其他违反社区准则的情况（需详细说明）",
+    severe: false,
+  },
+] as const satisfies readonly ReportOption[];
+
+export type ReportReason =
+  | (typeof SUBMISSION_REPORT_REASONS)[number]["id"]
+  | (typeof PROMPT_REPORT_REASONS)[number]["id"];
+
+export const REPORT_REASON_IDS = [
+  ...new Set([
+    ...SUBMISSION_REPORT_REASONS.map((r) => r.id),
+    ...PROMPT_REPORT_REASONS.map((r) => r.id),
+  ]),
+] as [ReportReason, ...ReportReason[]];
+
+export function reportOptions(
+  target: ReportTarget,
+): readonly (ReportOption & { id: ReportReason })[] {
+  return (
+    target === "prompt" ? PROMPT_REPORT_REASONS : SUBMISSION_REPORT_REASONS
+  ) as readonly (ReportOption & { id: ReportReason })[];
+}
+
+export function severeReasons(target: ReportTarget) {
+  return reportOptions(target)
+    .filter((r) => r.severe)
+    .map((r) => r.id as ReportReason);
+}
+
+/** Distinct reporters with open severe reports needed to hide a target pending review. */
 export const AUTO_HIDE_REPORTS = 3;
 export const REPORT_NOTE_LIMIT = 500;
 export const MODERATION_NOTE_LIMIT = 500;
@@ -81,10 +153,10 @@ export const REJECT_REASONS = [
 ] as const;
 
 export const reportReasonLabel = (id: string) =>
-  REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
+  [...SUBMISSION_REPORT_REASONS, ...PROMPT_REPORT_REASONS].find((r) => r.id === id)?.label ?? id;
 
-export function isReportReason(value: unknown): value is ReportReason {
-  return typeof value === "string" && (REPORT_REASON_IDS as string[]).includes(value);
+export function isReportReason(value: unknown, target: ReportTarget): value is ReportReason {
+  return typeof value === "string" && reportOptions(target).some((r) => r.id === value);
 }
 
 export function reportNeedsNote(reason: ReportReason) {
@@ -157,6 +229,7 @@ export const MODERATION_ACTIONS = [
   "prompt_reject",
   "prompt_remove",
   "prompt_restore",
+  "prompt_flag",
   "submission_keep",
   "submission_remove",
   "submission_restore",
@@ -169,6 +242,7 @@ export const MODERATION_ACTION_LABELS: Record<ModerationAction, string> = {
   prompt_reject: "驳回题目",
   prompt_remove: "下架题目",
   prompt_restore: "恢复题目",
+  prompt_flag: "自动隐藏题目",
   submission_keep: "保留答案",
   submission_remove: "下架答案",
   submission_restore: "恢复答案",
@@ -186,7 +260,15 @@ export interface Viewer {
 export const isAdmin = (viewer: Pick<Viewer, "role"> | null | undefined) =>
   viewer?.role === "admin";
 
-export function initialPromptStatus(author: Pick<Viewer, "role" | "trustLevel">): PromptStatus {
+/**
+ * New prompts publish straight away unless review is enabled, in which case
+ * only admins and the trusted tier skip it.
+ */
+export function initialPromptStatus(
+  author: Pick<Viewer, "role" | "trustLevel">,
+  review: boolean,
+): PromptStatus {
+  if (!review) return "active";
   return isAdmin(author) || author.trustLevel >= SKIP_PROMPT_REVIEW_TRUST ? "active" : "pending";
 }
 
@@ -214,8 +296,11 @@ export function canViewSubmission(
   );
 }
 
-/** Auto-hide only applies to a live answer; anything else needs a human. */
-export function shouldAutoHide(status: SubmissionStatus, severeReporters: number) {
+/** Auto-hide only applies to a live target; anything else needs a human. */
+export function shouldAutoHide(
+  status: PromptStatus | SubmissionStatus,
+  severeReporters: number,
+) {
   return status === "active" && severeReporters >= AUTO_HIDE_REPORTS;
 }
 

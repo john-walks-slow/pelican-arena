@@ -68,12 +68,16 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (tab === "reports") {
     const groups = await listReportGroups(page);
     const withGrants: ReportGroupData[] = await Promise.all(
-      groups.groups.map(async (group) => ({
-        ...group,
-        grant: isSubmissionServable(group.submission.status, group.submission.promptStatus)
-          ? null
-          : await createPreviewGrant(group.submission.id),
-      })),
+      groups.groups.map(async (group) =>
+        group.targetType === "prompt"
+          ? group
+          : {
+              ...group,
+              grant: isSubmissionServable(group.submission.status, group.submission.promptStatus)
+                ? null
+                : await createPreviewGrant(group.submission.id),
+            },
+      ),
     );
     return {
       tab,
@@ -261,7 +265,7 @@ function ReportQueue({
     <>
       <ul className="mt-4 space-y-3">
         {items.map((group) => (
-          <li key={group.submission.id}>
+          <li key={`${group.targetType}:${group.targetType === "prompt" ? group.prompt.id : group.submission.id}`}>
             <ReportCard group={group} usercontentOrigin={usercontentOrigin} />
           </li>
         ))}
@@ -272,7 +276,7 @@ function ReportQueue({
         onLoad={loadMore}
         shown={items.length}
         total={initial.total}
-        noun="份答案"
+        noun="项内容"
       />
     </>
   );

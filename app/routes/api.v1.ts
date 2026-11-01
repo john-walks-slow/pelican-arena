@@ -5,8 +5,9 @@ import {
   isPromptAction,
   isSubmissionAction,
   MODERATION_ACTIONS,
+  PROMPT_REPORT_REASONS,
   PROMPT_STATUSES,
-  REPORT_REASONS,
+  SUBMISSION_REPORT_REASONS,
   SUBMISSION_STATUSES,
 } from "~/lib/moderation";
 import {
@@ -90,12 +91,20 @@ function meta(request: Request) {
       prompt: ["approve", "reject", "remove", "restore"],
       submission: ["keep", "remove", "restore"],
     },
-    reportReasons: REPORT_REASONS.map(({ id, label, description, severe }) => ({
-      id,
-      label,
-      description,
-      severe,
-    })),
+    reportReasons: {
+      prompt: PROMPT_REPORT_REASONS.map(({ id, label, description, severe }) => ({
+        id,
+        label,
+        description,
+        severe,
+      })),
+      submission: SUBMISSION_REPORT_REASONS.map(({ id, label, description, severe }) => ({
+        id,
+        label,
+        description,
+        severe,
+      })),
+    },
     rules: {
       autoHideReports: AUTO_HIDE_REPORTS,
       skipPromptReviewTrust: SKIP_PROMPT_REVIEW_TRUST,
@@ -108,7 +117,7 @@ function meta(request: Request) {
 async function promptDetail(id: string) {
   const prompt = await getPromptReviewPayload(id);
   if (!prompt) throw new HttpError(404, "not_found", "题目不存在");
-  return prompt;
+  return { ...prompt, reports: await listAllReports("prompt", id) };
 }
 
 async function submissionDetail(request: Request, id: string) {
@@ -140,7 +149,7 @@ async function submissionDetail(request: Request, id: string) {
     logMeta: submission.logMeta,
     votes: submission.votes,
     starSum: submission.starSum,
-    reports: await listAllReports(submission.id),
+    reports: await listAllReports("submission", submission.id),
     preview: {
       entry: KIND_META[kind].entry,
       url: submissionUrl(origin, submission.id, kind, grant),

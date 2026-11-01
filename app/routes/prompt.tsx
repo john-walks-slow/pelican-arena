@@ -28,6 +28,7 @@ import { Markdown } from "~/components/markdown";
 import { ModerationActions } from "~/components/moderation-actions";
 import { OutputRequirements } from "~/components/output-requirements";
 import { PageHeader } from "~/components/page-header";
+import { ReportDialog } from "~/components/report-dialog";
 import { ShareDialog } from "~/components/share-dialog";
 import { PromptStatusBanner } from "~/components/status-banner";
 import { SubmissionPreview } from "~/components/submission-preview";
@@ -42,9 +43,10 @@ import { backTarget, withFrom } from "~/lib/navigation";
 import { submissionUrl } from "~/lib/sandbox";
 import { KIND_META } from "~/lib/kinds";
 import { canViewPrompt, isAdmin } from "~/lib/moderation";
+import { hasReported, promptReviewEnabled } from "~/lib/moderation.server";
 import { origins } from "~/lib/origins.server";
 import { promptWithRequirements } from "~/lib/output-requirements";
-import { can } from "~/lib/permissions";
+import { can, denyReason } from "~/lib/permissions";
 import {
   getPrompt,
   getPromptFacets,
@@ -91,6 +93,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     getPromptFacets(params.promptId),
   ]);
 
+  const isAuthor = user?.id === prompt.author.id;
+  const reported = user && !isAuthor ? await hasReported(user.id, "prompt", prompt.id) : false;
+
   const key = [sort, filters.model, filters.provider, filters.harness, filters.mod].join("|");
   return {
     prompt,
@@ -100,6 +105,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     key,
     admin: isAdmin(user),
     canAnswer: prompt.status === "active",
+    reported,
+    review: promptReviewEnabled(),
     usercontentOrigin: origins(request).usercontent,
     appOrigin: origins(request).app,
   };
@@ -211,6 +218,8 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
     facets,
     admin,
     canAnswer,
+    reported,
+    review,
     usercontentOrigin,
     appOrigin,
   } = loaderData;
@@ -227,6 +236,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const editHref = withFrom(`/p/${prompt.id}/edit`, here);
   const answerHref = (id: string) => withFrom(`/s/${id}`, here);
   const fetcher = useFetcher<MoreSubmissions>();
+  const showReport = Boolean(user && user.id !== prompt.author.id);
 
   const [items, setItems] = useState(submissions);
   const [next, setNext] = useState(nextPage);
@@ -369,7 +379,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
       />
 
       {prompt.status !== "active" && (
-        <PromptStatusBanner status={prompt.status} note={prompt.moderationNote}>
+        <PromptStatusBanner status={prompt.status} note={prompt.moderationNote} review={review}>
           {user?.id === prompt.author.id && prompt.status === "rejected" && (
             <Button asChild size="sm" variant="outline">
               <Link to={editHref}>修改后重新提交</Link>
@@ -385,6 +395,16 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
             <Markdown>{prompt.body}</Markdown>
           </div>
           <OutputRequirements kind={prompt.kind} className="mt-3" />
+          {showReport && canAnswer && (
+            <div className="mt-3 flex justify-end border-t border-border pt-2.5">
+              <ReportDialog
+                target="prompt"
+                targetId={prompt.id}
+                reported={reported}
+                disabledReason={!can(user, "report") ? denyReason(user, "report") : undefined}
+              />
+            </div>
+          )}
         </section>
       </ViewTransition>
 

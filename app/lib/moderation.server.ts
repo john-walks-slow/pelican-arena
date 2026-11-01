@@ -1,30 +1,37 @@
+import { env } from "cloudflare:workers";
 import { and, asc, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import {
   apiTokens,
   moderationLog,
   prompts,
-  submissionReports,
+  reports,
   submissions,
   users,
   type User,
 } from "~/db/schema";
 import type { TokenActor } from "./api-tokens.server";
 import { newId } from "./ids";
+import type { PromptKind } from "./kinds";
 import {
   AUTO_HIDE_REPORTS,
+  isReportReason,
   MODERATION_NOTE_LIMIT,
   PROMPT_TRANSITIONS,
   REPORT_NOTE_LIMIT,
-  SEVERE_REASONS,
+  severeReasons,
   SUBMISSION_TRANSITIONS,
   type ModerationAction,
   type PromptAction,
   type PromptStatus,
   type ReportReason,
+  type ReportTarget,
   type SubmissionAction,
   type SubmissionStatus,
 } from "./moderation";
+
+/** Prompt review is opt-in; without it new prompts publish immediately. */
+export const promptReviewEnabled = () => String(env.PROMPT_REVIEW) === "true";
 
 /** Who performed a moderation action: a signed-in admin or an API token. */
 export type Actor =
@@ -95,7 +102,8 @@ export async function applyPromptAction(
 ) {
   const transition = PROMPT_TRANSITIONS[action];
   const clean = cleanNote(note, transition.noteRequired);
-  const [updated] = await db()
+  const d = db();
+  const [updated] = await d
     .update(prompts)
     .set({
       status: transition.to,
@@ -108,6 +116,22 @@ export async function applyPromptAction(
       action === "approve" ? "题目已被处理" : "题目当前状态不允许此操作",
     );
   }
+  if (action !== "restore") {
+    await d
+      .update(reports)
+      .set({
+        status: action === "approve" ? "dismissed" : "accepted",
+        resolvedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(reports.targetType, "prompt"),
+          eq(reports.targetId, promptId),
+          eq(reports.status, "open"),
+        ),
+      );
+  }
+
   await writeLog(actor, "prompt", promptId, PROMPT_ACTION_LOG[action], clean);
   return updated;
 }
@@ -140,10 +164,14 @@ export async function applySubmissionAction(
   const reportStatus = action === "remove" ? "accepted" : "dismissed";
   if (action !== "restore") {
     await d
-      .update(submissionReports)
+      .update(reports)
       .set({ status: reportStatus, resolvedAt: new Date() })
       .where(
-        and(eq(submissionReports.submissionId, submissionId), eq(submissionReports.status, "open")),
+        and(
+          eq(reports.targetType, "submission"),
+          eq(reports.targetId, submissionId),
+          eq(reports.status, "open"),
+        ),
       );
   }
 
@@ -155,15 +183,24 @@ export async function applySubmissionAction(
 
 export class ReportConflict extends Error {}
 
-export async function createReport(
-  reporter: Pick<User, "id">,
-  submissionId: string,
-  reason: ReportReason,
-  note: string | null,
-) {
-  const clean = (note ?? "").trim().slice(0, REPORT_NOTE_LIMIT) || null;
+interface ReportTargetRow {
+  id: string;
+  status: PromptStatus | SubmissionStatus;
+  authorId: number;
+}
 
-  const [submission] = await db()
+async function loadReportTarget(
+  target: ReportTarget,
+  id: string,
+): Promise<ReportTargetRow | null> {
+  if (target === "prompt") {
+    const [row] = await db()
+      .select({ id: prompts.id, status: prompts.status, authorId: prompts.authorId })
+      .from(prompts)
+      .where(eq(prompts.id, id));
+    return row ?? null;
+  }
+  const [row] = await db()
     .select({
       id: submissions.id,
       status: submissions.status,
@@ -172,67 +209,105 @@ export async function createReport(
     })
     .from(submissions)
     .innerJoin(prompts, eq(prompts.id, submissions.promptId))
-    .where(eq(submissions.id, submissionId));
-  if (!submission || submission.promptStatus !== "active") throw new ReportConflict("找不到答案");
-  if (submission.authorId === reporter.id) throw new ReportConflict("不能举报自己的答案");
-  if (submission.status !== "active" && submission.status !== "flagged") {
-    throw new ReportConflict("答案未公开，不需要举报");
-  }
+    .where(eq(submissions.id, id));
+  if (!row || row.promptStatus !== "active") return null;
+  return { id: row.id, status: row.status, authorId: row.authorId };
+}
+
+export async function createReport(
+  reporter: Pick<User, "id">,
+  target: ReportTarget,
+  targetId: string,
+  reason: ReportReason,
+  note: string | null,
+) {
+  const clean = (note ?? "").trim().slice(0, REPORT_NOTE_LIMIT) || null;
+  const noun = target === "prompt" ? "题目" : "答案";
+
+  if (!isReportReason(reason, target)) throw new ModerationValidation("请选择举报理由");
+
+  const row = await loadReportTarget(target, targetId);
+  if (!row) throw new ReportConflict(`找不到${noun}`);
+  if (row.authorId === reporter.id) throw new ReportConflict(`不能举报自己的${noun}`);
+  const reportable =
+    target === "prompt"
+      ? row.status === "active"
+      : row.status === "active" || row.status === "flagged";
+  if (!reportable) throw new ReportConflict(`${noun}未公开，不需要举报`);
 
   const [existing] = await db()
-    .select({ id: submissionReports.id })
-    .from(submissionReports)
+    .select({ id: reports.id })
+    .from(reports)
     .where(
       and(
-        eq(submissionReports.submissionId, submissionId),
-        eq(submissionReports.reporterId, reporter.id),
+        eq(reports.targetType, target),
+        eq(reports.targetId, targetId),
+        eq(reports.reporterId, reporter.id),
       ),
     );
-  if (existing) throw new ReportConflict("你已经举报过这份答案");
+  if (existing) throw new ReportConflict(`你已经举报过这${target === "prompt" ? "道题" : "份答案"}`);
 
-  await db().insert(submissionReports).values({
+  await db().insert(reports).values({
     id: newId(12),
-    submissionId,
+    targetType: target,
+    targetId,
     reporterId: reporter.id,
     reason,
     note: clean,
   });
 
-  if ((SEVERE_REASONS as readonly string[]).includes(reason)) {
-    await autoHideIfFlagged(submissionId);
+  if (severeReasons(target).includes(reason)) {
+    await autoHideIfFlagged(target, targetId);
   }
 }
 
-/** Hides an answer once enough distinct users report it for a severe reason. */
-async function autoHideIfFlagged(submissionId: string) {
+/** Hides a reported target once enough distinct users call it severe. */
+async function autoHideIfFlagged(target: ReportTarget, targetId: string) {
   const [row] = await db()
-    .select({ n: sql<number>`count(distinct ${submissionReports.reporterId})` })
-    .from(submissionReports)
+    .select({ n: sql<number>`count(distinct ${reports.reporterId})` })
+    .from(reports)
     .where(
       and(
-        eq(submissionReports.submissionId, submissionId),
-        eq(submissionReports.status, "open"),
-        inArray(submissionReports.reason, SEVERE_REASONS),
+        eq(reports.targetType, target),
+        eq(reports.targetId, targetId),
+        eq(reports.status, "open"),
+        inArray(reports.reason, severeReasons(target)),
       ),
     );
   if (row.n < AUTO_HIDE_REPORTS) return false;
 
-  const [flagged] = await db()
+  const d = db();
+  if (target === "prompt") {
+    const [hidden] = await d
+      .update(prompts)
+      .set({ status: "pending", moderationNote: "收到多起严重举报，等待复核。" })
+      .where(and(eq(prompts.id, targetId), eq(prompts.status, "active")))
+      .returning({ id: prompts.id });
+    if (!hidden) return false;
+    await writeLog(null, "prompt", targetId, "prompt_flag", null);
+    return true;
+  }
+
+  const [flagged] = await d
     .update(submissions)
     .set({ status: "flagged" })
-    .where(and(eq(submissions.id, submissionId), eq(submissions.status, "active")))
+    .where(and(eq(submissions.id, targetId), eq(submissions.status, "active")))
     .returning({ id: submissions.id });
   if (!flagged) return false;
-  await writeLog(null, "submission", submissionId, "submission_flag", null);
+  await writeLog(null, "submission", targetId, "submission_flag", null);
   return true;
 }
 
-export async function hasReported(userId: number, submissionId: string) {
+export async function hasReported(userId: number, target: ReportTarget, targetId: string) {
   const [row] = await db()
-    .select({ id: submissionReports.id })
-    .from(submissionReports)
+    .select({ id: reports.id })
+    .from(reports)
     .where(
-      and(eq(submissionReports.submissionId, submissionId), eq(submissionReports.reporterId, userId)),
+      and(
+        eq(reports.targetType, target),
+        eq(reports.targetId, targetId),
+        eq(reports.reporterId, userId),
+      ),
     );
   return Boolean(row);
 }
@@ -320,176 +395,220 @@ export async function getPromptForReview(id: string) {
   return { ...row, history: stats.get(row.author.id)! };
 }
 
+
 /* ---------- admin: reports ---------- */
 
 export const REPORT_GROUP_PAGE_SIZE = 20;
 
-export interface ReportGroup {
-  submission: {
-    id: string;
-    status: SubmissionStatus;
-    createdAt: Date;
-    model: string;
-    provider: string;
-    promptId: string;
-    promptTitle: string;
-    promptStatus: PromptStatus;
-    kind: "web" | "markdown" | "svg";
-    author: { id: number; username: string; avatarTemplate: string | null };
-  };
-  reports: {
-    id: string;
-    reason: ReportReason;
-    note: string | null;
-    createdAt: Date;
-    reporter: { id: number; username: string; avatarTemplate: string | null };
-  }[];
-  firstReportAt: Date;
+export interface ReportEntry {
+  id: string;
+  reason: ReportReason;
+  note: string | null;
+  createdAt: Date;
+  reporter: { id: number; username: string; avatarTemplate: string | null };
+}
+
+export interface PromptReportTarget {
+  id: string;
+  status: PromptStatus;
+  createdAt: Date;
+  title: string;
+  kind: PromptKind;
+  excerpt: string;
+  author: { id: number; username: string; avatarTemplate: string | null };
+}
+
+export interface SubmissionReportTarget {
+  id: string;
+  status: SubmissionStatus;
+  createdAt: Date;
+  model: string;
+  provider: string;
+  promptId: string;
+  promptTitle: string;
+  promptStatus: PromptStatus;
+  kind: PromptKind;
+  author: { id: number; username: string; avatarTemplate: string | null };
+}
+
+export type ReportGroup = { reports: ReportEntry[]; firstReportAt: Date } & (
+  | { targetType: "prompt"; prompt: PromptReportTarget }
+  | { targetType: "submission"; submission: SubmissionReportTarget }
+);
+
+interface GroupRow {
+  targetType: ReportTarget;
+  targetId: string;
+  firstAt: number;
+  status: string;
 }
 
 /**
- * Answers with open reports, ordered so automatically hidden ones come first,
- * then by how long the oldest report has waited.
+ * Reported prompts and answers in one queue: automatically hidden targets come
+ * first, then by how long the oldest report has waited.
  */
 export async function listReportGroups(page = 1, limit = REPORT_GROUP_PAGE_SIZE) {
   const d = db();
-  const open = eq(submissionReports.status, "open");
-  const [grouped, [totalGroups]] = await Promise.all([
+  const open = eq(reports.status, "open");
+  const statusExpr = sql<string>`case ${reports.targetType}
+    when 'prompt' then (select status from prompts p where p.id = ${reports.targetId})
+    else (select status from submissions s where s.id = ${reports.targetId}) end`;
+
+  const [grouped, [total]] = await Promise.all([
     d
       .select({
-        submissionId: submissionReports.submissionId,
-        firstAt: sql<number>`min(${submissionReports.createdAt})`,
-        status: submissions.status,
+        targetType: reports.targetType,
+        targetId: reports.targetId,
+        firstAt: sql<number>`min(${reports.createdAt})`,
+        status: statusExpr,
       })
-      .from(submissionReports)
-      .innerJoin(submissions, eq(submissions.id, submissionReports.submissionId))
+      .from(reports)
       .where(open)
-      .groupBy(submissionReports.submissionId, submissions.status)
+      .groupBy(reports.targetType, reports.targetId)
       .orderBy(
-        desc(sql`case when ${submissions.status} = 'flagged' then 1 else 0 end`),
-        asc(sql`min(${submissionReports.createdAt})`),
+        desc(sql`case when (${statusExpr}) in ('flagged', 'pending') then 1 else 0 end`),
+        asc(sql`min(${reports.createdAt})`),
       )
       .limit(limit)
       .offset((page - 1) * limit),
     d
-      .select({ n: sql<number>`count(distinct ${submissionReports.submissionId})` })
-      .from(submissionReports)
+      .select({
+        n: sql<number>`count(distinct ${reports.targetType} || ':' || ${reports.targetId})`,
+      })
+      .from(reports)
       .where(open),
   ]);
 
   return {
     groups: await hydrateReportGroups(grouped),
-    total: totalGroups.n,
+    total: total.n,
     page,
-    nextPage: page * limit < totalGroups.n ? page + 1 : null,
+    nextPage: page * limit < total.n ? page + 1 : null,
   };
 }
 
-interface GroupKey {
-  submissionId: string;
-  firstAt: number;
-  status: SubmissionStatus;
-}
-
-async function hydrateReportGroups(grouped: GroupKey[]): Promise<ReportGroup[]> {
+async function hydrateReportGroups(grouped: GroupRow[]): Promise<ReportGroup[]> {
+  if (grouped.length === 0) return [];
   const d = db();
-  const open = eq(submissionReports.status, "open");
-  const ids = grouped.map((g) => g.submissionId);
-  if (ids.length === 0) return [];
+  const open = eq(reports.status, "open");
+  const promptIds = grouped.filter((g) => g.targetType === "prompt").map((g) => g.targetId);
+  const submissionIds = grouped
+    .filter((g) => g.targetType === "submission")
+    .map((g) => g.targetId);
+  const allIds = [...promptIds, ...submissionIds];
 
-  const [submissionRows, reportRows] = await Promise.all([
+  const [promptRows, submissionRows, reportRows] = await Promise.all([
+    promptIds.length === 0
+      ? Promise.resolve([])
+      : d
+          .select({
+            id: prompts.id,
+            status: prompts.status,
+            createdAt: prompts.createdAt,
+            title: prompts.title,
+            kind: prompts.kind,
+            excerpt: sql<string>`substr(${prompts.body}, 1, 360)`,
+            author: {
+              id: users.id,
+              username: users.username,
+              avatarTemplate: users.avatarTemplate,
+            },
+          })
+          .from(prompts)
+          .innerJoin(users, eq(users.id, prompts.authorId))
+          .where(inArray(prompts.id, promptIds)),
+    submissionIds.length === 0
+      ? Promise.resolve([])
+      : d
+          .select({
+            id: submissions.id,
+            status: submissions.status,
+            createdAt: submissions.createdAt,
+            promptId: prompts.id,
+            promptTitle: prompts.title,
+            promptStatus: prompts.status,
+            kind: prompts.kind,
+            author: {
+              id: users.id,
+              username: users.username,
+              avatarTemplate: users.avatarTemplate,
+            },
+            model: sql<string>`(select name from models where models.id = ${submissions.modelId})`,
+            provider: sql<string>`(select name from providers where providers.id = ${submissions.providerId})`,
+          })
+          .from(submissions)
+          .innerJoin(prompts, eq(prompts.id, submissions.promptId))
+          .innerJoin(users, eq(users.id, submissions.authorId))
+          .where(inArray(submissions.id, submissionIds)),
     d
       .select({
-        id: submissions.id,
-        status: submissions.status,
-        createdAt: submissions.createdAt,
-        promptId: prompts.id,
-        promptTitle: prompts.title,
-        promptStatus: prompts.status,
-        kind: prompts.kind,
-        author: {
-          id: users.id,
-          username: users.username,
-          avatarTemplate: users.avatarTemplate,
-        },
-        model: sql<string>`(select name from models where models.id = ${submissions.modelId})`,
-        provider: sql<string>`(select name from providers where providers.id = ${submissions.providerId})`,
-      })
-      .from(submissions)
-      .innerJoin(prompts, eq(prompts.id, submissions.promptId))
-      .innerJoin(users, eq(users.id, submissions.authorId))
-      .where(inArray(submissions.id, ids)),
-    d
-      .select({
-        id: submissionReports.id,
-        submissionId: submissionReports.submissionId,
-        reason: submissionReports.reason,
-        note: submissionReports.note,
-        createdAt: submissionReports.createdAt,
+        id: reports.id,
+        targetType: reports.targetType,
+        targetId: reports.targetId,
+        reason: reports.reason,
+        note: reports.note,
+        createdAt: reports.createdAt,
         reporter: {
           id: users.id,
           username: users.username,
           avatarTemplate: users.avatarTemplate,
         },
       })
-      .from(submissionReports)
-      .innerJoin(users, eq(users.id, submissionReports.reporterId))
-      .where(and(open, inArray(submissionReports.submissionId, ids)))
-      .orderBy(asc(submissionReports.createdAt)),
+      .from(reports)
+      .innerJoin(users, eq(users.id, reports.reporterId))
+      .where(and(open, inArray(reports.targetId, allIds)))
+      .orderBy(asc(reports.createdAt)),
   ]);
 
-  const byId = new Map(submissionRows.map((s) => [s.id, s]));
-  return grouped.flatMap((g) => {
-    const submission = byId.get(g.submissionId);
-    if (!submission) return [];
-    return [
-      {
-        submission,
-        reports: reportRows.filter((r) => r.submissionId === g.submissionId),
-        firstReportAt: new Date(g.firstAt),
-      },
-    ];
-  });
+  const promptsById = new Map(promptRows.map((row) => [row.id, row]));
+  const submissionsById = new Map(submissionRows.map((row) => [row.id, row]));
+  const reportsByKey = new Map<string, ReportEntry[]>();
+  for (const row of reportRows) {
+    const key = `${row.targetType}:${row.targetId}`;
+    const entry: ReportEntry = {
+      id: row.id,
+      reason: row.reason,
+      note: row.note,
+      createdAt: row.createdAt,
+      reporter: row.reporter,
+    };
+    const bucket = reportsByKey.get(key);
+    if (bucket) bucket.push(entry);
+    else reportsByKey.set(key, [entry]);
+  }
+
+  const out: ReportGroup[] = [];
+  for (const g of grouped) {
+    const entries = reportsByKey.get(`${g.targetType}:${g.targetId}`) ?? [];
+    const firstReportAt = new Date(g.firstAt);
+    if (g.targetType === "prompt") {
+      const prompt = promptsById.get(g.targetId);
+      if (prompt) out.push({ targetType: "prompt", prompt, reports: entries, firstReportAt });
+    } else {
+      const submission = submissionsById.get(g.targetId);
+      if (submission) {
+        out.push({ targetType: "submission", submission, reports: entries, firstReportAt });
+      }
+    }
+  }
+  return out;
 }
 
-/** One answer's open reports, for the submission page and the API. */
-export async function getReportGroup(submissionId: string) {
-  const [row] = await db()
-    .select({
-      firstAt: sql<number>`min(${submissionReports.createdAt})`,
-      status: submissions.status,
-    })
-    .from(submissionReports)
-    .innerJoin(submissions, eq(submissions.id, submissionReports.submissionId))
-    .where(
-      and(
-        eq(submissionReports.status, "open"),
-        eq(submissionReports.submissionId, submissionId),
-      ),
-    )
-    .groupBy(submissions.status);
-  if (!row) return null;
-  const [group] = await hydrateReportGroups([
-    { submissionId, firstAt: row.firstAt, status: row.status },
-  ]);
-  return group ?? null;
-}
-
-/** Appeal details for the API: open and resolved reports of one answer. */
-export async function listAllReports(submissionId: string) {
+/** Every report about one target, for the moderation API. */
+export async function listAllReports(target: ReportTarget, targetId: string) {
   return db()
     .select({
-      id: submissionReports.id,
-      reason: submissionReports.reason,
-      note: submissionReports.note,
-      status: submissionReports.status,
-      createdAt: submissionReports.createdAt,
+      id: reports.id,
+      reason: reports.reason,
+      note: reports.note,
+      status: reports.status,
+      createdAt: reports.createdAt,
       reporter: users.username,
     })
-    .from(submissionReports)
-    .innerJoin(users, eq(users.id, submissionReports.reporterId))
-    .where(eq(submissionReports.submissionId, submissionId))
-    .orderBy(asc(submissionReports.createdAt));
+    .from(reports)
+    .innerJoin(users, eq(users.id, reports.reporterId))
+    .where(and(eq(reports.targetType, target), eq(reports.targetId, targetId)))
+    .orderBy(asc(reports.createdAt));
 }
 
 /* ---------- admin: log & counters ---------- */
@@ -540,9 +659,11 @@ export async function moderationCounts() {
   const [[pending], [reported]] = await Promise.all([
     d.select({ n: count() }).from(prompts).where(eq(prompts.status, "pending")),
     d
-      .select({ n: sql<number>`count(distinct ${submissionReports.submissionId})` })
-      .from(submissionReports)
-      .where(eq(submissionReports.status, "open")),
+      .select({
+        n: sql<number>`count(distinct ${reports.targetType} || ':' || ${reports.targetId})`,
+      })
+      .from(reports)
+      .where(eq(reports.status, "open")),
   ]);
   return { pending: pending.n, reports: reported.n, total: pending.n + reported.n };
 }
