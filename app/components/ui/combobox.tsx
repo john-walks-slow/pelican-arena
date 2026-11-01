@@ -14,7 +14,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import type { CatalogEntry, CatalogKind } from "~/lib/catalog";
+import {
+  PROVIDER_CATEGORIES,
+  providerCategoryLabel,
+  type CatalogEntry,
+  type CatalogKind,
+} from "~/lib/catalog";
 import { cn } from "~/lib/utils";
 
 interface ComboboxProps {
@@ -34,8 +39,6 @@ interface ComboboxProps {
   icon?: React.ReactNode;
   /** field: full-width form control. chip: inline pill that sits with other tags. */
   trigger?: "field" | "chip";
-  /** Adds an entry for text that is not in the list. Models are picked from the synced catalog only. */
-  creatable?: boolean;
   className?: string;
 }
 
@@ -53,7 +56,6 @@ export function Combobox({
   required,
   icon,
   trigger = "field",
-  creatable = true,
   className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
@@ -82,7 +84,8 @@ export function Combobox({
           .then((raw: unknown) => {
             const data = raw as { items?: CatalogEntry[]; total?: number } | null;
             if (!data || controller.signal.aborted) return;
-            if (Array.isArray(data?.items)) setList(data.items.map(({ id, name }) => ({ id, name })));
+            if (Array.isArray(data?.items))
+              setList(data.items.map(({ id, name, category }) => ({ id, name, category })));
             if (typeof data?.total === "number") setTotal(data.total);
           })
           .catch(() => {})
@@ -104,9 +107,42 @@ export function Combobox({
   const showSelected = Boolean(value && !selectedEntry);
   const isChip = trigger === "chip";
   const isCustomNew =
-    creatable &&
     query.trim().length > 0 &&
     !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
+
+  const groups = React.useMemo(() => {
+    if (!list.some((option) => option.category)) return null;
+    const order: string[] = PROVIDER_CATEGORIES.map((category) => category.id);
+    const buckets = new Map<string, CatalogEntry[]>();
+    for (const option of list) {
+      const key = option.category ?? "other";
+      buckets.set(key, [...(buckets.get(key) ?? []), option]);
+    }
+    return [...buckets.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
+  }, [list]);
+
+  function renderOption(option: CatalogEntry) {
+    const isSelected = value.toLowerCase() === option.name.toLowerCase();
+    return (
+      <CommandItem
+        key={option.id}
+        value={kind ? `${option.name}__${option.id}` : option.name}
+        onSelect={() => {
+          onChange(option.name);
+          setOpen(false);
+          setQuery("");
+        }}
+      >
+        <Check
+          className={cn(
+            "mr-2 h-4 w-4",
+            isSelected ? "text-accent opacity-100" : "opacity-0",
+          )}
+        />
+        <span className="truncate">{option.name}</span>
+      </CommandItem>
+    );
+  }
 
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -204,30 +240,13 @@ export function Combobox({
                 </CommandGroup>
               )}
 
-              <CommandGroup>
-                {list.map((option) => {
-                  const isSelected = value.toLowerCase() === option.name.toLowerCase();
-                  return (
-                    <CommandItem
-                      key={option.id}
-                      value={kind ? `${option.name}__${option.id}` : option.name}
-                      onSelect={() => {
-                        onChange(option.name);
-                        setOpen(false);
-                        setQuery("");
-                      }}
-                    >
-                      <Check
-                        className={cn(
-                          "mr-2 h-4 w-4",
-                          isSelected ? "text-accent opacity-100" : "opacity-0",
-                        )}
-                      />
-                      <span className="truncate">{option.name}</span>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
+              {groups
+                ? groups.map(([category, options]) => (
+                    <CommandGroup key={category} heading={providerCategoryLabel(category)}>
+                      {options.map(renderOption)}
+                    </CommandGroup>
+                  ))
+                : <CommandGroup>{list.map(renderOption)}</CommandGroup>}
             </CommandList>
             {kind && total > list.length && (
               <p className="border-t border-rule px-3 py-1.5 text-[11px] text-muted">

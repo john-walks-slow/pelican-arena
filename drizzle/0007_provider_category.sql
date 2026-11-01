@@ -1,0 +1,1 @@
+ALTER TABLE `providers` ADD `category` text DEFAULT 'other' NOT NULL;

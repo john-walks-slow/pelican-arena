@@ -88,6 +88,7 @@ export const providers = sqliteTable("providers", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
   rank: integer("rank").notNull().default(1000),
+  category: text("category").notNull().default("other"),
   createdAt: createdAt(),
 });
 
