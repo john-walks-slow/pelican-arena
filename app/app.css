@@ -62,6 +62,9 @@
   --color-scrim: var(--scrim);
 
   --color-accent: var(--accent);
+  --color-medal-gold: var(--medal-gold);
+  --color-medal-silver: var(--medal-silver);
+  --color-medal-bronze: var(--medal-bronze);
   --color-accent-soft: var(--accent-soft);
   --color-accent-track: var(--accent-track);
   --color-accent-ink: var(--accent-ink);
@@ -107,6 +110,11 @@
   --accent-soft: #fff5ee;
   --accent-track: #fbe0cf;
   --accent-ink: #7c2d12;
+
+  /* Podium marks on the leaderboard, kept muted enough to sit beside text. */
+  --medal-gold: #b07d18;
+  --medal-silver: #7d8794;
+  --medal-bronze: #a2643c;
 
   --positive: #1f7a4d;
   --negative: #bf2329;
@@ -161,6 +169,10 @@
   --accent-soft: #2a1a12;
   --accent-track: #4a2a1a;
   --accent-ink: #f6b795;
+
+  --medal-gold: #d9a83f;
+  --medal-silver: #a7b0bd;
+  --medal-bronze: #c98a5e;
 
   --positive: #56c892;
   --negative: #f07a7a;

@@ -86,7 +86,9 @@ export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) 
   return cachedClientLoader(request, serverLoader);
 }
 
-const MEDALS = ["text-accent", "text-accent/60", "text-accent/40"];
+/** Gold, silver, bronze for the podium; the medal stands in for the numeral. */
+const MEDALS = ["text-medal-gold", "text-medal-silver", "text-medal-bronze"];
+const PLACEMENTS = ["金牌", "银牌", "铜牌"];
 
 function Rank({ place }: { place: number | null }) {
   if (place === null) {
@@ -94,9 +96,11 @@ function Rank({ place }: { place: number | null }) {
   }
   if (place <= 3) {
     return (
-      <span className="inline-flex items-center gap-1">
-        <Trophy className={cn("size-3.5", MEDALS[place - 1])} strokeWidth={2} />
-        <span className="num text-sm font-semibold text-ink">{place}</span>
+      <span className="flex items-center">
+        <Trophy className={cn("size-4", MEDALS[place - 1])} strokeWidth={2} aria-hidden />
+        <span className="sr-only">
+          第 {place} 名，{PLACEMENTS[place - 1]}
+        </span>
       </span>
     );
   }
