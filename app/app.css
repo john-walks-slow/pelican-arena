@@ -348,13 +348,13 @@ body {
   animation: stage-up 240ms var(--ease-spatial);
 }
 .route-stage:not([data-motion="steady"]) .reveal-tier-1 {
-  animation: reveal-rise 260ms var(--ease-spatial);
+  animation: reveal-rise 260ms var(--ease-spatial) both;
 }
 .route-stage:not([data-motion="steady"]) .reveal-tier-2 {
-  animation: reveal-rise 280ms var(--ease-spatial);
+  animation: reveal-rise 280ms var(--ease-spatial) both;
 }
 .route-stage:not([data-motion="steady"]) .reveal-card {
-  animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms);
+  animation: reveal-card-in 400ms var(--ease-spatial) var(--stagger, 0ms) both;
 }
 
 /* Tactile card hover & press physics with touch ripple feedback */
