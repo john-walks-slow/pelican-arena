@@ -126,20 +126,29 @@ export async function updateSubmission(input: {
   return true;
 }
 
+/** Authors may only toggle their own answer between public and withdrawn. */
 export async function setSubmissionStatus(
   id: string,
   authorId: number,
   status: "active" | "hidden",
 ) {
   const [row] = await db()
-    .select({ authorId: submissions.authorId })
+    .select({ authorId: submissions.authorId, status: submissions.status })
     .from(submissions)
     .where(eq(submissions.id, id));
   if (!row) return "not_found" as const;
   if (row.authorId !== authorId) return "forbidden" as const;
-  await db()
+  const from = status === "hidden" ? "active" : "hidden";
+  if (row.status !== from) return "conflict" as const;
+  const result = await db()
     .update(submissions)
     .set({ status })
-    .where(and(eq(submissions.id, id), eq(submissions.authorId, authorId)));
-  return "ok" as const;
+    .where(
+      and(
+        eq(submissions.id, id),
+        eq(submissions.authorId, authorId),
+        eq(submissions.status, from),
+      ),
+    );
+  return result.meta.changes > 0 ? ("ok" as const) : ("conflict" as const);
 }

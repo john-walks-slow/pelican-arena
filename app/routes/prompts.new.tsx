@@ -7,6 +7,7 @@ import { prompts } from "~/db/schema";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { newId } from "~/lib/ids";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
+import { initialPromptStatus } from "~/lib/moderation";
 import { cachedClientLoader, clearRouteCache } from "~/lib/route-cache";
 import { flashToast } from "~/lib/session.server";
 
@@ -15,8 +16,8 @@ export const meta: Route.MetaFunction = () => [{ title: "出题 · Pelican Arena
 const LIMITS = { title: 80, body: 8000 };
 
 export async function loader({ request }: Route.LoaderArgs) {
-  await requirePermission(request, "createPrompt");
-  return null;
+  const user = await requirePermission(request, "createPrompt");
+  return { reviewed: initialPromptStatus(user) === "pending" };
 }
 
 export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) {
@@ -48,13 +49,19 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   const id = newId(10);
-  await db().insert(prompts).values({ id, authorId: user.id, title, body, kind });
+  const status = initialPromptStatus(user);
+  await db().insert(prompts).values({ id, authorId: user.id, title, body, kind, status });
   return redirect(`/p/${id}`, {
-    headers: { "Set-Cookie": await flashToast(request, "题目已发布") },
+    headers: {
+      "Set-Cookie": await flashToast(
+        request,
+        status === "pending" ? "已提交，通过审核后公开" : "题目已发布",
+      ),
+    },
   });
 }
 
-export default function NewPrompt({ actionData }: Route.ComponentProps) {
+export default function NewPrompt({ loaderData, actionData }: Route.ComponentProps) {
   return (
     <div className="mx-auto max-w-[1240px]">
       <PageHeader title="出题" subtitle="写一段让模型产出同一类作品的提示词。" />
@@ -64,7 +71,8 @@ export default function NewPrompt({ actionData }: Route.ComponentProps) {
         errors={actionData?.errors}
         values={actionData?.values}
         cancelTo="/"
-        submitLabel="发布题目"
+        submitLabel={loaderData.reviewed ? "提交审核" : "发布题目"}
+        hint={loaderData.reviewed ? "新题目经审核后公开并开放作答。" : undefined}
       />
     </div>
   );

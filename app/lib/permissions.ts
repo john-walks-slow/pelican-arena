@@ -4,14 +4,21 @@ import type { User } from "~/db/schema";
 export const TRUST = {
   submit: 1,
   rate: 1,
+  report: 1,
   createPrompt: 2,
 } as const;
 
+/** Trust level at which new prompts are published without review. */
+export const SKIP_PROMPT_REVIEW_TRUST = 3;
+
 export type Action = keyof typeof TRUST;
 
-export const DAILY_LIMITS: Record<"submit" | "createPrompt", number> = {
+export type LimitedAction = "submit" | "createPrompt" | "report";
+
+export const DAILY_LIMITS: Record<LimitedAction, number> = {
   submit: 30,
   createPrompt: 5,
+  report: 20,
 };
 
 export function can(user: Pick<User, "trustLevel" | "silenced" | "role"> | null, action: Action) {

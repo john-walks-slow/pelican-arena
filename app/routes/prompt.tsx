@@ -25,9 +25,11 @@ import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
 import { LoadMore } from "~/components/load-more";
 import { Markdown } from "~/components/markdown";
+import { ModerationActions } from "~/components/moderation-actions";
 import { OutputRequirements } from "~/components/output-requirements";
 import { PageHeader } from "~/components/page-header";
 import { ShareDialog } from "~/components/share-dialog";
+import { PromptStatusBanner } from "~/components/status-banner";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { StarScore } from "~/components/stars";
 import { ModTags } from "~/components/submission-tags";
@@ -39,6 +41,7 @@ import { formatRelative } from "~/lib/format";
 import { backTarget, withFrom } from "~/lib/navigation";
 import { submissionUrl } from "~/lib/sandbox";
 import { KIND_META } from "~/lib/kinds";
+import { canViewPrompt, isAdmin } from "~/lib/moderation";
 import { origins } from "~/lib/origins.server";
 import { promptWithRequirements } from "~/lib/output-requirements";
 import { can } from "~/lib/permissions";
@@ -49,6 +52,7 @@ import {
   type SubmissionSort,
 } from "~/lib/queries.server";
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
+import { getUser } from "~/lib/session.server";
 import { useOptionalUser } from "~/lib/use-user";
 
 const MAX_COMPARE = 4;
@@ -66,6 +70,14 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
+  const [prompt, user] = await Promise.all([getPrompt(params.promptId), getUser(request)]);
+  if (
+    !prompt ||
+    !canViewPrompt(user, { status: prompt.status, authorId: prompt.author.id })
+  ) {
+    throw data("Not Found", { status: 404 });
+  }
+
   const q = new URL(request.url).searchParams;
   const sort: SubmissionSort = q.get("sort") === "new" ? "new" : "top";
   const filters = {
@@ -74,12 +86,10 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     harness: q.get("harness") || undefined,
     mod: q.get("mod") || undefined,
   };
-  const [prompt, gallery, facets] = await Promise.all([
-    getPrompt(params.promptId),
+  const [gallery, facets] = await Promise.all([
     listSubmissions(params.promptId, filters, sort),
     getPromptFacets(params.promptId),
   ]);
-  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
 
   const key = [sort, filters.model, filters.provider, filters.harness, filters.mod].join("|");
   return {
@@ -88,6 +98,8 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     facets,
     sort,
     key,
+    admin: isAdmin(user),
+    canAnswer: prompt.status === "active",
     usercontentOrigin: origins(request).usercontent,
     appOrigin: origins(request).app,
   };
@@ -189,7 +201,19 @@ function FilterBar({ facets, total }: { facets: Facets; total: number }) {
 }
 
 export default function PromptPage({ loaderData }: Route.ComponentProps) {
-  const { prompt, submissions, total, nextPage, sort, key, facets, usercontentOrigin, appOrigin } = loaderData;
+  const {
+    prompt,
+    submissions,
+    total,
+    nextPage,
+    sort,
+    key,
+    facets,
+    admin,
+    canAnswer,
+    usercontentOrigin,
+    appOrigin,
+  } = loaderData;
   const user = useOptionalUser();
   const [params] = useSearchParams();
   const { pathname, search } = useLocation();
@@ -289,6 +313,9 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                 </Link>
               </Button>
             )}
+            {admin && prompt.status === "active" && (
+              <ModerationActions kind="prompt" id={prompt.id} status={prompt.status} />
+            )}
             <ShareDialog
               path={`/p/${prompt.id}`}
               title={prompt.title}
@@ -321,23 +348,36 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
               )}
               {copied ? "已复制" : "复制提示词"}
             </Button>
-            <Button asChild variant="primary" className="gap-1.5">
-              <Link
-                to={
-                  user
-                    ? { pathname: `/p/${prompt.id}/submit`, search }
-                    : `/auth/login?returnTo=/p/${prompt.id}/submit`
-                }
-                prefetch="intent"
-                preventScrollReset={Boolean(user)}
-              >
-                <Upload className="size-4" strokeWidth={1.75} />
-                提交答案
-              </Link>
-            </Button>
+            {canAnswer && (
+              <Button asChild variant="primary" className="gap-1.5">
+                <Link
+                  to={
+                    user
+                      ? { pathname: `/p/${prompt.id}/submit`, search }
+                      : `/auth/login?returnTo=/p/${prompt.id}/submit`
+                  }
+                  prefetch="intent"
+                  preventScrollReset={Boolean(user)}
+                >
+                  <Upload className="size-4" strokeWidth={1.75} />
+                  提交答案
+                </Link>
+              </Button>
+            )}
           </>
         }
       />
+
+      {prompt.status !== "active" && (
+        <PromptStatusBanner status={prompt.status} note={prompt.moderationNote}>
+          {user?.id === prompt.author.id && prompt.status === "rejected" && (
+            <Button asChild size="sm" variant="outline">
+              <Link to={editHref}>修改后重新提交</Link>
+            </Button>
+          )}
+          {admin && <ModerationActions kind="prompt" id={prompt.id} status={prompt.status} />}
+        </PromptStatusBanner>
+      )}
 
       <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
         <div className="max-h-64 overflow-y-auto scroll-thin">

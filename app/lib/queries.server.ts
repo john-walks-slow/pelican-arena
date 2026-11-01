@@ -6,6 +6,7 @@ import {
   eq,
   gte,
   inArray,
+  ne,
   or,
   sql,
 } from "drizzle-orm";
@@ -19,6 +20,7 @@ import {
   providers,
   ratings,
   submissionMods,
+  submissionReports,
   submissions,
   users,
 } from "~/db/schema";
@@ -26,6 +28,7 @@ import type { Catalog, CatalogEntry, CatalogKind } from "./catalog";
 import { slugify } from "./ids";
 import type { PromptKind } from "./kinds";
 import { matchModel } from "./model-match";
+import type { PromptSort } from "./prompt-sort";
 
 /** Gallery order shrinks stars toward a neutral 3 so one vote does not top the list. */
 const PRIOR_VOTES = 3;
@@ -128,15 +131,25 @@ export async function ensureCatalogEntry(kind: CatalogKind, name: string) {
 }
 
 export async function countSince(
-  table: "prompts" | "submissions",
+  table: "prompts" | "submissions" | "reports",
   authorId: number,
   since: Date,
 ) {
-  const t = table === "prompts" ? prompts : submissions;
-  const [row] = await db()
-    .select({ n: count() })
-    .from(t)
-    .where(and(eq(t.authorId, authorId), gte(t.createdAt, since)));
+  const [row] =
+    table === "reports"
+      ? await db()
+          .select({ n: count() })
+          .from(submissionReports)
+          .where(
+            and(eq(submissionReports.reporterId, authorId), gte(submissionReports.createdAt, since)),
+          )
+      : await (async () => {
+          const t = table === "prompts" ? prompts : submissions;
+          return db()
+            .select({ n: count() })
+            .from(t)
+            .where(and(eq(t.authorId, authorId), gte(t.createdAt, since)));
+        })();
   return row.n;
 }
 
@@ -146,11 +159,8 @@ const author = {
   avatarTemplate: users.avatarTemplate,
 };
 
-export const PROMPT_SORTS = ["latest", "new", "answers", "hardest"] as const;
-export type PromptSort = (typeof PROMPT_SORTS)[number];
-export const DEFAULT_PROMPT_SORT: PromptSort = "latest";
-export const isPromptSort = (value: unknown): value is PromptSort =>
-  typeof value === "string" && (PROMPT_SORTS as readonly string[]).includes(value);
+export type { PromptSort } from "./prompt-sort";
+export { DEFAULT_PROMPT_SORT, isPromptSort, PROMPT_SORTS } from "./prompt-sort";
 
 export interface PromptQuery {
   q?: string;
@@ -251,6 +261,7 @@ export async function getPrompt(id: string) {
       body: prompts.body,
       kind: prompts.kind,
       status: prompts.status,
+      moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
       updatedAt: prompts.updatedAt,
       author,
@@ -274,6 +285,7 @@ export async function listOwnPrompts(authorId: number, page = 1, limit = 18) {
       title: prompts.title,
       kind: prompts.kind,
       status: prompts.status,
+      moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
       updatedAt: prompts.updatedAt,
       answers: answerCount,
@@ -310,6 +322,7 @@ export async function listOwnSubmissions(authorId: number, page = 1, limit = 24)
         promptKind: prompts.kind,
         promptStatus: prompts.status,
         status: submissions.status,
+        moderationNote: submissions.moderationNote,
         createdAt: submissions.createdAt,
         updatedAt: submissions.updatedAt,
         excerpt: sql<string | null>`substr(${submissions.content}, 1, 900)`,
@@ -317,6 +330,7 @@ export async function listOwnSubmissions(authorId: number, page = 1, limit = 24)
         provider: { id: providers.id, name: providers.name },
         starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = submissions.id), 0)`,
         votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id)`,
+        otherVotes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id and r.user_id <> submissions.author_id)`,
       })
       .from(submissions)
       .innerJoin(prompts, eq(prompts.id, submissions.promptId))
@@ -354,6 +368,7 @@ export async function getPromptForEdit(id: string) {
       body: prompts.body,
       kind: prompts.kind,
       status: prompts.status,
+      moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
       updatedAt: prompts.updatedAt,
       answers: sql<number>`(select count(*) from ${submissions} s where s.prompt_id = prompts.id and s.status = 'active')`,
@@ -364,6 +379,14 @@ export async function getPromptForEdit(id: string) {
   return row ?? null;
 }
 
+export async function countOtherRatings(submissionId: string, authorId: number) {
+  const [row] = await db()
+    .select({ n: count() })
+    .from(ratings)
+    .where(and(eq(ratings.submissionId, submissionId), ne(ratings.userId, authorId)));
+  return row.n;
+}
+
 export async function updatePrompt(input: {
   id: string;
   authorId: number;
@@ -371,10 +394,18 @@ export async function updatePrompt(input: {
   body: string;
   kind: PromptKind;
   locked: boolean;
+  /** True when the author's changes must be reviewed again before going public. */
+  reviewed: boolean;
 }) {
   const set = input.locked
     ? { title: input.title, updatedAt: new Date() }
-    : { title: input.title, body: input.body, kind: input.kind, updatedAt: new Date() };
+    : {
+        title: input.title,
+        body: input.body,
+        kind: input.kind,
+        ...(input.reviewed ? { status: "pending" as const, moderationNote: null } : {}),
+        updatedAt: new Date(),
+      };
   const condition = input.locked
     ? and(eq(prompts.id, input.id), eq(prompts.authorId, input.authorId))
     : and(
@@ -561,31 +592,22 @@ export async function getPromptFacets(promptId: string): Promise<PromptFacets> {
 }
 
 export async function getSubmission(id: string) {
-  const [rows, modLinks] = await Promise.all([
-    db()
-      .select({
-        ...submissionColumns,
-        files: submissions.files,
-        notes: submissions.notes,
-        content: submissions.content,
-        status: submissions.status,
-        authorId: submissions.authorId,
-      })
-      .from(submissions)
-      .innerJoin(users, eq(users.id, submissions.authorId))
-      .innerJoin(models, eq(models.id, submissions.modelId))
-      .innerJoin(providers, eq(providers.id, submissions.providerId))
-      .leftJoin(harnesses, eq(harnesses.id, submissions.harnessId))
-      .where(eq(submissions.id, id)),
-    db()
-      .select({ id: mods.id, name: mods.name })
-      .from(submissionMods)
-      .innerJoin(mods, eq(mods.id, submissionMods.modId))
-      .where(eq(submissionMods.submissionId, id)),
-  ]);
-  const row = rows[0];
-  if (!row) return null;
-  return { ...row, mods: modLinks };
+  const rows = await submissionQuery().where(eq(submissions.id, id));
+  if (rows.length === 0) return null;
+  const [row] = await attachMods(rows);
+  const [extra] = await db()
+    .select({
+      files: submissions.files,
+      notes: submissions.notes,
+      content: submissions.content,
+      hasRawLog: submissions.hasRawLog,
+      status: submissions.status,
+      moderationNote: submissions.moderationNote,
+      authorId: submissions.authorId,
+    })
+    .from(submissions)
+    .where(eq(submissions.id, id));
+  return { ...row, ...extra };
 }
 
 export async function getUserRating(userId: number, submissionId: string) {
@@ -623,6 +645,64 @@ export async function siteStats() {
       .where(eq(submissions.status, "active")),
   ]);
   return { prompts: p.n, submissions: s.n, ratings: r.n };
+}
+
+/**
+ * Everything the leaderboard needs: the active answers and every star cast on
+ * them. The calibration in `~/lib/leaderboard` fits prompt and voter biases, so
+ * it needs the individual votes rather than per-answer sums.
+ */
+export async function leaderboardData(kind?: PromptKind | null) {
+  const active = kind
+    ? and(eq(submissions.status, "active"), eq(prompts.status, "active"), eq(prompts.kind, kind))
+    : and(eq(submissions.status, "active"), eq(prompts.status, "active"));
+
+  const [answers, stars] = await Promise.all([
+    db()
+      .select({
+        id: submissions.id,
+        promptId: submissions.promptId,
+        promptTitle: prompts.title,
+        model: { id: models.id, name: models.name },
+        provider: { id: providers.id, name: providers.name },
+        harness: { id: harnesses.id, name: harnesses.name },
+      })
+      .from(submissions)
+      .innerJoin(prompts, eq(prompts.id, submissions.promptId))
+      .innerJoin(models, eq(models.id, submissions.modelId))
+      .innerJoin(providers, eq(providers.id, submissions.providerId))
+      .leftJoin(harnesses, eq(harnesses.id, submissions.harnessId))
+      .where(active),
+    db()
+      .select({
+        userId: ratings.userId,
+        submissionId: ratings.submissionId,
+        stars: ratings.stars,
+      })
+      .from(ratings)
+      .innerJoin(submissions, eq(submissions.id, ratings.submissionId))
+      .innerJoin(prompts, eq(prompts.id, submissions.promptId))
+      .where(active),
+  ]);
+
+  return {
+    submissions: answers.map((row) => ({
+      ...row,
+      harness: row.harness?.id ? row.harness : null,
+    })),
+    ratings: stars,
+  };
+}
+
+/** Prompt counts per work kind, for the leaderboard's kind filter. */
+export async function answerCountsByKind() {
+  const rows = await db()
+    .select({ kind: prompts.kind, n: count(submissions.id) })
+    .from(submissions)
+    .innerJoin(prompts, eq(prompts.id, submissions.promptId))
+    .where(and(eq(submissions.status, "active"), eq(prompts.status, "active")))
+    .groupBy(prompts.kind);
+  return rows;
 }
 
 export async function countActiveAnswers(promptId: string) {

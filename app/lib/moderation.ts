@@ -1,0 +1,225 @@
+import { SKIP_PROMPT_REVIEW_TRUST } from "./permissions";
+
+export { SKIP_PROMPT_REVIEW_TRUST };
+
+/**
+ * Moderation vocabulary and pure rules, shared by the server, the admin UI and
+ * the moderation API.
+ */
+
+export const PROMPT_STATUSES = ["pending", "active", "rejected", "removed"] as const;
+export type PromptStatus = (typeof PROMPT_STATUSES)[number];
+
+/** `hidden` is an author withdrawal; `flagged` and `removed` come from moderation. */
+export const SUBMISSION_STATUSES = ["active", "hidden", "flagged", "removed"] as const;
+export type SubmissionStatus = (typeof SUBMISSION_STATUSES)[number];
+
+export const REPORT_STATUSES = ["open", "accepted", "dismissed"] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
+
+export const REPORT_REASONS = [
+  {
+    id: "metadata",
+    label: "模型与实际不符",
+    description: "实际响应的模型与标注不一致（含降智路由、偷换模型或虚假标注）",
+    severe: false,
+  },
+  {
+    id: "malicious",
+    label: "恶意行为或安全隐患",
+    description: "包含试图逃逸沙箱、窃取信息、暗刷流量或恶意跳转的代码",
+    severe: true,
+  },
+  {
+    id: "abuse",
+    label: "违规或不良内容",
+    description: "包含违法信息、露骨色情、仇恨言论或人身攻击",
+    severe: true,
+  },
+  {
+    id: "spam",
+    label: "垃圾信息或广告",
+    description: "与作答无关的商业引流、推广链接或无意义灌水",
+    severe: true,
+  },
+  {
+    id: "offtopic",
+    label: "与题目无关",
+    description: "未按题目要求作答，或完全偏离主题",
+    severe: false,
+  },
+  {
+    id: "plagiarism",
+    label: "抄袭已有答案",
+    description: "未经重新生成，直接复制或搬运他人作品",
+    severe: false,
+  },
+  {
+    id: "other",
+    label: "其他问题",
+    description: "存在其他违反社区准则的情况（需详细说明）",
+    severe: false,
+  },
+] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number]["id"];
+export const REPORT_REASON_IDS = REPORT_REASONS.map((r) => r.id) as [ReportReason, ...ReportReason[]];
+export const SEVERE_REASONS = REPORT_REASONS.filter((r) => r.severe).map((r) => r.id);
+
+/** Distinct reporters with open severe reports needed to hide an answer pending review. */
+export const AUTO_HIDE_REPORTS = 3;
+export const REPORT_NOTE_LIMIT = 500;
+export const MODERATION_NOTE_LIMIT = 500;
+
+export const ROUTING_REPORT_TIP =
+  "关于模型路由与退化：若 API 服务商将高阶模型静默降级（例如请求旗舰模型但实际由轻量模型响应），作品应按实际响应的模型标注。如你掌握证据（如响应特征、日志线索），请在补充说明中注明。";
+
+export const REJECT_REASONS = [
+  { id: "unclear", label: "描述不清，无法据此作答" },
+  { id: "duplicate", label: "与已有题目重复" },
+  { id: "unsuitable", label: "不适合作答（违规、需要外部资源或结果无法比较）" },
+  { id: "other", label: "其他" },
+] as const;
+
+export const reportReasonLabel = (id: string) =>
+  REPORT_REASONS.find((r) => r.id === id)?.label ?? id;
+
+export function isReportReason(value: unknown): value is ReportReason {
+  return typeof value === "string" && (REPORT_REASON_IDS as string[]).includes(value);
+}
+
+export function reportNeedsNote(reason: ReportReason) {
+  return reason === "other";
+}
+
+/* ---------- transitions ---------- */
+
+export const PROMPT_ACTIONS = ["approve", "reject", "remove", "restore"] as const;
+export type PromptAction = (typeof PROMPT_ACTIONS)[number];
+
+export const SUBMISSION_ACTIONS = ["keep", "remove", "restore"] as const;
+export type SubmissionAction = (typeof SUBMISSION_ACTIONS)[number];
+
+interface Transition<S extends string> {
+  from: readonly S[];
+  to: S;
+  noteRequired: boolean;
+}
+
+export const PROMPT_TRANSITIONS: Record<PromptAction, Transition<PromptStatus>> = {
+  approve: { from: ["pending"], to: "active", noteRequired: false },
+  reject: { from: ["pending"], to: "rejected", noteRequired: true },
+  remove: { from: ["active"], to: "removed", noteRequired: true },
+  restore: { from: ["rejected", "removed"], to: "active", noteRequired: false },
+};
+
+/**
+ * `keep` closes open reports and lifts an automatic hide; `remove` upholds them.
+ * Author withdrawals (`hidden`) are left to the author.
+ */
+export const SUBMISSION_TRANSITIONS: Record<SubmissionAction, Transition<SubmissionStatus>> = {
+  keep: { from: ["active", "flagged"], to: "active", noteRequired: false },
+  remove: { from: ["active", "flagged", "hidden"], to: "removed", noteRequired: true },
+  restore: { from: ["removed"], to: "active", noteRequired: false },
+};
+
+export function isPromptAction(value: unknown): value is PromptAction {
+  return typeof value === "string" && (PROMPT_ACTIONS as readonly string[]).includes(value);
+}
+
+export function isSubmissionAction(value: unknown): value is SubmissionAction {
+  return typeof value === "string" && (SUBMISSION_ACTIONS as readonly string[]).includes(value);
+}
+
+export function availablePromptActions(status: PromptStatus) {
+  return PROMPT_ACTIONS.filter((a) => PROMPT_TRANSITIONS[a].from.includes(status));
+}
+
+export function availableSubmissionActions(status: SubmissionStatus) {
+  return SUBMISSION_ACTIONS.filter((a) => SUBMISSION_TRANSITIONS[a].from.includes(status));
+}
+
+export const PROMPT_STATUS_LABELS: Record<PromptStatus, string> = {
+  pending: "审核中",
+  active: "公开",
+  rejected: "未通过",
+  removed: "已下架",
+};
+
+export const SUBMISSION_STATUS_LABELS: Record<SubmissionStatus, string> = {
+  active: "公开",
+  hidden: "已撤回",
+  flagged: "处理中",
+  removed: "已下架",
+};
+
+export const MODERATION_ACTIONS = [
+  "prompt_approve",
+  "prompt_reject",
+  "prompt_remove",
+  "prompt_restore",
+  "submission_keep",
+  "submission_remove",
+  "submission_restore",
+  "submission_flag",
+] as const;
+export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
+
+export const MODERATION_ACTION_LABELS: Record<ModerationAction, string> = {
+  prompt_approve: "通过题目",
+  prompt_reject: "驳回题目",
+  prompt_remove: "下架题目",
+  prompt_restore: "恢复题目",
+  submission_keep: "保留答案",
+  submission_remove: "下架答案",
+  submission_restore: "恢复答案",
+  submission_flag: "自动隐藏答案",
+};
+
+/* ---------- who sees what ---------- */
+
+export interface Viewer {
+  id: number;
+  role: "user" | "admin";
+  trustLevel: number;
+}
+
+export const isAdmin = (viewer: Pick<Viewer, "role"> | null | undefined) =>
+  viewer?.role === "admin";
+
+export function initialPromptStatus(author: Pick<Viewer, "role" | "trustLevel">): PromptStatus {
+  return isAdmin(author) || author.trustLevel >= SKIP_PROMPT_REVIEW_TRUST ? "active" : "pending";
+}
+
+export function canViewPrompt(
+  viewer: Pick<Viewer, "id" | "role"> | null,
+  prompt: { status: PromptStatus; authorId: number },
+) {
+  return prompt.status === "active" || isAdmin(viewer) || viewer?.id === prompt.authorId;
+}
+
+/** Public only when both the answer and its prompt are live; authors and admins always see it. */
+export function isSubmissionPublic(status: SubmissionStatus, promptStatus: PromptStatus) {
+  return status === "active" && promptStatus === "active";
+}
+
+export function canViewSubmission(
+  viewer: Pick<Viewer, "id" | "role"> | null,
+  submission: { status: SubmissionStatus; authorId: number },
+  promptStatus: PromptStatus,
+) {
+  return (
+    isSubmissionPublic(submission.status, promptStatus) ||
+    isAdmin(viewer) ||
+    viewer?.id === submission.authorId
+  );
+}
+
+/** Auto-hide only applies to a live answer; anything else needs a human. */
+export function shouldAutoHide(status: SubmissionStatus, severeReporters: number) {
+  return status === "active" && severeReporters >= AUTO_HIDE_REPORTS;
+}
+
+/** Whether the usercontent origin may serve the files without a preview grant. */
+export function isSubmissionServable(status: SubmissionStatus, promptStatus: PromptStatus) {
+  return promptStatus === "active" && (status === "active" || status === "hidden");
+}

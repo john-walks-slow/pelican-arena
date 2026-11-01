@@ -27,6 +27,7 @@ export function PromptForm({
   cancelTo,
   cancelHistory = true,
   submitLabel,
+  hint,
 }: {
   mode: "create" | "edit";
   initial?: PromptFormValues;
@@ -37,6 +38,7 @@ export function PromptForm({
   cancelTo: string;
   cancelHistory?: boolean;
   submitLabel: string;
+  hint?: string;
 }) {
   const [kind, setKind] = useState<PromptKind>(values?.kind ?? initial?.kind ?? "web");
   const [title, setTitle] = useState(values?.title ?? initial?.title ?? "");
@@ -147,7 +149,9 @@ export function PromptForm({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border px-5 py-3.5">
-          {errors?.form ? (
+          {hint && !errors?.form ? (
+            <p className="mr-auto text-xs text-muted">{hint}</p>
+          ) : errors?.form ? (
             <p className="mr-auto text-xs text-negative">{errors.form}</p>
           ) : mode === "edit" && !locked ? (
             <p className="mr-auto text-xs text-muted">保存后立即生效。</p>

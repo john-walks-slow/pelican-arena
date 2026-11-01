@@ -2,6 +2,7 @@ import { data, redirect } from "react-router";
 import type { Route } from "./+types/prompt.edit";
 import { PageHeader } from "~/components/page-header";
 import { PromptForm } from "~/components/prompt-form";
+import { initialPromptStatus, PROMPT_STATUS_LABELS } from "~/lib/moderation";
 import { getPromptForEdit, updatePrompt } from "~/lib/queries.server";
 import { requireOwnership } from "~/lib/guards.server";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
@@ -15,11 +16,12 @@ export function meta({ loaderData }: Route.MetaArgs) {
 export async function loader({ params, request }: Route.LoaderArgs) {
   const user = await requireUser(request);
   const prompt = await getPromptForEdit(params.promptId);
-  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
+  if (!prompt || prompt.status === "removed") throw data("Not Found", { status: 404 });
   requireOwnership(user, prompt.authorId);
   return {
     prompt,
     locked: prompt.answers > 0,
+    reviewed: initialPromptStatus(user) === "pending",
     from: safeFrom(new URL(request.url).searchParams.get("from")),
   };
 }
@@ -27,7 +29,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
 export async function action({ params, request }: Route.ActionArgs) {
   const user = await requireUser(request);
   const prompt = await getPromptForEdit(params.promptId);
-  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
+  if (!prompt || prompt.status === "removed") throw data("Not Found", { status: 404 });
   requireOwnership(user, prompt.authorId);
 
   const form = await request.formData();
@@ -49,6 +51,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     return data({ errors, values: { title, body, kind } }, { status: locked ? 409 : 400 });
   }
 
+  const reviewed = !locked && initialPromptStatus(user) === "pending";
   const ok = await updatePrompt({
     id: prompt.id,
     authorId: user.id,
@@ -56,6 +59,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     body,
     kind,
     locked,
+    reviewed,
   });
   if (!ok) {
     const lateError: Partial<Record<"title" | "body" | "form", string>> = {
@@ -66,20 +70,31 @@ export async function action({ params, request }: Route.ActionArgs) {
 
   const from = safeFrom(new URL(request.url).searchParams.get("from"));
   return redirect(from ?? `/p/${prompt.id}`, {
-    headers: { "Set-Cookie": await flashToast(request, "题目已更新") },
+    headers: {
+      "Set-Cookie": await flashToast(
+        request,
+        reviewed ? "已保存，等待审核" : "题目已更新",
+      ),
+    },
   });
 }
 
 export default function EditPrompt({ loaderData, actionData }: Route.ComponentProps) {
-  const { prompt, locked, from } = loaderData;
+  const { prompt, locked, reviewed, from } = loaderData;
   const back = backTarget(from, { label: prompt.title, to: `/p/${prompt.id}` });
 
   return (
     <div className="mx-auto max-w-[1240px]">
       <PageHeader
-        back={{ to: back.to, label: back.label }}
+        back={{ to: back.to, label: back.label, history: !back.explicit }}
         title="编辑题目"
-        subtitle={locked ? "调整题目标题。" : "修改标题、正文和作品类型。"}
+        subtitle={
+          locked
+            ? "调整题目标题。"
+            : reviewed
+              ? `修改标题、正文和作品类型，保存后重新审核（当前${PROMPT_STATUS_LABELS[prompt.status]}）。`
+              : "修改标题、正文和作品类型。"
+        }
       />
 
       <PromptForm
@@ -90,6 +105,7 @@ export default function EditPrompt({ loaderData, actionData }: Route.ComponentPr
         errors={actionData?.errors}
         values={actionData?.values}
         cancelTo={back.to}
+        cancelHistory={!back.explicit}
         submitLabel="保存修改"
       />
     </div>

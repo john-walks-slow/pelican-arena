@@ -20,12 +20,20 @@ import {
   listOwnSubmissions,
   ownContentCounts,
 } from "~/lib/queries.server";
+import {
+  isSubmissionServable,
+  PROMPT_STATUS_LABELS,
+  SUBMISSION_STATUS_LABELS,
+} from "~/lib/moderation";
+import { createPreviewGrant } from "~/lib/preview-grant.server";
 import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { setSubmissionStatus } from "~/lib/submissions.server";
 import { requireUser } from "~/lib/session.server";
 
 type PromptRow = Awaited<ReturnType<typeof listOwnPrompts>>["prompts"][number];
-type AnswerRow = Awaited<ReturnType<typeof listOwnSubmissions>>["submissions"][number];
+type AnswerRow = Awaited<ReturnType<typeof listOwnSubmissions>>["submissions"][number] & {
+  grant?: string | null;
+};
 type ActionResult = { ok: true; message: string } | { error: string };
 
 export function meta() {
@@ -45,7 +53,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     usercontentOrigin: origins(request).usercontent,
   };
   if (tab === "answers") {
-    return { ...shared, tab: "answers" as const, result: await listOwnSubmissions(user.id, page) };
+    const result = await listOwnSubmissions(user.id, page);
+    // Non-public answers need a signed grant for their own author to preview them.
+    const submissions = await Promise.all(
+      result.submissions.map(async (answer) => ({
+        ...answer,
+        grant: isSubmissionServable(answer.status, answer.promptStatus)
+          ? null
+          : await createPreviewGrant(answer.id),
+      })),
+    );
+    return { ...shared, tab: "answers" as const, result: { ...result, submissions } };
   }
   return { ...shared, tab: "prompts" as const, result: await listOwnPrompts(user.id, page) };
 }
@@ -87,6 +105,9 @@ export async function action({ request }: Route.ActionArgs) {
       };
     }
     if (result === "not_found") return data({ error: "答案不存在" }, { status: 404 });
+    if (result === "conflict") {
+      return data({ error: "答案正在处理或已下架，请联系管理员" }, { status: 409 });
+    }
     return data({ error: "只能操作自己的答案" }, { status: 403 });
   }
 
@@ -159,9 +180,16 @@ function PromptRowItem({
           >
             {prompt.title}
           </Link>
-          {prompt.status === "hidden" && (
-            <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[11px] text-muted">
-              已隐藏
+          {prompt.status !== "active" && (
+            <span
+              title={prompt.moderationNote ?? undefined}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
+                prompt.status === "pending"
+                  ? "bg-pill-warning text-pill-warning-ink"
+                  : "bg-pill-negative text-pill-negative-ink"
+              }`}
+            >
+              {PROMPT_STATUS_LABELS[prompt.status]}
             </span>
           )}
         </div>
@@ -273,17 +301,19 @@ function AnswerRowItem({
   onAction: (pending: PendingAction) => void;
 }) {
   const hidden = answer.status === "hidden";
-  const editable = !hidden;
+  const moderated = answer.status === "flagged" || answer.status === "removed";
+  const editable = answer.status === "active" && answer.otherVotes === 0;
   const title = `${answer.model.name} · ${answer.provider.name}`;
 
   return (
     <li className="flex flex-col gap-3 px-5 py-4 transition-colors hover:bg-raised/30 sm:flex-row sm:items-center">
-      {hidden ? (
+      {hidden || moderated ? (
         <div className="block w-32 shrink-0 overflow-hidden rounded-control border border-border opacity-70 sm:w-40">
           <SubmissionPreview
             kind={answer.promptKind}
             submissionId={answer.id}
             origin={origin}
+            grant={answer.grant}
             title={title}
             excerpt={answer.excerpt}
           />
@@ -298,6 +328,7 @@ function AnswerRowItem({
             kind={answer.promptKind}
             submissionId={answer.id}
             origin={origin}
+            grant={answer.grant}
             title={title}
             excerpt={answer.excerpt}
           />
@@ -312,9 +343,18 @@ function AnswerRowItem({
           >
             {title}
           </Link>
-          {hidden && (
-            <span className="shrink-0 rounded bg-raised px-1.5 py-0.5 text-[11px] text-muted">
-              已撤回
+          {answer.status !== "active" && (
+            <span
+              title={answer.moderationNote ?? undefined}
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] ${
+                answer.status === "hidden"
+                  ? "bg-raised text-muted"
+                  : answer.status === "flagged"
+                    ? "bg-pill-warning text-pill-warning-ink"
+                    : "bg-pill-negative text-pill-negative-ink"
+              }`}
+            >
+              {SUBMISSION_STATUS_LABELS[answer.status]}
             </span>
           )}
         </div>
@@ -338,7 +378,7 @@ function AnswerRowItem({
       </div>
 
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 sm:ml-auto">
-        {!hidden && (
+        {!hidden && !moderated && (
           <Button asChild variant="ghost" size="sm">
             <Link to={withFrom(`/s/${answer.id}`, from)}>查看</Link>
           </Button>
@@ -348,7 +388,7 @@ function AnswerRowItem({
             <Link to={withFrom(`/s/${answer.id}/edit`, from)}>编辑</Link>
           </Button>
         )}
-        {hidden ? (
+        {moderated ? null : hidden ? (
           <Button
             type="button"
             variant="outline"

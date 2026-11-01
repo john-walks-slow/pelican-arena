@@ -12,7 +12,10 @@ import { data, Link, Outlet, redirect, useLocation, useNavigation, useSearchPara
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
 import { Markdown } from "~/components/markdown";
+import { ModerationActions } from "~/components/moderation-actions";
 import { PageHeader } from "~/components/page-header";
+import { ReportDialog } from "~/components/report-dialog";
+import { StatusBanner, SubmissionStatusBanner } from "~/components/status-banner";
 import { LiveFrame } from "~/components/page-preview";
 import { ShareDialog } from "~/components/share-dialog";
 import { SourceViewer } from "~/components/source-viewer";
@@ -27,9 +30,11 @@ import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~
 import { backTarget, safeFrom, withFrom } from "~/lib/navigation";
 import { requirePermission } from "~/lib/guards.server";
 import { origins } from "~/lib/origins.server";
+import { canViewSubmission, isAdmin } from "~/lib/moderation";
 import { can, denyReason } from "~/lib/permissions";
 import {
   clearRating,
+  countOtherRatings,
   getPrompt,
   getSubmission,
   getUserRating,
@@ -37,6 +42,8 @@ import {
 } from "~/lib/queries.server";
 import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
+import { previewGrantFor } from "~/lib/preview-grant.server";
+import { hasReported } from "~/lib/moderation.server";
 import { flashToast, getUser, requireUser } from "~/lib/session.server";
 import { setSubmissionStatus } from "~/lib/submissions.server";
 import { ConfirmDialog } from "~/components/confirm-dialog";
@@ -50,25 +57,48 @@ export function meta({ loaderData }: Route.MetaArgs) {
   return [
     { title: `${title} · Pelican Arena` },
     { property: "og:title", content: title },
-    { property: "og:description", content: prompt.body.slice(0, 160) },
+    { property: "og:description", promptTitle: prompt.title, content: prompt.body.slice(0, 160) },
   ];
 }
 
 export async function loader({ params, request }: Route.LoaderArgs) {
-  const [submission, user] = await Promise.all([
-    getSubmission(params.submissionId),
-    getUser(request),
-  ]);
-  if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
-  const [prompt, myRating] = await Promise.all([
-    getPrompt(submission.promptId),
-    user ? getUserRating(user.id, submission.id) : Promise.resolve(null),
-  ]);
+  const submission = await getSubmission(params.submissionId);
+  if (!submission) throw data("Not Found", { status: 404 });
+  const [prompt, user] = await Promise.all([getPrompt(submission.promptId), getUser(request)]);
   if (!prompt) throw data("Not Found", { status: 404 });
+  if (
+    !canViewSubmission(
+      user,
+      { status: submission.status, authorId: submission.author.id },
+      prompt.status,
+    )
+  ) {
+    throw data("Not Found", { status: 404 });
+  }
+
+  const isAuthor = user?.id === submission.author.id;
+  const [myRating, otherRatings, reported, grant] = await Promise.all([
+    user ? getUserRating(user.id, submission.id) : null,
+    user?.id === submission.authorId
+      ? countOtherRatings(submission.id, submission.authorId)
+      : 0,
+    user && !isAuthor ? hasReported(user.id, submission.id) : false,
+    previewGrantFor({ id: submission.id, status: submission.status, promptStatus: prompt.status }),
+  ]);
   return {
     submission,
-    prompt: { id: prompt.id, title: prompt.title, body: prompt.body, kind: prompt.kind },
+    prompt: {
+      id: prompt.id,
+      title: prompt.title,
+      body: prompt.body,
+      kind: prompt.kind,
+      status: prompt.status,
+    },
     myRating,
+    otherRatings,
+    reported,
+    grant,
+    admin: isAdmin(user),
     usercontentOrigin: origins(request).usercontent,
     appOrigin: origins(request).app,
   };
@@ -142,7 +172,17 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
 }
 
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
-  const { submission: s, prompt, myRating, usercontentOrigin, appOrigin } = loaderData;
+  const {
+    submission: s,
+    prompt,
+    myRating,
+    otherRatings,
+    reported,
+    grant,
+    admin,
+    usercontentOrigin,
+    appOrigin,
+  } = loaderData;
   const user = useOptionalUser();
   const { pathname, search } = useLocation();
   const [params] = useSearchParams();
@@ -161,19 +201,31 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [tab, setTab] = useState<"preview" | "source">("preview");
   const kind = prompt.kind;
-  const pageUrl = submissionUrl(usercontentOrigin, s.id, kind);
-  const baseUrl = usercontentUrl(usercontentOrigin, s.id);
+  const pageUrl = submissionUrl(usercontentOrigin, s.id, kind, grant);
+  const baseUrl = usercontentUrl(usercontentOrigin, s.id, "", grant);
   const log = s.logMeta;
   const isAuthor = user?.id === s.author.id;
   const editable = isAuthor;
 
-  const ratingBlock = !user
-    ? "登录后可打分"
-    : user.id === s.author.id
-      ? "这是你提交的答案"
-      : !can(user, "rate")
-        ? denyReason(user, "rate")
-        : undefined;
+  const live = s.status === "active" && prompt.status === "active";
+  const ratingBlock = !live
+    ? "答案未公开，暂不能打分"
+    : !user
+      ? "登录后可打分"
+      : user.id === s.author.id
+        ? "这是你提交的答案"
+        : !can(user, "rate")
+          ? denyReason(user, "rate")
+          : undefined;
+  const reportBlock =
+    !user || isAuthor
+      ? undefined
+      : !can(user, "report")
+        ? denyReason(user, "report")
+        : !live
+          ? "答案未公开，不能举报"
+          : undefined;
+  const showReport = Boolean(user && !isAuthor);
 
   return (
     <div className="mx-auto max-w-[1400px]">
@@ -207,6 +259,9 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                 </Link>
               </Button>
             )}
+            {admin && s.status === "active" && (
+              <ModerationActions kind="submission" id={s.id} status={s.status} />
+            )}
             <ShareDialog
               path={`/s/${s.id}`}
               title={`${s.model.name} · ${s.provider.name} — ${prompt.title}`}
@@ -232,6 +287,24 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
           </>
         }
       />
+
+      {prompt.status !== "active" && (
+        <StatusBanner
+          tone="muted"
+          title="所属题目暂未公开"
+          detail={
+            prompt.status === "pending"
+              ? "题目通过审核后，这份答案才会出现在列表里。"
+              : "题目未通过审核，答案暂不公开。"
+          }
+        />
+      )}
+
+      {s.status !== "active" && (
+        <SubmissionStatusBanner status={s.status} note={s.moderationNote}>
+          {admin && <ModerationActions kind="submission" id={s.id} status={s.status} />}
+        </SubmissionStatusBanner>
+      )}
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
@@ -390,6 +463,13 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <p className="mt-2.5 border-t border-rule pt-2.5 text-xs whitespace-pre-wrap text-muted">
                 {s.notes}
               </p>
+            )}
+            {showReport && live && (
+              <ReportDialog
+                submissionId={s.id}
+                reported={reported}
+                disabledReason={reportBlock}
+              />
             )}
           </SideSection>
         </aside>

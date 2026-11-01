@@ -1,8 +1,9 @@
 import { data } from "react-router";
 import type { User } from "~/db/schema";
-import { can, DAILY_LIMITS, denyReason, type Action } from "./permissions";
+import { isAdmin } from "./moderation";
+import { can, DAILY_LIMITS, denyReason, type Action, type LimitedAction } from "./permissions";
 import { countSince } from "./queries.server";
-import { requireUser } from "./session.server";
+import { getUser, requireUser } from "./session.server";
 
 export async function requirePermission(request: Request, action: Action): Promise<User> {
   const user = await requireUser(request);
@@ -10,13 +11,25 @@ export async function requirePermission(request: Request, action: Action): Promi
   return user;
 }
 
+/** Admins only; anyone else gets a 404 so the backend's existence is not advertised. */
+export async function requireAdmin(request: Request): Promise<User> {
+  const user = await getUser(request);
+  if (!isAdmin(user)) throw data("Not Found", { status: 404 });
+  return user!;
+}
+
 /** Returns an error message when the user has used up today's quota. */
-export async function dailyLimitError(user: User, kind: "submit" | "createPrompt") {
+export async function dailyLimitError(user: User, kind: LimitedAction) {
   if (user.role === "admin") return null;
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
-  const used = await countSince(kind === "submit" ? "submissions" : "prompts", user.id, since);
+  const used = await countSince(
+    kind === "submit" ? "submissions" : kind === "createPrompt" ? "prompts" : "reports",
+    user.id,
+    since,
+  );
   const limit = DAILY_LIMITS[kind];
-  return used >= limit ? `24 小时内最多${kind === "submit" ? "提交" : "出题"} ${limit} 次` : null;
+  const noun = kind === "submit" ? "提交" : kind === "createPrompt" ? "出题" : "举报";
+  return used >= limit ? `24 小时内最多${noun} ${limit} 次` : null;
 }
 
 /** Author-only actions bypass trust-level gates but never bypass ownership. */

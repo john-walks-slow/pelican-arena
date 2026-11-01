@@ -16,6 +16,7 @@ import { AppShell, baseScreenKey } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
 import { Button } from "./components/ui/button";
 import { toast, Toaster } from "./components/ui/toaster";
+import { moderationCounts } from "./lib/moderation.server";
 import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
@@ -26,9 +27,10 @@ type RouteMotion = "steady" | "forward" | "back" | "lateral-down" | "lateral-up"
 
 function screenRank(key: string): { depth: number; slot: number } {
   if (key === "/") return { depth: 0, slot: 0 };
-  if (key === "/prompts/new") return { depth: 0, slot: 1 };
-  if (key.startsWith("/me")) return { depth: 0, slot: 2 };
-  if (key.startsWith("/auth")) return { depth: 0, slot: 3 };
+  if (key.startsWith("/leaderboard")) return { depth: 0, slot: 1 };
+  if (key === "/prompts/new") return { depth: 0, slot: 2 };
+  if (key.startsWith("/me")) return { depth: 0, slot: 3 };
+  if (key.startsWith("/auth")) return { depth: 0, slot: 4 };
   if (/^\/p\/[^/]+\/edit$/.test(key)) return { depth: 2, slot: 0 };
   if (key.startsWith("/p/")) return { depth: 1, slot: 0 };
   if (key.startsWith("/s/") || key.startsWith("/compare")) return { depth: 2, slot: 0 };
@@ -53,6 +55,7 @@ export const links: Route.LinksFunction = () => [
 
 export async function loader({ request }: Route.LoaderArgs) {
   const [user, session] = await Promise.all([getUser(request), getSession(request)]);
+  const review = user?.role === "admin" ? await moderationCounts() : null;
   const flash = session.get("toast") ?? null;
   const headers = new Headers();
   if (flash) {
@@ -62,6 +65,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   return data(
     {
       toast: flash,
+      review,
       user: user && {
         id: user.id,
         username: user.username,
@@ -144,7 +148,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
   return (
     <>
       <FlashToasts flash={loaderData.toast} />
-      <AppShell user={loaderData.user}>
+      <AppShell user={loaderData.user} reviewCount={loaderData.review?.total}>
         <div key={screenKey} data-motion={motion} className="route-stage">
           <Outlet />
         </div>

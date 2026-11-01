@@ -6,9 +6,17 @@ import {
   real,
   sqliteTable,
   text,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import type { BundleFile } from "~/lib/bundle";
 import { PROMPT_KINDS } from "../lib/kinds";
+import {
+  MODERATION_ACTIONS,
+  PROMPT_STATUSES,
+  REPORT_REASON_IDS,
+  REPORT_STATUSES,
+  SUBMISSION_STATUSES,
+} from "../lib/moderation";
 import type { LogMeta } from "~/lib/session-log";
 
 const createdAt = () =>
@@ -40,15 +48,18 @@ export const prompts = sqliteTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     kind: text("kind", { enum: PROMPT_KINDS }).notNull().default("web"),
-    status: text("status", { enum: ["active", "hidden"] })
+    status: text("status", { enum: PROMPT_STATUSES })
       .notNull()
       .default("active"),
+    /** Latest moderation reason, shown to the author. */
+    moderationNote: text("moderation_note"),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },
   (t) => [
     index("prompts_created_idx").on(t.createdAt),
     index("prompts_kind_created_idx").on(t.kind, t.createdAt),
+    index("prompts_status_created_idx").on(t.status, t.createdAt),
   ],
 );
 
@@ -104,9 +115,10 @@ export const submissions = sqliteTable(
     hasRawLog: integer("has_raw_log", { mode: "boolean" })
       .notNull()
       .default(false),
-    status: text("status", { enum: ["active", "hidden"] })
+    status: text("status", { enum: SUBMISSION_STATUSES })
       .notNull()
       .default("active"),
+    moderationNote: text("moderation_note"),
     createdAt: createdAt(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }),
   },
@@ -150,6 +162,61 @@ export const ratings = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.userId, t.submissionId] }),
     index("ratings_submission_idx").on(t.submissionId),
+  ],
+);
+
+export const submissionReports = sqliteTable(
+  "submission_reports",
+  {
+    id: text("id").primaryKey(),
+    submissionId: text("submission_id")
+      .notNull()
+      .references(() => submissions.id),
+    reporterId: integer("reporter_id")
+      .notNull()
+      .references(() => users.id),
+    reason: text("reason", { enum: REPORT_REASON_IDS }).notNull(),
+    note: text("note"),
+    status: text("status", { enum: REPORT_STATUSES }).notNull().default("open"),
+    createdAt: createdAt(),
+    resolvedAt: integer("resolved_at", { mode: "timestamp_ms" }),
+  },
+  (t) => [
+    uniqueIndex("submission_reports_unique").on(t.submissionId, t.reporterId),
+    index("submission_reports_open_idx").on(t.status, t.createdAt),
+    index("submission_reports_reporter_idx").on(t.reporterId, t.createdAt),
+  ],
+);
+
+/** Bearer tokens for automated moderators; only the SHA-256 of the secret is stored. */
+export const apiTokens = sqliteTable("api_tokens", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  createdBy: integer("created_by")
+    .notNull()
+    .references(() => users.id),
+  createdAt: createdAt(),
+  lastUsedAt: integer("last_used_at", { mode: "timestamp_ms" }),
+  revokedAt: integer("revoked_at", { mode: "timestamp_ms" }),
+});
+
+/** Every moderation decision. A row with neither actor was taken by the system. */
+export const moderationLog = sqliteTable(
+  "moderation_log",
+  {
+    id: text("id").primaryKey(),
+    actorUserId: integer("actor_user_id").references(() => users.id),
+    actorTokenId: text("actor_token_id").references(() => apiTokens.id),
+    targetType: text("target_type", { enum: ["prompt", "submission"] }).notNull(),
+    targetId: text("target_id").notNull(),
+    action: text("action", { enum: MODERATION_ACTIONS }).notNull(),
+    note: text("note"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("moderation_log_created_idx").on(t.createdAt),
+    index("moderation_log_target_idx").on(t.targetType, t.targetId),
   ],
 );
 

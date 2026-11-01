@@ -1,4 +1,4 @@
-import { LayoutGrid, LogOut, PenLine, UserRound } from "lucide-react";
+import { LayoutGrid, LogOut, PenLine, ShieldCheck, Trophy, UserRound } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
@@ -18,8 +18,11 @@ export interface ShellUser {
 
 const NAV = [
   { to: "/", label: "题目", icon: LayoutGrid, end: true },
+  { to: "/leaderboard", label: "排名", icon: Trophy, end: false },
   { to: "/prompts/new", label: "出题", icon: PenLine, end: false },
 ];
+
+const ADMIN_NAV = { to: "/admin", label: "审核", icon: ShieldCheck, end: false };
 
 export function baseScreenKey(pathname: string) {
   return (
@@ -44,16 +47,20 @@ function Brand() {
 function NavItems({
   onNavigate,
   user,
+  reviewCount,
   slidingPill = true,
 }: {
   onNavigate?: () => void;
   user: ShellUser | null;
+  reviewCount?: number;
   slidingPill?: boolean;
 }) {
   const { pathname } = useLocation();
-  const items = user
-    ? [...NAV, { to: "/me", label: "我的", icon: UserRound, end: false }]
-    : NAV;
+  const items = [
+    ...NAV,
+    ...(user ? [{ to: "/me", label: "我的", icon: UserRound, end: false }] : []),
+    ...(reviewCount == null ? [] : [ADMIN_NAV]),
+  ];
   const activeIndex = items.findIndex(({ to, end }) =>
     end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`),
   );
@@ -89,6 +96,9 @@ function NavItems({
                 strokeWidth={1.75}
               />
               <span>{label}</span>
+              {to === ADMIN_NAV.to && reviewCount ? (
+                <span className="num ml-auto text-[11px] text-muted">{reviewCount}</span>
+              ) : null}
             </>
           )}
         </NavLink>
@@ -222,7 +232,15 @@ function NavigationProgress() {
   );
 }
 
-export function AppShell({ user, children }: { user: ShellUser | null; children: React.ReactNode }) {
+export function AppShell({
+  user,
+  reviewCount,
+  children,
+}: {
+  user: ShellUser | null;
+  reviewCount?: number;
+  children: React.ReactNode;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
@@ -265,7 +283,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
             <Brand />
             <ThemeMenu />
           </div>
-          <NavItems user={user} />
+          <NavItems user={user} reviewCount={reviewCount} />
         </div>
         <Account user={user} />
       </aside>
@@ -291,7 +309,7 @@ export function AppShell({ user, children }: { user: ShellUser | null; children:
             menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
           }`}
         >
-          <NavItems user={user} onNavigate={() => setMenuOpen(false)} />
+          <NavItems user={user} reviewCount={reviewCount} onNavigate={() => setMenuOpen(false)} />
           <div className="border-t border-border pt-3">
             <Account user={user} />
           </div>

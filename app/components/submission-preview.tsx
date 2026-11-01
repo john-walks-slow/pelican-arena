@@ -61,6 +61,7 @@ export function SubmissionPreview({
   kind,
   submissionId,
   origin,
+  grant,
   title,
   excerpt,
   className,
@@ -68,6 +69,7 @@ export function SubmissionPreview({
   kind: PromptKind;
   submissionId: string;
   origin: string;
+  grant?: string | null;
   title: string;
   excerpt?: string | null;
   className?: string;
@@ -91,7 +93,7 @@ export function SubmissionPreview({
   if (kind === "svg") {
     return (
       <SvgPreview
-        src={previewUrl(origin, submissionId, kind)}
+        src={previewUrl(origin, submissionId, kind, grant)}
         alt={title}
         className={className}
       />
@@ -100,7 +102,7 @@ export function SubmissionPreview({
 
   return (
     <PagePreview
-      src={previewUrl(origin, submissionId, kind)}
+      src={previewUrl(origin, submissionId, kind, grant)}
       title={title}
       className={className}
     />
