@@ -4,15 +4,11 @@ import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/leaderboard";
 import { PageHeader } from "~/components/page-header";
 import { ScoreMethod } from "~/components/score-method";
-import { Segmented } from "~/components/ui/segmented";
 import { CompactSelect } from "~/components/ui/compact-select";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
 import {
   buildLeaderboard,
-  DEFAULT_DIMENSION,
-  isDimension,
   MIN_VOTES,
-  type Dimension,
   type LeaderboardEntry,
 } from "~/lib/leaderboard";
 import { answerCountsByKind, leaderboardData } from "~/lib/queries.server";
@@ -27,17 +23,6 @@ export const meta: Route.MetaFunction = () => [
   },
   { property: "og:title", content: "排名 · Pelican Arena" },
 ];
-
-const DIMENSION_LABELS: Record<Dimension, string> = {
-  model: "模型",
-  harness: "客户端",
-};
-
-/** What the second column counts, per dimension. */
-const UNIT_LABELS: Record<Dimension, string> = {
-  model: "个模型",
-  harness: "个客户端",
-};
 
 type BoardSource = {
   data: Awaited<ReturnType<typeof leaderboardData>>;
@@ -65,17 +50,14 @@ async function boardSource(kind: PromptKind | null): Promise<BoardSource> {
 
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
-  const dimensionParam = params.get("by");
-  const dimension: Dimension = isDimension(dimensionParam) ? dimensionParam : DEFAULT_DIMENSION;
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
 
   const { data, kindCounts } = await boardSource(kind);
-  const board = buildLeaderboard({ ...data, dimension });
+  const board = buildLeaderboard(data);
 
   return {
     board,
-    dimension,
     kind,
     kindCounts,
     answers: data.submissions.length,
@@ -124,10 +106,9 @@ function Score({ score, ranked }: { score: number | null; ranked: boolean }) {
   );
 }
 
-/** Why there is no ranking yet, worded for the dimension being shown. */
-function emptyReason(entries: number, kind: PromptKind | null, dimension: Dimension) {
-  if (entries > 0) return `还没有条目攒够 ${MIN_VOTES} 票。`;
-  if (dimension === "harness") return "还没有答案填写客户端。";
+/** Why there is no ranking yet. */
+function emptyReason(entries: number, kind: PromptKind | null) {
+  if (entries > 0) return "还没有两个模型同台作答过的题目。";
   if (kind) return `还没有${KIND_META[kind].label}类答案。`;
   return "还没有答案。";
 }
@@ -144,11 +125,16 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
 
       <th scope="row" className="min-w-0 py-2.5 pr-3 text-left align-middle font-normal">
         <span className="block truncate text-sm font-medium text-ink">{entry.name}</span>
-        {entry.sublabel && (
-          <div className="mt-0.5 truncate text-[11px] text-muted">{entry.sublabel}</div>
-        )}
-        <div className="num mt-0.5 text-[11px] text-muted sm:hidden">
-          {entry.ranked ? `${entry.votes} 票 · ${entry.prompts} 题` : `样本不足 ${MIN_VOTES} 票`}
+        <div className="mt-0.5 text-[11px] text-muted sm:hidden">
+          {entry.ranked ? (
+            <span className="num">
+              {entry.votes} 票 · {entry.prompts} 题
+            </span>
+          ) : entry.comparable ? (
+            `样本不足 ${MIN_VOTES} 票`
+          ) : (
+            "缺少同条件对照"
+          )}
         </div>
       </th>
 
@@ -177,7 +163,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
 }
 
 export default function Leaderboard({ loaderData }: Route.ComponentProps) {
-  const { board, dimension, kind, kindCounts, answers } = loaderData;
+  const { board, kind, kindCounts, answers } = loaderData;
   const [, setParams] = useSearchParams();
   const [showUnranked, setShowUnranked] = useState(false);
 
@@ -206,7 +192,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
         subtitle={
           answers > 0 ? (
             <>
-              <span className="num">{board.rankedCount}</span> {UNIT_LABELS[dimension]}进榜 ·{" "}
+              <span className="num">{board.rankedCount}</span> 个模型进榜 ·{" "}
               <span className="num">{answers}</span> 份答案 ·{" "}
               <span className="num">{board.votes}</span> 次打分
             </>
@@ -215,17 +201,6 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
       />
 
       <div className="reveal-tier-1 mt-3 flex flex-wrap items-center gap-2">
-        <Segmented
-          label="排名维度"
-          value={dimension}
-          onChange={(value) => update("by", value === DEFAULT_DIMENSION ? null : value)}
-          options={[
-            { value: "model", label: "模型" },
-            { value: "harness", label: "客户端" },
-          ]}
-          className="h-8"
-        />
-
         <CompactSelect
           label="作品类型"
           icon={<Shapes className="size-3.5" strokeWidth={1.75} />}
@@ -244,10 +219,10 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
       {board.rankedCount === 0 && !showUnranked ? (
         <div className="reveal-tier-2 mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center">
           <Trophy className="mx-auto size-5 text-control" strokeWidth={1.75} />
-          <p className="mt-3 text-sm text-muted">{emptyReason(board.entries.length, kind, dimension)}</p>
+          <p className="mt-3 text-sm text-muted">{emptyReason(board.entries.length, kind)}</p>
           {board.entries.length > 0 && (
             <p className="mt-1.5 text-xs text-muted">
-              已有 <span className="num">{answers}</span> 份答案，还差几票就能排出先后。
+              已有 <span className="num">{answers}</span> 份答案，但还没有可以互相对照的组合。
             </p>
           )}
           {board.entries.length > 0 && (
@@ -270,7 +245,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
           <div className="reveal-tier-2 mt-4 overflow-hidden rounded-card border border-border bg-surface">
             <table id="leaderboard-table" className="w-full table-fixed border-collapse">
               <caption className="sr-only">
-                {DIMENSION_LABELS[dimension]}排名，按校准后的平均星级排序
+                模型排名，按校准后的平均星级排序
               </caption>
               <thead>
                 <tr className="bg-raised/55 text-[11px] font-medium text-muted">
@@ -281,7 +256,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
                     #
                   </th>
                   <th scope="col" className="py-2 pr-3 text-left font-medium">
-                    {DIMENSION_LABELS[dimension]}
+                    模型
                   </th>
                   <th
                     scope="col"
@@ -326,8 +301,8 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
                   className="text-xs text-muted transition-colors hover:text-ink"
                 >
                   {showUnranked
-                    ? "收起样本不足的条目"
-                    : `另有 ${unranked.length} 项打分不足 ${MIN_VOTES} 票，未参与排名`}
+                    ? "收起未参与排名的条目"
+                    : `另有 ${unranked.length} 项样本不足或缺少同条件对照，未参与排名`}
                 </button>
               </div>
             )}

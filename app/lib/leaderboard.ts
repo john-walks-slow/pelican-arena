@@ -16,14 +16,6 @@ import type { CatalogEntry } from "./catalog";
  * Everything here is pure so the weighting can be tested directly.
  */
 
-export const DIMENSIONS = ["model", "harness"] as const;
-export type Dimension = (typeof DIMENSIONS)[number];
-export const DEFAULT_DIMENSION: Dimension = "model";
-
-export function isDimension(value: unknown): value is Dimension {
-  return typeof value === "string" && (DIMENSIONS as readonly string[]).includes(value);
-}
-
 /** Regularization strengths, read as "pseudo votes pulling the bias to zero". */
 const PRIOR = {
   prompt: 5,
@@ -60,8 +52,6 @@ export interface LeaderboardSubmission {
   id: string;
   promptId: string;
   model: CatalogEntry;
-  provider: CatalogEntry;
-  harness: CatalogEntry | null;
 }
 
 export interface LeaderboardRating {
@@ -73,8 +63,6 @@ export interface LeaderboardRating {
 export interface LeaderboardEntry {
   key: string;
   name: string;
-  /** Optional second line under the name. */
-  sublabel: string | null;
   /** Calibrated score on the five-star scale, or null when unrated. */
   score: number | null;
   /** Plain average of the stars received, for comparison. */
@@ -82,6 +70,8 @@ export interface LeaderboardEntry {
   answers: number;
   votes: number;
   prompts: number;
+  /** False when no answer of this entry could be compared under equal conditions. */
+  comparable: boolean;
   ranked: boolean;
   /** Place among the ranked entries, or null when the entry is not ranked. */
   place: number | null;
@@ -93,19 +83,6 @@ export interface Leaderboard {
   baseline: number;
   rankedCount: number;
   votes: number;
-}
-
-function identify(
-  submission: LeaderboardSubmission,
-  dimension: Dimension,
-): { key: string; name: string; sublabel: string | null } | null {
-  const { model, harness } = submission;
-  switch (dimension) {
-    case "model":
-      return { key: model.id, name: model.name, sublabel: null };
-    case "harness":
-      return harness ? { key: harness.id, name: harness.name, sublabel: null } : null;
-  }
 }
 
 /** One regularized bias update: shrunk mean of the residuals grouped by key. */
@@ -129,16 +106,10 @@ function fitBias<K>(
   for (const [key, { total, n }] of sums) into.set(key, total / (prior + n));
 }
 
-function mean(values: number[]) {
-  return values.reduce((a, b) => a + b, 0) / values.length;
-}
-
 export function buildLeaderboard(input: {
   submissions: LeaderboardSubmission[];
   ratings: LeaderboardRating[];
-  dimension: Dimension;
 }): Leaderboard {
-  const { dimension } = input;
   const byId = new Map(input.submissions.map((s) => [s.id, s]));
   const votes = input.ratings.filter((r) => byId.has(r.submissionId));
 
@@ -226,7 +197,6 @@ export function buildLeaderboard(input: {
   interface Group {
     key: string;
     name: string;
-    sublabel: string | null;
     answers: number;
     votes: number;
     starSum: number;
@@ -234,30 +204,43 @@ export function buildLeaderboard(input: {
     voters: Set<number>;
     /** Every prompt this entry answered, rated or not. */
     answered: Set<string>;
-    /**
-     * Answer biases grouped by prompt, each carrying the votes behind it, so a
-     * thinly-rated prompt counts for less than a well-rated one.
-     */
-    byPrompt: Map<string, { bias: number; votes: number }[]>;
+    /** Weighted sum of same-cell contrasts, and the weight behind it. */
+    weighted: number;
+    weight: number;
+    /** Whether any comparison at all was possible. */
+    comparable: boolean;
   }
 
   const groups = new Map<string, Group>();
-  for (const submission of input.submissions) {
-    const ident = identify(submission, dimension);
-    if (!ident) continue;
-    let group = groups.get(ident.key);
+  const groupOf = (model: CatalogEntry): Group => {
+    let group = groups.get(model.id);
     if (!group) {
       group = {
-        ...ident,
+        key: model.id,
+        name: model.name,
         answers: 0,
         votes: 0,
         starSum: 0,
         voters: new Set(),
         answered: new Set(),
-        byPrompt: new Map(),
+        weighted: 0,
+        weight: 0,
+        comparable: false,
       };
-      groups.set(ident.key, group);
+      groups.set(model.id, group);
     }
+    return group;
+  };
+
+  /**
+   * A model is only compared with the models that answered the same prompt: the
+   * score is how far it sits from the rest of that prompt's field, so题目难度
+   * cancels out instead of favouring whoever picked the easy ones.
+   */
+  const cells = new Map<string, Map<string, { bias: number; answers: number; votes: number }>>();
+
+  for (const submission of input.submissions) {
+    const group = groupOf(submission.model);
     group.answers += 1;
     group.answered.add(submission.promptId);
 
@@ -267,37 +250,62 @@ export function buildLeaderboard(input: {
     group.starSum += tally.stars;
     for (const voter of tally.voters) group.voters.add(voter);
 
+    let cell = cells.get(submission.promptId);
+    if (!cell) {
+      cell = new Map();
+      cells.set(submission.promptId, cell);
+    }
+    const slot = cell.get(submission.model.id);
     const bias = at(answerBias, submission.id);
-    const bucket = group.byPrompt.get(submission.promptId);
-    if (bucket) bucket.push({ bias, votes: tally.votes });
-    else group.byPrompt.set(submission.promptId, [{ bias, votes: tally.votes }]);
+    if (slot) {
+      slot.bias += bias;
+      slot.answers += 1;
+      slot.votes += tally.votes;
+    } else {
+      cell.set(submission.model.id, { bias, answers: 1, votes: tally.votes });
+    }
+  }
 
+  // Turn each cell into a contrast against the other entries in it.
+  for (const cell of cells.values()) {
+    if (cell.size < 2) continue;
+    let biasSum = 0;
+    let answerCount = 0;
+    for (const slot of cell.values()) {
+      biasSum += slot.bias;
+      answerCount += slot.answers;
+    }
+    for (const [key, slot] of cell) {
+      // An entry with no votes here contributes nothing usable.
+      if (slot.votes === 0) continue;
+      const others = answerCount - slot.answers;
+      if (others === 0) continue;
+      const contrast = slot.bias / slot.answers - (biasSum - slot.bias) / others;
+      const group = groups.get(key);
+      if (!group) continue;
+      const weight = Math.min(slot.votes, PROMPT_WEIGHT_CAP);
+      group.weighted += contrast * weight;
+      group.weight += weight;
+      group.comparable = true;
+    }
   }
 
   const entries: LeaderboardEntry[] = [...groups.values()].map((group) => {
-    // Average within each prompt first, then across prompts weighted by the
-    // (capped) votes behind each one, and finally shrink by the total evidence.
-    let weighted = 0;
-    let weight = 0;
-    for (const answers of group.byPrompt.values()) {
-      const promptWeight = Math.min(
-        answers.reduce((sum, a) => sum + a.votes, 0),
-        PROMPT_WEIGHT_CAP,
-      );
-      weighted += mean(answers.map((a) => a.bias)) * promptWeight;
-      weight += promptWeight;
-    }
-    const advantage = weight > 0 ? weighted / (weight + PRIOR.evidence) : 0;
+    // The pooled contrast shrinks toward "no advantage" until the comparisons
+    // add up, so a single shared cell cannot lift an entry onto the podium.
+    const advantage = group.weight > 0 ? group.weighted / (group.weight + PRIOR.evidence) : 0;
     return {
       key: group.key,
       name: group.name,
-      sublabel: group.sublabel,
-      score: group.votes ? Math.min(5, Math.max(1, baseline + advantage)) : null,
+      score: group.comparable
+        ? Math.min(5, Math.max(1, baseline + advantage))
+        : null,
       raw: group.votes ? group.starSum / group.votes : null,
       answers: group.answers,
       votes: group.votes,
       prompts: group.answered.size,
-      ranked: group.voters.size >= MIN_VOTES,
+      comparable: group.comparable,
+      ranked: group.comparable && group.voters.size >= MIN_VOTES,
       place: null,
     };
   });
@@ -308,8 +316,7 @@ export function buildLeaderboard(input: {
     if (a.votes !== b.votes) return b.votes - a.votes;
     if (a.answers !== b.answers) return b.answers - a.answers;
     const byName = a.name.localeCompare(b.name, "zh-CN");
-    const bySublabel = (a.sublabel ?? "").localeCompare(b.sublabel ?? "", "zh-CN");
-    return byName !== 0 ? byName : bySublabel !== 0 ? bySublabel : a.key.localeCompare(b.key);
+    return byName !== 0 ? byName : a.key.localeCompare(b.key);
   });
 
   // Strict order: the place follows the score, with the sample size shown next
