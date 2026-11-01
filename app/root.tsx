@@ -10,7 +10,7 @@ import {
 } from "react-router";
 
 import { useEffect, useLayoutEffect, useRef, ViewTransition } from "react";
-import { useLocation, useNavigation, useNavigationType } from "react-router";
+import { useLocation, useNavigationType } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
@@ -20,8 +20,6 @@ import { moderationCounts } from "./lib/moderation.server";
 import { clearRouteCache } from "./lib/route-cache";
 import { commitSession, getSession, getUser, type FlashToast } from "./lib/session.server";
 import { screenKey } from "./lib/navigation";
-import { setMorphEnabled } from "./lib/morph";
-import { recallScroll, rememberScroll } from "./lib/scroll-memory";
 import { useTrackNavigationHistory } from "./lib/navigation-history";
 import { themeScript } from "./lib/theme";
 import "./app.css";
@@ -112,73 +110,31 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
 export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
   const location = useLocation();
-  const navigation = useNavigation();
   const navigationType = useNavigationType();
   const key = screenKey(location.pathname);
-  const ready = navigation.state === "idle";
   const restoring = navigationType === "POP";
   // The router commits several times per navigation (pending, data, Suspense
   // reveals). Only the commit that actually changes the screen may animate;
   // otherwise each intermediate commit replays the page cross-fade.
   const lastScreen = useRef(key);
   const screenChanged = lastScreen.current !== key;
-  // Remember where the outgoing screen was scrolled before the router resets
-  // it. Reading window.scrollY at render time is already too late.
-  useEffect(() => {
-    const onNavigateIntent = (event: MouseEvent) => {
-      if (event.defaultPrevented || event.button !== 0) return;
-      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const anchor =
-        event.target instanceof Element ? event.target.closest("a[href]") : null;
-      if (!(anchor instanceof HTMLAnchorElement)) return;
-      if (anchor.target || anchor.hasAttribute("download")) return;
-      if (anchor.origin !== window.location.origin) return;
-
-    };
-    const onPopState = () => {
-      setMorphEnabled(false);
-    };
-    document.addEventListener("click", onNavigateIntent, true);
-    window.addEventListener("popstate", onPopState, true);
-    return () => {
-      document.removeEventListener("click", onNavigateIntent, true);
-      window.removeEventListener("popstate", onPopState, true);
-    };
-  }, []);
-
   useLayoutEffect(() => {
-    if (ready) lastScreen.current = key;
-  }, [key, ready]);
-
-  // Scroll offsets live per history entry. Recording them here lets the header
-  // restore before its first measure, instead of after the browser paints the
-  // new page at the old offset.
-  useEffect(() => {
-    const remember = () => rememberScroll(location.key, window.scrollY);
-    remember();
-    window.addEventListener("scroll", remember, { passive: true });
-    return () => window.removeEventListener("scroll", remember);
-  }, [location.key]);
-
-  const restoreY = restoring ? recallScroll(location.key) : null;
+    lastScreen.current = key;
+  }, [key]);
 
   // React captures the incoming screen after layout effects, so the viewport
   // has to be back at the top before that snapshot is measured. A history
   // entry keeps its own scroll position.
   useLayoutEffect(() => {
-    if (!ready) return;
-    if (restoring) {
-      if (restoreY != null) window.scrollTo(0, restoreY);
-      return;
-    }
+    if (restoring) return;
     window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
-  }, [key, ready, restoring, restoreY]);
+  }, [key, restoring]);
 
   return (
     <>
       <FlashToasts flash={loaderData.toast} />
       <AppShell user={loaderData.user} reviewCount={loaderData.review?.total}>
-        <ViewTransition update={screenChanged && ready ? "page" : "none"} default="none">
+        <ViewTransition update={screenChanged ? "page" : "none"} default="none">
           <div className="route-stage">
             <Outlet />
           </div>

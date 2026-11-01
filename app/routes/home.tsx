@@ -1,5 +1,5 @@
 import { ArrowUpDown, Code2, PenLine, Search, Shapes, X } from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useState, ViewTransition } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import { Link, useFetcher, useLocation, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
 import { Avatar } from "~/components/avatar";
@@ -21,7 +21,6 @@ import {
 } from "~/lib/queries.server";
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
 import { useOptionalUser } from "~/lib/use-user";
-import { useMorphEnabled } from "~/lib/morph";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Pelican Arena" },
@@ -125,7 +124,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { pathname, search } = useLocation();
   const [, setParams] = useSearchParams();
   const user = useOptionalUser();
-  const morph = useMorphEnabled();
   const fetcher = useFetcher<MorePrompts>();
 
   const [items, setItems] = useState(prompts);
@@ -280,11 +278,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
                   className="reveal-card min-w-0"
                 >
-                  <ViewTransition
-                    name={morph ? `prompt-card-${p.id}` : undefined}
-                    share={morph ? "morph" : undefined}
-                    default="none"
-                  >
                     <Link
                       to={`/p/${p.id}`}
                       prefetch="intent"
@@ -328,7 +321,6 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                       </div>
                     </div>
                   </Link>
-                </ViewTransition>
               </li>
             );
           })}

@@ -7,7 +7,7 @@ import {
   Pencil,
   Undo2,
 } from "lucide-react";
-import { useEffect, useState, ViewTransition } from "react";
+import { useEffect, useState } from "react";
 import { data, Link, Outlet, redirect, useLocation, useNavigation, useSearchParams, useSubmit } from "react-router";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
@@ -49,7 +49,6 @@ import { setSubmissionStatus } from "~/lib/submissions.server";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
 import { useOptionalUser } from "~/lib/use-user";
-import { useMorphEnabled } from "~/lib/morph";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "找不到答案 · Pelican Arena" }];
@@ -195,7 +194,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
     appOrigin,
   } = loaderData;
   const user = useOptionalUser();
-  const morph = useMorphEnabled();
   const { pathname, search } = useLocation();
   const [params] = useSearchParams();
 
@@ -319,11 +317,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <ViewTransition
-          name={morph ? `submission-card-${s.id}` : undefined}
-          share={morph ? "morph" : undefined}
-          default="none"
-        >
         <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(
@@ -408,7 +401,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
             <SourceViewer files={s.files} baseUrl={baseUrl} />
           )}
         </section>
-        </ViewTransition>
 
         <aside className="reveal-tier-2 space-y-5">
           <SideSection title="评分">

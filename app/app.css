@@ -280,21 +280,13 @@ body {
   overflow: clip;
 }
 
-/* Screens dissolve into each other. The outgoing screen carries a soft defocus
-   while the new one settles in sharp, so the overlap reads as depth rather than
-   two layouts sliding over each other. */
-/* The UA sizes this group from the page element, which is taller than the
-   viewport and starts at a scrolled offset. Pin it to the viewport instead:
-   the old and new screens then dissolve in place instead of the whole page
-   travelling along the document's vertical geometry. */
+/* Screens cross-fade with a small upward drift. The outgoing screen keeps its
+   weight while the incoming one rises, so the content is never gone and the
+   ground can never flash through a blank frame. */
 ::view-transition-group(.page) {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100dvh !important;
-  animation: none !important;
-  overflow: clip !important;
-  transform: none !important;
+  animation-duration: 280ms;
+  animation-timing-function: var(--ease-spatial);
+  overflow: clip;
 }
 ::view-transition-old(.page),
 ::view-transition-new(.page) {
@@ -303,30 +295,10 @@ body {
   mix-blend-mode: normal;
 }
 ::view-transition-old(.page) {
-  animation: page-out 180ms ease-out both !important;
+  animation: page-out 160ms ease-out 120ms both;
 }
 ::view-transition-new(.page) {
-  animation: page-in 160ms cubic-bezier(0, 0, 0.2, 1) both !important;
-}
-
-/* The headers are viewport-level anchors: the sticky page title is snapshotted
-   where it actually sits (a tall scrolled screen would otherwise capture it at
-   its static document position and let it pop in after the transition), and
-   only the incoming header is drawn so two titles never overlap. */
-::view-transition-group(page-header) {
-  position: fixed !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100vw !important;
-  animation: none !important;
-  z-index: 50;
-}
-::view-transition-old(page-header) {
-  display: none;
-}
-::view-transition-new(page-header) {
-  animation: header-in 180ms var(--ease-spatial) both !important;
-  mix-blend-mode: normal;
+  animation: page-in 150ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 
 /* The mobile brand bar is shell furniture, but the page header's sheet reaches
@@ -346,18 +318,6 @@ body {
   mix-blend-mode: normal;
 }
 
-/* Card ↔ detail container transform. */
-::view-transition-group(.morph) {
-  animation-duration: 340ms;
-  animation-timing-function: cubic-bezier(0.2, 0, 0, 1);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  z-index: 10;
-}
-::view-transition-image-pair(.morph) {
-  animation-name: morph-soften;
-}
-
 /* The nav pill is a shell element, so it gets its own snapshot pair to glide
    between menu entries instead of snapping with the frozen shell. */
 ::view-transition-group(nav-active-pill) {
@@ -365,32 +325,16 @@ body {
   animation-timing-function: var(--ease-spatial);
 }
 
-@keyframes header-out {
-  to {
-    opacity: 0;
-  }
-}
-
-@keyframes header-in {
-  from {
-    opacity: 0;
-    transform: translate3d(0, -4px, 0);
-  }
-}
-
 @keyframes page-out {
-  from {
-    filter: blur(0);
-  }
   to {
     opacity: 0;
-    filter: blur(1.5px);
   }
 }
 
 @keyframes page-in {
   from {
     opacity: 0;
+    transform: translate3d(0, 8px, 0);
   }
 }
 
@@ -664,7 +608,6 @@ html[data-booting="true"] .boot-screen {
   --compact-pl: 0px;
   --compact-pr: 0px;
   top: calc(var(--shell-top) - var(--delta));
-  view-transition-name: page-header;
 }
 
 @media (min-width: 1024px) {

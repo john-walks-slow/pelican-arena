@@ -11,7 +11,7 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { type CSSProperties, useCallback, useEffect, useState, ViewTransition } from "react";
+import { type CSSProperties, useCallback, useEffect, useState } from "react";
 import {
   data,
   Link,
@@ -56,7 +56,6 @@ import {
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
 import { getUser } from "~/lib/session.server";
 import { useOptionalUser } from "~/lib/use-user";
-import { useMorphEnabled } from "~/lib/morph";
 
 const MAX_COMPARE = 4;
 
@@ -225,7 +224,6 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
     appOrigin,
   } = loaderData;
   const user = useOptionalUser();
-  const morph = useMorphEnabled();
   const [params] = useSearchParams();
   const { pathname, search } = useLocation();
 
@@ -391,11 +389,6 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         </PromptStatusBanner>
       )}
 
-      <ViewTransition
-        name={morph ? `prompt-card-${prompt.id}` : undefined}
-        share={morph ? "morph" : undefined}
-        default="none"
-      >
         <section className="reveal-tier-1 mt-2.5 rounded-card border border-border bg-surface px-4 py-3.5">
           <div className="max-h-64 overflow-y-auto scroll-thin">
             <Markdown>{prompt.body}</Markdown>
@@ -412,7 +405,6 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
             </div>
           )}
         </section>
-      </ViewTransition>
 
       <section className="mt-8">
         <div className="reveal-tier-2 flex items-baseline gap-2">
@@ -441,11 +433,6 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                     key={s.id}
                     style={{ "--stagger": `${Math.min(rippleWave, 7) * 28}ms` } as CSSProperties}
                     className="reveal-card min-w-0"
-                  >
-                  <ViewTransition
-                    name={morph ? `submission-card-${s.id}` : undefined}
-                    share={morph ? "morph" : undefined}
-                    default="none"
                   >
                   <div
                     className={`arena-card overflow-hidden rounded-card border bg-surface ${
@@ -501,8 +488,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
                       </div>
                     </div>
                   </div>
-                  </ViewTransition>
-                  </li>
+                              </li>
                 );
               })}
             </ul>
