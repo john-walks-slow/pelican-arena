@@ -82,7 +82,10 @@
   --shadow-btn-control: var(--btn-control-shadow);
 }
 
-:root {
+/* Light tokens are repeated under `data-theme="light"` so a subtree can opt out
+   of the dark palette, e.g. the always-light share card preview. */
+:root,
+[data-theme="light"] {
   color-scheme: light;
 
   --ground: #f8f9fb;

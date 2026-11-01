@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PelicanMark } from "~/components/pelican-mark";
 import { Star } from "lucide-react";
 import type { PromptKind } from "~/lib/kinds";
@@ -97,11 +97,23 @@ function ScaledFrame({
   );
 }
 
+/** The card is a light asset like the exported SVG, so it opts out of the page palette. */
+function CardFrame({ children }: { children: ReactNode }) {
+  return (
+    <div
+      data-theme="light"
+      className="relative aspect-[1200/630] w-full overflow-hidden rounded-card border border-border bg-ground select-none"
+    >
+      {children}
+    </div>
+  );
+}
+
 export function ShareCardPreview({ data }: { data: ShareCardData }) {
   if (data.type === "answer") {
     const avg = data.votes > 0 ? (data.starSum / data.votes).toFixed(1) : null;
     return (
-      <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-card border border-border bg-ground select-none">
+      <CardFrame>
         {/* 背景作品双向绝对居中铺满 */}
         <div className="absolute inset-0">
           <ScaledFrame src={data.previewUrl} kind={data.kind} />
@@ -143,14 +155,14 @@ export function ShareCardPreview({ data }: { data: ShareCardData }) {
             </div>
           </div>
         </div>
-      </div>
+      </CardFrame>
     );
   }
 
   // 题目卡
   const top = data.topSubmissions.slice(0, 3);
   return (
-    <div className="relative aspect-[1200/630] w-full overflow-hidden rounded-card border border-border bg-ground select-none">
+    <CardFrame>
       {/* 上半部分三格并排，双向绝对居中裁剪 */}
       <div className="absolute inset-x-0 top-0 h-[60%] border-b border-border bg-raised">
         {top.length > 0 ? (
@@ -204,6 +216,6 @@ export function ShareCardPreview({ data }: { data: ShareCardData }) {
           </div>
         </div>
       </div>
-    </div>
+    </CardFrame>
   );
 }
