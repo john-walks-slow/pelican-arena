@@ -141,11 +141,15 @@ export default function App({ loaderData }: Route.ComponentProps) {
   const [motion, setMotion] = useState<RouteMotion>("steady");
 
   if (prevScreenRef.current !== screenKey) {
-    const nextMotion = resolveMotion(prevScreenRef.current, screenKey);
+    const direction = resolveMotion(prevScreenRef.current, screenKey);
+    // A history entry restores the same screen, so replaying the entrance
+    // animation reads as a flash. The snapshot pipeline already suppresses it;
+    // the keyframe fallback has no snapshot and has to skip it here.
     prevScreenRef.current = screenKey;
-    setMotion(nextMotion);
+    setMotion(navigationType === "POP" ? "steady" : direction);
     if (typeof document !== "undefined") {
-      document.documentElement.dataset.navDir = nextMotion;
+      // Direction still steers the view-transition rail on history navigation.
+      document.documentElement.dataset.navDir = direction;
     }
   }
 
