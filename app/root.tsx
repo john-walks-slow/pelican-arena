@@ -10,7 +10,7 @@ import {
 } from "react-router";
 
 import { useEffect, useRef, useState } from "react";
-import { useLocation, useNavigationType } from "react-router";
+import { useLocation } from "react-router";
 import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
@@ -135,7 +135,6 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
 export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
   const location = useLocation();
-  const navigationType = useNavigationType();
   const screenKey = baseScreenKey(location.pathname);
   const prevScreenRef = useRef(screenKey);
   const [motion, setMotion] = useState<RouteMotion>("steady");
@@ -143,10 +142,7 @@ export default function App({ loaderData }: Route.ComponentProps) {
   if (prevScreenRef.current !== screenKey) {
     const direction = resolveMotion(prevScreenRef.current, screenKey);
     prevScreenRef.current = screenKey;
-    // A history pop restores the list the reader already knows. Replaying the
-    // cascade there first paints the card, then hides it behind the stagger
-    // delay, then fades it back in. Keep the restored screen steady.
-    setMotion(navigationType === "POP" ? "steady" : direction);
+    setMotion(direction);
   }
 
   return (
