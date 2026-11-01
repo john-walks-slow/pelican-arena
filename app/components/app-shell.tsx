@@ -284,7 +284,7 @@ export function AppShell({
 
       <header
         data-scrolled={scrolled}
-        className="shell-bar fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color,backdrop-filter] duration-150 lg:hidden"
+        className="shell-bar fixed inset-x-0 top-0 z-40 flex h-12 items-center justify-between px-2 transition-[background-color,border-color] duration-150 lg:hidden"
       >
         <Brand />
         <div className="flex items-center">

@@ -1,7 +1,8 @@
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation, useNavigationType } from "react-router";
 import { BackLink } from "~/components/back-link";
+import { recallScroll } from "~/lib/scroll-memory";
 import { cn } from "~/lib/utils";
 
 export interface PageHeaderBack {
@@ -45,8 +46,20 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
   const titleRef = useRef<HTMLHeadingElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const [multiline, setMultiline] = useState(false);
+  const location = useLocation();
+  const navigationType = useNavigationType();
 
   useIsoLayoutEffect(() => {
+    if (navigationType === "POP") {
+      const restored = recallScroll(location.key);
+      if (restored != null) window.scrollTo(0, restored);
+    } else {
+      // The browser captures the incoming screen before the parent app can
+      // reset the document scroll, so reset it here, while the outgoing screen
+      // is already safely in its snapshot.
+      window.scrollTo(0, 0);
+    }
+
     const header = headerRef.current;
     const inner = innerRef.current;
     const titleEl = titleRef.current;
@@ -190,7 +203,7 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
       desktopMql.removeEventListener("change", measure);
       reducedMql.removeEventListener("change", applyScroll);
     };
-  }, [back?.to, back?.label, back?.trail?.to, title, Boolean(actions)]);
+  }, [back?.to, back?.label, back?.trail?.to, title, Boolean(actions), location.key, navigationType]);
 
   return (
     <header

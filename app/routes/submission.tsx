@@ -49,6 +49,7 @@ import { setSubmissionStatus } from "~/lib/submissions.server";
 import { ConfirmDialog } from "~/components/confirm-dialog";
 import { LOG_SOURCE_LABELS, totalTokens } from "~/lib/session-log";
 import { useOptionalUser } from "~/lib/use-user";
+import { useMorphEnabled } from "~/lib/morph";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "找不到答案 · Pelican Arena" }];
@@ -194,6 +195,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
     appOrigin,
   } = loaderData;
   const user = useOptionalUser();
+  const morph = useMorphEnabled();
   const { pathname, search } = useLocation();
   const [params] = useSearchParams();
 
@@ -317,7 +319,11 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <ViewTransition name={`submission-card-${s.id}`} share="morph" default="none">
+        <ViewTransition
+          name={morph ? `submission-card-${s.id}` : undefined}
+          share={morph ? "morph" : undefined}
+          default="none"
+        >
         <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
           <div className="flex h-10 items-center border-b border-border px-1.5">
             {(

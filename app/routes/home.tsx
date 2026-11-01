@@ -21,6 +21,7 @@ import {
 } from "~/lib/queries.server";
 import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
 import { useOptionalUser } from "~/lib/use-user";
+import { useMorphEnabled } from "~/lib/morph";
 
 export const meta: Route.MetaFunction = () => [
   { title: "Pelican Arena" },
@@ -124,6 +125,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { pathname, search } = useLocation();
   const [, setParams] = useSearchParams();
   const user = useOptionalUser();
+  const morph = useMorphEnabled();
   const fetcher = useFetcher<MorePrompts>();
 
   const [items, setItems] = useState(prompts);
@@ -279,8 +281,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
                   className="reveal-card min-w-0"
                 >
                   <ViewTransition
-                    name={`prompt-card-${p.id}`}
-                    share="morph"
+                    name={morph ? `prompt-card-${p.id}` : undefined}
+                    share={morph ? "morph" : undefined}
                     default="none"
                   >
                     <Link

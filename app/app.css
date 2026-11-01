@@ -280,13 +280,21 @@ body {
   overflow: clip;
 }
 
-/* Screens cross-fade with a small upward drift. The outgoing screen keeps its
-   weight while the incoming one rises, so the content is never gone and the
-   ground can never flash through a blank frame. */
+/* Screens dissolve into each other. The outgoing screen carries a soft defocus
+   while the new one settles in sharp, so the overlap reads as depth rather than
+   two layouts sliding over each other. */
+/* The UA sizes this group from the page element, which is taller than the
+   viewport and starts at a scrolled offset. Pin it to the viewport instead:
+   the old and new screens then dissolve in place instead of the whole page
+   travelling along the document's vertical geometry. */
 ::view-transition-group(.page) {
-  animation-duration: 280ms;
-  animation-timing-function: var(--ease-spatial);
-  overflow: clip;
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100dvh !important;
+  animation: none !important;
+  overflow: clip !important;
+  transform: none !important;
 }
 ::view-transition-old(.page),
 ::view-transition-new(.page) {
@@ -295,10 +303,30 @@ body {
   mix-blend-mode: normal;
 }
 ::view-transition-old(.page) {
-  animation: page-out 160ms ease-out 120ms both;
+  animation: page-out 180ms ease-out both !important;
 }
 ::view-transition-new(.page) {
-  animation: page-in 150ms cubic-bezier(0, 0, 0.2, 1) both;
+  animation: page-in 160ms cubic-bezier(0, 0, 0.2, 1) both !important;
+}
+
+/* The headers are viewport-level anchors: the sticky page title is snapshotted
+   where it actually sits (a tall scrolled screen would otherwise capture it at
+   its static document position and let it pop in after the transition), and
+   only the incoming header is drawn so two titles never overlap. */
+::view-transition-group(page-header) {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  animation: none !important;
+  z-index: 50;
+}
+::view-transition-old(page-header) {
+  display: none;
+}
+::view-transition-new(page-header) {
+  animation: header-in 180ms var(--ease-spatial) both !important;
+  mix-blend-mode: normal;
 }
 
 /* The mobile brand bar is shell furniture, but the page header's sheet reaches
@@ -337,16 +365,32 @@ body {
   animation-timing-function: var(--ease-spatial);
 }
 
-@keyframes page-out {
+@keyframes header-out {
   to {
     opacity: 0;
+  }
+}
+
+@keyframes header-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+@keyframes page-out {
+  from {
+    filter: blur(0);
+  }
+  to {
+    opacity: 0;
+    filter: blur(1.5px);
   }
 }
 
 @keyframes page-in {
   from {
     opacity: 0;
-    transform: translate3d(0, 8px, 0);
   }
 }
 
@@ -599,9 +643,7 @@ html[data-booting="true"] .boot-screen {
 }
 
 .shell-bar[data-scrolled="true"] {
-  background: color-mix(in srgb, var(--color-ground) 88%, transparent);
-  -webkit-backdrop-filter: blur(20px) saturate(1.6);
-  backdrop-filter: blur(20px) saturate(1.6);
+  background: var(--color-ground);
   border-bottom-color: var(--color-border);
 }
 
@@ -622,6 +664,7 @@ html[data-booting="true"] .boot-screen {
   --compact-pl: 0px;
   --compact-pr: 0px;
   top: calc(var(--shell-top) - var(--delta));
+  view-transition-name: page-header;
 }
 
 @media (min-width: 1024px) {
@@ -640,10 +683,7 @@ html[data-booting="true"] .boot-screen {
   width: calc(100cqw + var(--main-px, 1.25rem) * 2);
   transform: translateX(-50%);
   background: var(--color-ground);
-  transition:
-    background-color 180ms ease,
-    backdrop-filter 180ms ease,
-    -webkit-backdrop-filter 180ms ease;
+  transition: background-color 180ms ease;
   border-bottom: 1px solid
     color-mix(
       in srgb,
@@ -656,9 +696,7 @@ html[data-booting="true"] .boot-screen {
    The tint carries most of the surface (like iOS bars) so light stays foggy-white
    and dark stays deep; the blur only softens what slips through. */
 .page-header[data-compact="true"] .page-header-backdrop {
-  background: color-mix(in srgb, var(--color-ground) 92%, transparent);
-  -webkit-backdrop-filter: blur(24px) saturate(1.6);
-  backdrop-filter: blur(24px) saturate(1.6);
+  background: var(--color-ground);
 }
 
 .page-header-title {
