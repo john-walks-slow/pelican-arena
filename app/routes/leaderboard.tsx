@@ -1,4 +1,4 @@
-import { ArrowUpRight, Shapes, Trophy } from "lucide-react";
+import { Shapes, Trophy } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/leaderboard";
@@ -30,17 +30,13 @@ export const meta: Route.MetaFunction = () => [
 
 const DIMENSION_LABELS: Record<Dimension, string> = {
   model: "模型",
-  provider: "提供方",
   harness: "客户端",
-  "model-provider": "模型 × 提供方",
 };
 
 /** What the second column counts, per dimension. */
 const UNIT_LABELS: Record<Dimension, string> = {
   model: "个模型",
-  provider: "家提供方",
   harness: "个客户端",
-  "model-provider": "种组合",
 };
 
 type BoardSource = {
@@ -143,20 +139,7 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
       </td>
 
       <th scope="row" className="min-w-0 py-2.5 pr-3 text-left align-middle font-normal">
-        <div className="flex min-w-0 items-center gap-2">
-          <span className="truncate text-sm font-medium text-ink">{entry.name}</span>
-          {entry.best && (
-            <Link
-              to={`/s/${entry.best.submissionId}`}
-              prefetch="intent"
-              title={`最佳答案：${entry.best.promptTitle}`}
-              aria-label={`查看最佳答案：${entry.best.promptTitle}`}
-              className="-m-1 shrink-0 p-1 text-muted transition-colors hover:text-accent"
-            >
-              <ArrowUpRight className="size-3.5" strokeWidth={2} />
-            </Link>
-          )}
-        </div>
+        <span className="block truncate text-sm font-medium text-ink">{entry.name}</span>
         {entry.sublabel && (
           <div className="mt-0.5 truncate text-[11px] text-muted">{entry.sublabel}</div>
         )}
@@ -234,9 +217,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
           onChange={(value) => update("by", value === DEFAULT_DIMENSION ? null : value)}
           options={[
             { value: "model", label: "模型" },
-            { value: "provider", label: "提供方" },
             { value: "harness", label: "客户端" },
-            { value: "model-provider", label: "模型 × 提供方" },
           ]}
           className="h-8"
         />

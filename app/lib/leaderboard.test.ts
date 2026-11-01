@@ -18,7 +18,6 @@ function answer(
   return {
     id,
     promptId,
-    promptTitle: promptId,
     model: entry(model),
     provider: entry(provider),
     harness: harness ? entry(harness) : null,
@@ -202,14 +201,6 @@ describe("buildLeaderboard", () => {
     expect(entry.ranked).toBe(false);
   });
 
-  it("does not call a single vote the best answer", () => {
-    const submissions = [answer("lucky", "q1", "m"), answer("solid", "q2", "m")];
-    const ratings = [...votes("lucky", 5, [9]), ...votes("solid", 4, [1, 2, 3, 4])];
-    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
-
-    expect(find(board, "m").best?.submissionId).toBe("solid");
-  });
-
   it("counts prompts an entry answered but was not rated on", () => {
     const submissions = [answer("a1", "q1", "m"), answer("a2", "q2", "m")];
     const board = buildLeaderboard({
@@ -237,10 +228,10 @@ describe("buildLeaderboard", () => {
     expect(board.rankedCount).toBe(0);
   });
 
-  it("groups model and provider as one row and skips answers without a harness", () => {
+  it("skips answers without a harness when ranking clients", () => {
     const submissions = [
-      answer("a1", "q1", "m", "official"),
-      answer("a2", "q1", "m", "relay"),
+      answer("a1", "q1", "m", "official", "cc"),
+      answer("a2", "q1", "m", "relay", "codex"),
       answer("a3", "q1", "m", "relay", null),
     ];
     const ratings = [
@@ -249,14 +240,9 @@ describe("buildLeaderboard", () => {
       ...votes("a3", 2, [1, 2, 3]),
     ];
 
-    const pairs = buildLeaderboard({ submissions, ratings, dimension: "model-provider" });
-    expect(pairs.entries.map((e) => e.key)).toEqual(["m@official", "m@relay"]);
-    expect(find(pairs, "m@relay").answers).toBe(2);
-    expect(find(pairs, "m@official").sublabel).toBe("official");
-
     const harnesses = buildLeaderboard({ submissions, ratings, dimension: "harness" });
-    expect(harnesses.entries).toHaveLength(1);
-    expect(find(harnesses, "cc").answers).toBe(2);
+    expect(harnesses.entries.map((e) => e.key).sort()).toEqual(["cc", "codex"]);
+    expect(find(harnesses, "cc").answers).toBe(1);
   });
 
   it("ignores ratings that point at a missing submission", () => {
@@ -267,14 +253,6 @@ describe("buildLeaderboard", () => {
     });
     expect(board.votes).toBe(3);
     expect(find(board, "m").votes).toBe(3);
-  });
-
-  it("reports the best answer of each entry", () => {
-    const submissions = [answer("weak", "q1", "m"), answer("strong", "q2", "m")];
-    const ratings = [...votes("weak", 2, [1, 2, 3]), ...votes("strong", 5, [1, 2, 3])];
-    const board = buildLeaderboard({ submissions, ratings, dimension: "model" });
-    expect(find(board, "m").best?.submissionId).toBe("strong");
-    expect(find(board, "m").prompts).toBe(2);
   });
 
   it("requires MIN_VOTES before an entry is ranked", () => {

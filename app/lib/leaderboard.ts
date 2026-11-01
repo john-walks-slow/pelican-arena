@@ -16,7 +16,7 @@ import type { CatalogEntry } from "./catalog";
  * Everything here is pure so the weighting can be tested directly.
  */
 
-export const DIMENSIONS = ["model", "provider", "harness", "model-provider"] as const;
+export const DIMENSIONS = ["model", "harness"] as const;
 export type Dimension = (typeof DIMENSIONS)[number];
 export const DEFAULT_DIMENSION: Dimension = "model";
 
@@ -59,7 +59,6 @@ export const MIN_VOTES = 3;
 export interface LeaderboardSubmission {
   id: string;
   promptId: string;
-  promptTitle: string;
   model: CatalogEntry;
   provider: CatalogEntry;
   harness: CatalogEntry | null;
@@ -74,7 +73,7 @@ export interface LeaderboardRating {
 export interface LeaderboardEntry {
   key: string;
   name: string;
-  /** Second line of the label; the provider when ranking model × provider. */
+  /** Optional second line under the name. */
   sublabel: string | null;
   /** Calibrated score on the five-star scale, or null when unrated. */
   score: number | null;
@@ -83,7 +82,6 @@ export interface LeaderboardEntry {
   answers: number;
   votes: number;
   prompts: number;
-  best: { submissionId: string; promptTitle: string } | null;
   ranked: boolean;
   /** Place among the ranked entries, or null when the entry is not ranked. */
   place: number | null;
@@ -101,20 +99,12 @@ function identify(
   submission: LeaderboardSubmission,
   dimension: Dimension,
 ): { key: string; name: string; sublabel: string | null } | null {
-  const { model, provider, harness } = submission;
+  const { model, harness } = submission;
   switch (dimension) {
     case "model":
       return { key: model.id, name: model.name, sublabel: null };
-    case "provider":
-      return { key: provider.id, name: provider.name, sublabel: null };
     case "harness":
       return harness ? { key: harness.id, name: harness.name, sublabel: null } : null;
-    case "model-provider":
-      return {
-        key: `${model.id}@${provider.id}`,
-        name: model.name,
-        sublabel: provider.name,
-      };
   }
 }
 
@@ -249,7 +239,6 @@ export function buildLeaderboard(input: {
      * thinly-rated prompt counts for less than a well-rated one.
      */
     byPrompt: Map<string, { bias: number; votes: number }[]>;
-    best: { submissionId: string; promptTitle: string; bias: number } | null;
   }
 
   const groups = new Map<string, Group>();
@@ -266,7 +255,6 @@ export function buildLeaderboard(input: {
         voters: new Set(),
         answered: new Set(),
         byPrompt: new Map(),
-        best: null,
       };
       groups.set(ident.key, group);
     }
@@ -284,11 +272,6 @@ export function buildLeaderboard(input: {
     if (bucket) bucket.push({ bias, votes: tally.votes });
     else group.byPrompt.set(submission.promptId, [{ bias, votes: tally.votes }]);
 
-    // A single five-star vote is not a best answer; require the same sample the
-    // ranking itself demands.
-    if (tally.votes >= MIN_VOTES && (!group.best || bias > group.best.bias)) {
-      group.best = { submissionId: submission.id, promptTitle: submission.promptTitle, bias };
-    }
   }
 
   const entries: LeaderboardEntry[] = [...groups.values()].map((group) => {
@@ -314,9 +297,6 @@ export function buildLeaderboard(input: {
       answers: group.answers,
       votes: group.votes,
       prompts: group.answered.size,
-      best: group.best
-        ? { submissionId: group.best.submissionId, promptTitle: group.best.promptTitle }
-        : null,
       ranked: group.voters.size >= MIN_VOTES,
       place: null,
     };
