@@ -12,4 +12,11 @@ export default defineConfig({
   resolve: {
     tsconfigPaths: true,
   },
+  // Temporary tunnels (dev-tunnel) hit the Vite host check otherwise.
+  server: {
+    allowedHosts: [".trycloudflare.com"],
+  },
+  preview: {
+    allowedHosts: [".trycloudflare.com"],
+  },
 });
