@@ -930,11 +930,13 @@ lines.push("DELETE FROM ratings WHERE submission_id LIKE 'seedsub%' OR user_id B
 lines.push("DELETE FROM submission_mods WHERE submission_id LIKE 'seedsub%';");
 lines.push("DELETE FROM submissions WHERE id LIKE 'seedsub%';");
 lines.push("DELETE FROM prompts WHERE id LIKE 'seedprompt%';");
-lines.push("DELETE FROM users WHERE id BETWEEN 99001 AND 99005;");
+lines.push(
+  "DELETE FROM users WHERE id BETWEEN 99001 AND 99005 AND id NOT IN (SELECT author_id FROM prompts) AND id NOT IN (SELECT author_id FROM submissions);",
+);
 
 for (const user of USERS) {
   lines.push(
-    `INSERT INTO users (id, username, name, avatar_template, trust_level, silenced, role, banned, created_at, last_login_at) VALUES (${user.id}, ${q(user.username)}, ${q(user.name)}, NULL, ${user.trustLevel}, 0, ${q(user.role)}, 0, ${NOW - 120 * DAY}, ${NOW - 2 * DAY});`,
+    `INSERT OR IGNORE INTO users (id, username, name, avatar_template, trust_level, silenced, role, banned, created_at, last_login_at) VALUES (${user.id}, ${q(user.username)}, ${q(user.name)}, NULL, ${user.trustLevel}, 0, ${q(user.role)}, 0, ${NOW - 120 * DAY}, ${NOW - 2 * DAY});`,
   );
 }
 
