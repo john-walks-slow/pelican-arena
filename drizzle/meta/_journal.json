@@ -78,6 +78,13 @@
       "when": 1793585538680,
       "tag": "0012_provider_curation",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1793588542394,
+      "tag": "0013_provider_cleanup",
+      "breakpoints": true
     }
   ]
 }

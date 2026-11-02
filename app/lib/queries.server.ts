@@ -131,9 +131,7 @@ export async function searchCatalog(
   }
 
   if (kind === "providers") {
-    const where = query
-      ? and(eq(providers.hidden, false), nameLike(providers.name, query))
-      : eq(providers.hidden, false);
+    const where = query ? nameLike(providers.name, query) : undefined;
     const [rows, [total]] = await Promise.all([
       d
         .select({ id: providers.id, name: providers.name, uses: count(submissions.id) })

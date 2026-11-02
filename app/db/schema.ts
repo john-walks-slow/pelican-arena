@@ -93,7 +93,6 @@ export const providers = sqliteTable("providers", {
   rank: integer("rank").notNull().default(1000),
   /** Kept for grouping in the data; the picker shows one flat, curated list. */
   category: text("category").notNull().default("other"),
-  hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
   createdAt: createdAt(),
 });
 
