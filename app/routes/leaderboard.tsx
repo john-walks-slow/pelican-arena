@@ -186,7 +186,7 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
   const countFor = (value: PromptKind) => kindCounts.find((row) => row.kind === value)?.n ?? 0;
 
   return (
-    <div className="mx-auto max-w-[900px]">
+    <div className="mx-auto max-w-[1240px]">
       <PageHeader
         title="排名"
         subtitle={

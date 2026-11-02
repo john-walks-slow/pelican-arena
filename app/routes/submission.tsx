@@ -238,7 +238,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const showReport = Boolean(user && !isAuthor);
 
   return (
-    <div className="mx-auto max-w-[1400px]">
+    <div className="mx-auto max-w-[1240px]">
       <PageHeader
         back={{
           to: back.to,
