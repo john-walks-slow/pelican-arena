@@ -109,7 +109,57 @@ const SETUPS = [
   { model: "GLM-4.6", provider: "阿里云百炼", harness: "裸 API", reasoning: "off", source: null },
   { model: "Qwen3 Coder", provider: "阿里云百炼", harness: "官方网页版", reasoning: "medium", source: null },
   { model: "Grok 4", provider: "官方网页版", harness: "官方网页版", reasoning: "low", source: null },
+  { model: "Claude Opus 5.5", provider: "Anthropic 官方", harness: "Claude Code", reasoning: "high", source: "claude-code" },
+  { model: "GPT-6.1 Terra", provider: "OpenAI 官方", harness: "Codex CLI", reasoning: "medium", source: "codex" },
+  { model: "Gemini 4 Argon", provider: "Google Gemini 官方", harness: "opencode", reasoning: "high", source: "opencode" },
+  { model: "DeepSeek V4.1 Flash", provider: "DeepSeek 官方", harness: "DSH", reasoning: "medium", source: "dsh" },
+  { model: "Kimi K3.1 Pro", provider: "月之暗面 Kimi 官方", harness: "pi", reasoning: "high", source: "pi" },
+  { model: "GLM-5.3", provider: "智谱 GLM 官方", harness: "裸 API", reasoning: "off", source: null },
+  { model: "Qwen3.8 Max", provider: "阿里通义千问官方", harness: "官方网页版", reasoning: "medium", source: null },
+  { model: "MiniMax-M3.1-Flash", provider: "MiniMax 官方", harness: "Cursor", reasoning: "low", source: null },
 ];
+
+// 题库：20 个主题循环到 92 道，标题加轮次后缀，避免手工铺 100 条。
+const TEMPLATE_TOPICS = [
+  { kind: "web", title: "做一个三栏阅读器", body: "左侧目录、中间正文、右侧批注，滚动时目录跟随高亮。单文件 HTML，不要框架。" },
+  { kind: "web", title: "设计一个专注计时器", body: "一个大号倒计时、一个开始按钮、一组可切换的时长。留白足够，尽量不要装饰。" },
+  { kind: "web", title: "做一个可筛选的表格", body: "二十行数据，支持按状态筛选、按数字排序、关键词搜索。移动端不要横向滚动。" },
+  { kind: "web", title: "画一张响应式价格表", body: "三档价格，中间那档突出。窄屏时纵向堆叠，不要用图片。" },
+  { kind: "web", title: "做一个极简登录页", body: "邮箱加密码，一个提交按钮。错误提示要贴字段出现，不要弹窗。" },
+  { kind: "web", title: "做一个瀑布流卡片墙", body: "不同高度的卡片，滚动时懒加载。只用 CSS 和少量 JS。" },
+  { kind: "web", title: "做一个天气小组件", body: "当前温度、天气图标、未来三天。数据写死即可，重点是排版。" },
+  { kind: "web", title: "做一个可拖拽的看板", body: "三列任务，卡片可以在列之间拖动。支持键盘操作更好。" },
+  { kind: "web", title: "做一个音乐播放器界面", body: "封面、进度条、播放控制。进度条可以拖动，不要接真实音频。" },
+  { kind: "web", title: "做一个命令行风格的作品页", body: "黑底等宽字，输入命令后逐行输出个人介绍。要能键盘操作。" },
+  { kind: "markdown", title: "解释一次数据库迁移的心智模型", body: "面向刚接触后端的前端，讲清楚为什么迁移只能向前、回滚为什么危险，配一个最小例子。" },
+  { kind: "markdown", title: "写一份代码评审清单", body: "按可读性、边界、错误处理、测试四个维度组织，每条给出一个真实会踩的坑。" },
+  { kind: "markdown", title: "梳理 HTTP 缓存的三层结构", body: "浏览器、CDN、源站各管什么，用一张表和三个请求时序说明。" },
+  { kind: "markdown", title: "讲清楚乐观更新的失败路径", body: "从一次点赞出发，说明什么时候回滚、什么时候重试、什么时候让用户手动处理。" },
+  { kind: "markdown", title: "写一份小团队的上线检查表", body: "覆盖数据迁移、灰度、回滚、监控和值班交接，适合十人以内团队。" },
+  { kind: "markdown", title: "解释为什么日志要结构化", body: "用一个排障故事对比纯文本和结构化日志，最后给出字段命名建议。" },
+  { kind: "svg", title: "画一组几何风格的天气图标", body: "晴、雨、雪三个图标，同一套配色和线宽，单张 SVG 里并排。" },
+  { kind: "svg", title: "用圆和弧线画一座拱桥", body: "单色线稿，桥拱、水面倒影、几只飞鸟。控制在三种颜色以内。" },
+  { kind: "svg", title: "画一个可缩放的图标集", body: "搜索、设置、通知、返回四个图标，24×24 网格，线宽一致。" },
+  { kind: "svg", title: "用路径画一枚抽象徽章", body: "中心对称，外圈齿轮，内圈星形。适合做社区徽章。" },
+];
+
+const ROUND_LABELS = ["", "深色版", "移动端", "极简版", "动效版", "无障碍版"];
+const generatedPrompts = [];
+for (let i = 0; i < 92; i++) {
+  const topic = TEMPLATE_TOPICS[i % TEMPLATE_TOPICS.length];
+  const round = Math.floor(i / TEMPLATE_TOPICS.length);
+  const suffix = round === 0 ? "" : ` · ${ROUND_LABELS[round % ROUND_LABELS.length] || round}`;
+  generatedPrompts.push({
+    id: `seedprompt${String(9 + i).padStart(2, "0")}`,
+    kind: topic.kind,
+    title: `${topic.title}${suffix}`,
+    body: topic.body,
+    authorId: USERS[(i + 2) % USERS.length].id,
+    ageDays: Math.max(1, (i * 7) % 120),
+    hasAnswer: i < 76,
+  });
+}
+PROMPTS.push(...generatedPrompts);
 
 const MOD_POOLS = [["联网搜索"], [], ["多轮修改"], ["skills"], ["mcp", "联网搜索"], [], [], ["多轮修改"]];
 
@@ -144,6 +194,46 @@ ${script ? `<script>\n${script}\n</script>` : ""}
 </body>
 </html>
 `;
+
+// 模板题的内容：只求三类作品都有真实文件，seed 决定配色与文案。
+function webTemplate(seed) {
+  const r = rng(seed);
+  const hue = Math.floor(r() * 360);
+  const titles = ["少即是多", "把复杂留给自己", "只做一件事", "让内容自己说话"];
+  const title = titles[Math.floor(r() * titles.length)];
+  const accent = `hsl(${hue} 58% 46%)`;
+  const bg = `hsl(${(hue + 170) % 360} 32% 96%)`;
+  return page(
+    title,
+    `*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:${bg};color:#1d1d1f;font-family:"DM Sans",system-ui,sans-serif}.card{width:min(560px,86vw);padding:56px 48px;border:1px solid hsl(${hue} 20% 84%);border-radius:24px;background:#fff;box-shadow:0 24px 80px hsl(${hue} 30% 50% / .12)}h1{margin:0 0 16px;font-size:clamp(32px,6vw,52px);letter-spacing:-.03em;line-height:1.05}p{margin:0;color:#6b6b70;line-height:1.7}.dot{width:10px;height:10px;border-radius:50%;background:${accent};margin-bottom:28px}`,
+    `<main class="card"><div class="dot"></div><h1>${title}</h1><p>这是一份用于本地演示的生成内容。重点是让列表、筛选和预览在真实数据量下仍然顺手。</p></main>`,
+  );
+}
+
+function markdownTemplate(seed) {
+  const r = rng(seed);
+  const titles = ["一次迁移的复盘", "把边界写清楚", "缓存不是银弹", "先让错误可见"];
+  const title = titles[Math.floor(r() * titles.length)];
+  const count = 3 + Math.floor(r() * 3);
+  const items = Array.from({ length: count }, (_, i) => `${i + 1}. 第 ${i + 1} 条：先约束输入，再处理输出，最后补日志。`).join("\n");
+  return `# ${title}\n\n演示用的 Markdown 答案。真正的结论通常只有一句，剩下的都是边界条件。\n\n${items}\n\n\`\`\`ts\nconst result = await load(id);\nif (!result) throw new Error("missing");\n\`\`\`\n\n最后检查一遍：失败路径是否也有测试。`;
+}
+
+function svgTemplate(seed) {
+  const r = rng(seed);
+  const hue = Math.floor(r() * 360);
+  const fill = `hsl(${hue} 55% 48%)`;
+  const soft = `hsl(${(hue + 40) % 360} 45% 76%)`;
+  const x = 120 + Math.floor(r() * 360);
+  const y = 120 + Math.floor(r() * 240);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">\n  <rect width="800" height="600" fill="#f6f3ed"/>\n  <circle cx="${x}" cy="${y}" r="${90 + Math.floor(r() * 60)}" fill="${fill}" opacity="0.9"/>\n  <rect x="${x - 140}" y="${y + 110}" width="280" height="18" rx="9" fill="${soft}"/>\n  <path d="M80 520 Q400 ${320 + Math.floor(r() * 80)} 720 520" fill="none" stroke="${fill}" stroke-width="10" stroke-linecap="round"/>\n</svg>\n`;
+}
+
+function templateContent(prompt, seed) {
+  if (prompt.kind === "web") return webTemplate(seed);
+  if (prompt.kind === "markdown") return markdownTemplate(seed);
+  return svgTemplate(seed);
+}
 
 function landingPage(variant) {
   const themes = [
@@ -747,7 +837,8 @@ const submissions = [];
 let subIndex = 0;
 
 for (const [pIndex, prompt] of PROMPTS.entries()) {
-  const variants = CONTENT[prompt.id];
+  if (prompt.hasAnswer === false) continue;
+  const variants = CONTENT[prompt.id] ?? [templateContent(prompt, pIndex + 1)];
   for (const [vIndex, text] of variants.entries()) {
     const setup = SETUPS[(pIndex * 3 + vIndex) % SETUPS.length];
     const author = USERS[(pIndex + vIndex) % USERS.length];
@@ -813,7 +904,8 @@ for (const submission of submissions) {
     .sort(() => rand() - 0.5)
     .slice(0, 3);
   submission.votes = raters.map((rater, i) => {
-    const base = 3.6 + MODEL_BIAS[submission.model] + PROMPT_BIAS[submission.promptId];
+    const base =
+      3.6 + (MODEL_BIAS[submission.model] ?? 0) + (PROMPT_BIAS[submission.promptId] ?? 0);
     const noise = (rand() - 0.5) * 1.6;
     const stars = Math.min(5, Math.max(1, Math.round((base + noise) * 2) / 2));
     return {
