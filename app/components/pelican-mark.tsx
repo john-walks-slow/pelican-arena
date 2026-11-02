@@ -1,7 +1,7 @@
 /** Pelican-on-a-wheel mark: a wheel, the bird's body and its long pouch bill. */
 export function PelicanMark({ className }: { className?: string }) {
   return (
-    <svg viewBox="0 0 32 32" fill="none" className={className} aria-hidden="true">
+    <svg viewBox="0 2.5 32 32" fill="none" className={className} aria-hidden="true">
       <circle cx="9" cy="23" r="5.5" stroke="currentColor" strokeWidth="2" />
       <circle cx="23" cy="23" r="5.5" stroke="currentColor" strokeWidth="2" />
       <path

@@ -12,7 +12,7 @@ interface PelicanRideProps {
  */
 export function PelicanRide({
   className,
-  viewBox = "0 0 32 32",
+  viewBox = "0 2.5 32 32",
   road = false,
   dust = false,
 }: PelicanRideProps) {
