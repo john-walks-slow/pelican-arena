@@ -78,6 +78,8 @@ export const models = sqliteTable("models", {
   name: text("name").notNull(),
   family: text("family"),
   releaseDate: text("release_date"),
+  /** JSON array of supported effort levels; null when the source is silent. */
+  reasoning: text("reasoning"),
   source: text("source").notNull().default("manual"),
   hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
   syncedAt: integer("synced_at", { mode: "timestamp_ms" }),

@@ -1,7 +1,7 @@
 import { data } from "react-router";
 import type { Route } from "./+types/api.catalog";
 import type { CatalogKind } from "~/lib/catalog";
-import { resolveModel, searchCatalog } from "~/lib/queries.server";
+import { getModelMeta, resolveModel, searchCatalog } from "~/lib/queries.server";
 
 const KINDS: CatalogKind[] = ["models", "providers", "harnesses", "mods"];
 
@@ -15,6 +15,9 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (resolve) {
     return { match: await resolveModel(resolve.slice(0, 100)) };
   }
+
+  const find = url.searchParams.get("find")?.trim();
+  if (find) return { model: await getModelMeta(find.slice(0, 100)) };
 
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 60);
   const fallback = kind === "providers" ? 120 : 20;

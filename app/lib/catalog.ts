@@ -5,6 +5,8 @@ export interface CatalogEntry {
   name: string;
   /** Providers only: groups the picker by how the channel is obtained. */
   category?: string;
+  /** Models only: effort levels advertised by the source; null when unknown. */
+  reasoning?: string[] | null;
 }
 
 export type Catalog = Record<CatalogKind, CatalogEntry[]>;

@@ -1,5 +1,5 @@
 import { AppWindow, Brain, Cpu, Server } from "lucide-react";
-import { use } from "react";
+import { use, useEffect, useState } from "react";
 import { Combobox } from "~/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { Skeleton } from "~/components/ui/skeleton";
@@ -42,7 +42,38 @@ export function SubmissionMetaFields({
   logModelHint?: string | null;
 }) {
   const resolved = use(catalog);
+  const [modelLevels, setModelLevels] = useState<string[] | null | undefined>(undefined);
   const modOptions = [...new Set([...resolved.mods.map((m) => m.name), ...mods])];
+
+  useEffect(() => {
+    const name = model.trim();
+    if (!name) {
+      setModelLevels(undefined);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      fetch(`/api/catalog?kind=models&find=${encodeURIComponent(name)}`, {
+        signal: controller.signal,
+      })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((raw: unknown) => {
+          if (controller.signal.aborted) return;
+          const data = raw as { model?: { reasoning?: string[] | null } | null } | null;
+          setModelLevels(data?.model?.reasoning ?? undefined);
+        })
+        .catch(() => {});
+    }, 250);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [model]);
+
+  const levels: readonly string[] =
+    modelLevels == null ? REASONING_LEVELS : modelLevels;
+  const reasoningOptions =
+    reasoning && !levels.includes(reasoning) ? [...levels, reasoning] : levels;
 
   function addMod(name: string) {
     const clean = name.trim();
@@ -104,9 +135,9 @@ export function SubmissionMetaFields({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="default">Default</SelectItem>
-            {REASONING_LEVELS.map((level) => (
+            {reasoningOptions.map((level) => (
               <SelectItem key={level} value={level}>
-                {REASONING_LABELS[level]}
+                {REASONING_LABELS[level as keyof typeof REASONING_LABELS] ?? level}
               </SelectItem>
             ))}
           </SelectContent>

@@ -85,7 +85,14 @@ export function Combobox({
             const data = raw as { items?: CatalogEntry[]; total?: number } | null;
             if (!data || controller.signal.aborted) return;
             if (Array.isArray(data?.items))
-              setList(data.items.map(({ id, name, category }) => ({ id, name, category })));
+              setList(
+                data.items.map(({ id, name, category, reasoning }) => ({
+                  id,
+                  name,
+                  category,
+                  reasoning,
+                })),
+              );
             if (typeof data?.total === "number") setTotal(data.total);
           })
           .catch(() => {})

@@ -46,6 +46,19 @@ function likePattern(query: string) {
 const nameLike = (column: SQLiteColumn, query: string) =>
   sql`${column} like ${likePattern(query)} escape '\\'`;
 
+/** Stored as JSON so the picker can narrow reasoning levels without another table. */
+function parseReasoning(value: string | null): string[] | null {
+  if (value == null) return null;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((level) => typeof level === "string")
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface CatalogSearchResult {
   items: Array<CatalogEntry & { uses: number }>;
   total: number;
@@ -90,14 +103,19 @@ export async function searchCatalog(
       : eq(models.hidden, false);
     const [rows, [total]] = await Promise.all([
       d
-        .select({ id: models.id, name: models.name, uses: count(submissions.id) })
+        .select({
+          id: models.id,
+          name: models.name,
+          reasoning: models.reasoning,
+          uses: count(submissions.id),
+        })
         .from(models)
         .leftJoin(
           submissions,
           and(eq(submissions.modelId, models.id), eq(submissions.status, "active")),
         )
         .where(where)
-        .groupBy(models.id, models.name)
+        .groupBy(models.id, models.name, models.reasoning)
         .orderBy(
           desc(sql`coalesce(${models.releaseDate}, '')`),
           desc(count(submissions.id)),
@@ -106,7 +124,10 @@ export async function searchCatalog(
         .limit(limit),
       d.select({ n: count() }).from(models).where(where),
     ]);
-    return { items: rows, total: total.n };
+    return {
+      items: rows.map((row) => ({ ...row, reasoning: parseReasoning(row.reasoning) })),
+      total: total.n,
+    };
   }
 
   if (kind === "providers") {
@@ -159,6 +180,21 @@ export async function resolveModel(rawId: string) {
   return matchModel(rawId, rows);
 }
 
+/** Reasoning metadata for one model, used when the picker changes selection. */
+export async function getModelMeta(name: string) {
+  const clean = name.trim().slice(0, 60);
+  const id = slugify(clean);
+  if (!id) return null;
+
+  const [row] = await db()
+    .select({ id: models.id, name: models.name, reasoning: models.reasoning })
+    .from(models)
+    .where(eq(models.id, id))
+    .limit(1);
+  if (!row) return null;
+  return { ...row, reasoning: parseReasoning(row.reasoning) };
+}
+
 /** Popular entries for the submit form, without pulling the whole catalog. */
 export async function getCatalog(): Promise<Catalog> {
   const [m, p, h, md] = await Promise.all([
@@ -168,7 +204,7 @@ export async function getCatalog(): Promise<Catalog> {
     searchCatalog("mods", "", 20),
   ]);
   return {
-    models: m.items.map(({ id, name }) => ({ id, name })),
+    models: m.items.map(({ id, name, reasoning }) => ({ id, name, reasoning })),
     providers: p.items.map(({ id, name, category }) => ({ id, name, category })),
     harnesses: h.items.map(({ id, name }) => ({ id, name })),
     mods: md.items.map(({ id, name }) => ({ id, name })),

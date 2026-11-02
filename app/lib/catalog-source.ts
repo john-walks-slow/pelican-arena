@@ -10,6 +10,8 @@ export interface RemoteModel {
   canonical_model_id?: string;
   release_date?: string;
   modalities?: { output?: string[] };
+  reasoning?: boolean;
+  reasoning_options?: Array<{ type: string; values?: string[] }>;
 }
 
 export interface RemoteProvider {
@@ -25,6 +27,8 @@ export interface CatalogModel {
   name: string;
   family: string | null;
   releaseDate: string;
+  /** Effort levels the model advertises; null when the source has no answer. */
+  reasoning: string[] | null;
 }
 
 export const CATALOG_SOURCE_URL = "https://models.dev/api.json";
@@ -68,6 +72,23 @@ const ALIAS_NAME = /\b(latest|custom tools|computer use)\b/i;
 const PATCH_NAME = /\b\d+\.\d+\.\d+\b/;
 
 const MONTHS = 24;
+
+/** Same order as REASONING_LEVELS in the schema. */
+const REASONING_ORDER = ["off", "minimal", "low", "medium", "high", "xhigh", "max", "auto"];
+
+const REASONING_ALIASES: Record<string, string> = { none: "off", default: "auto" };
+
+function selectReasoning(model: RemoteModel): string[] | null {
+  if (model.reasoning === false) return [];
+  const effort = model.reasoning_options?.find((option) => option.type === "effort");
+  if (!effort?.values?.length) return null;
+  const levels = effort.values
+    .map((value) => REASONING_ALIASES[value] ?? value)
+    .filter((value) => REASONING_ORDER.includes(value));
+  return [...new Set(levels)].sort(
+    (a, b) => REASONING_ORDER.indexOf(a) - REASONING_ORDER.indexOf(b),
+  );
+}
 
 function isChatModel(model: RemoteModel) {
   if (model.status === "deprecated") return false;
@@ -132,6 +153,7 @@ export function selectCatalogModels(
         name,
         family: model.family ?? null,
         releaseDate: model.release_date,
+        reasoning: selectReasoning(model),
       });
     }
   }

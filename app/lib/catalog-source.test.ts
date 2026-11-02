@@ -116,6 +116,27 @@ describe("selectCatalogModels", () => {
     expect(result.map((m) => m.name)).toEqual(["GPT-6.1", "GPT-6", "GPT-5.6"]);
   });
 
+  it("reads effort levels from the model metadata", () => {
+    const result = selectCatalogModels(
+      catalog({
+        openai: provider([
+          model("gpt-effort", "GPT Effort", {
+            reasoning: true,
+            reasoning_options: [{ type: "effort", values: ["none", "low", "high"] }],
+          }),
+          model("gpt-plain", "GPT Plain", { reasoning: false }),
+          model("gpt-unknown", "GPT Unknown", { reasoning: true }),
+        ]),
+      }),
+      NOW,
+    );
+
+    const byName = Object.fromEntries(result.map((m) => [m.name, m.reasoning]));
+    expect(byName["GPT Effort"]).toEqual(["off", "low", "high"]);
+    expect(byName["GPT Plain"]).toEqual([]);
+    expect(byName["GPT Unknown"]).toBeNull();
+  });
+
   it("prefers the vendor entry when two providers carry the same name", () => {
     const result = selectCatalogModels(
       catalog({

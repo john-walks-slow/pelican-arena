@@ -27,6 +27,7 @@ export async function syncModelCatalog() {
   for (let i = 0; i < selected.length; i += CHUNK) {
     const rows = selected.slice(i, i + CHUNK).map((model) => ({
       ...model,
+      reasoning: model.reasoning ? JSON.stringify(model.reasoning) : null,
       source: "models.dev",
       hidden: false,
       syncedAt,
@@ -40,6 +41,7 @@ export async function syncModelCatalog() {
           name: sql`excluded.name`,
           family: sql`excluded.family`,
           releaseDate: sql`excluded.release_date`,
+          reasoning: sql`excluded.reasoning`,
           source: "models.dev",
           hidden: false,
           syncedAt,
