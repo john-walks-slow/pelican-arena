@@ -1,7 +1,8 @@
 import { Lock } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Form, useNavigation } from "react-router";
 import { BackLink } from "~/components/back-link";
+import { useGate } from "~/components/gate-dialog";
 import { Markdown } from "~/components/markdown";
 import { OutputRequirements } from "~/components/output-requirements";
 import { Button } from "~/components/ui/button";
@@ -44,6 +45,13 @@ export function PromptForm({
   const [title, setTitle] = useState(values?.title ?? initial?.title ?? "");
   const [body, setBody] = useState(values?.body ?? initial?.body ?? "");
   const navigation = useNavigation();
+  const gate = useGate();
+
+  useEffect(() => {
+    if (errors?.form && (errors.form.includes("最多") || errors.form.includes("上限"))) {
+      gate.open({ reason: "daily_limit", action: "createPrompt", message: errors.form });
+    }
+  }, [errors?.form, gate]);
   const submitting = navigation.state !== "idle";
   const meta = KIND_META[kind];
   const ready = title.trim().length > 0 && body.trim().length > 0;

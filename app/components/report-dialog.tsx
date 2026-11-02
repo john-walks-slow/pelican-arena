@@ -13,6 +13,7 @@ import {
 } from "~/components/ui/dialog";
 import { Textarea } from "~/components/ui/textarea";
 import { toast } from "~/components/ui/toaster";
+import { useGate } from "~/components/gate-dialog";
 import {
   reportOptions,
   REPORT_NOTE_LIMIT,
@@ -58,6 +59,7 @@ export function ReportDialog({
   disabledReason?: string;
   className?: string;
 }) {
+  const gate = useGate();
   const fetcher = useFetcher<Result>();
   const revalidator = useRevalidator();
   const [open, setOpen] = useState(false);
@@ -79,9 +81,14 @@ export function ReportDialog({
       setNote("");
       revalidator.revalidate();
     } else {
-      toast.error(result.error);
+      if (result.error.includes("最多") || result.error.includes("上限")) {
+        setOpen(false);
+        gate.open({ reason: "daily_limit", action: "report", message: result.error });
+      } else {
+        toast.error(result.error);
+      }
     }
-  }, [fetcher.data, revalidator]);
+  }, [fetcher.data, revalidator, gate]);
 
   if (reported) {
     return <p className={cn("text-xs text-muted", className)}>{copy.done}</p>;
@@ -89,15 +96,22 @@ export function ReportDialog({
 
   const action = target === "prompt" ? `/p/${targetId}/report` : `/s/${targetId}/report`;
 
+  const handleTrigger = () => {
+    if (disabledReason) return;
+    gate.guard("report", () => {
+      setOpen(true);
+    });
+  };
+
   return (
     <>
       <button
         type="button"
         disabled={Boolean(disabledReason)}
         title={disabledReason}
-        onClick={() => setOpen(true)}
+        onClick={handleTrigger}
         className={cn(
-          "inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-negative disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted",
+          "inline-flex items-center gap-1.5 text-xs text-muted transition-colors hover:text-negative disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:text-muted cursor-pointer",
           className,
         )}
       >

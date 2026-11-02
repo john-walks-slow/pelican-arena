@@ -18,11 +18,13 @@ import {
   Outlet,
   useFetcher,
   useLocation,
+  useNavigate,
   useSearchParams,
   type ShouldRevalidateFunctionArgs,
 } from "react-router";
 import type { Route } from "./+types/prompt";
 import { Avatar } from "~/components/avatar";
+import { useGate } from "~/components/gate-dialog";
 import { LoadMore } from "~/components/load-more";
 import { Markdown } from "~/components/markdown";
 import { ModerationActions } from "~/components/moderation-actions";
@@ -226,6 +228,8 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const user = useOptionalUser();
   const [params] = useSearchParams();
   const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const gate = useGate();
 
   useEffect(() => {
     primeRouteCache(`${pathname}${search}`, loaderData);
@@ -236,7 +240,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const editHref = withFrom(`/p/${prompt.id}/edit`, here);
   const answerHref = (id: string) => withFrom(`/s/${id}`, here);
   const fetcher = useFetcher<MoreSubmissions>();
-  const showReport = Boolean(user && user.id !== prompt.author.id);
+  const showReport = Boolean(!user || user.id !== prompt.author.id);
 
   const [items, setItems] = useState(submissions);
   const [next, setNext] = useState(nextPage);
@@ -359,19 +363,25 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
               {copied ? "已复制" : "复制提示词"}
             </Button>
             {canAnswer && (
-              <Button asChild variant="primary" className="gap-1.5">
-                <Link
-                  to={
-                    user
-                      ? { pathname: `/p/${prompt.id}/submit`, search }
-                      : `/auth/login?returnTo=/p/${prompt.id}/submit`
-                  }
-                  prefetch="intent"
-                  preventScrollReset={Boolean(user)}
-                >
-                  <Upload className="size-4" strokeWidth={1.75} />
-                  提交答案
-                </Link>
+              <Button
+                type="button"
+                variant="primary"
+                className="gap-1.5"
+                onClick={() => {
+                  gate.guard(
+                    "submit",
+                    () => {
+                      navigate(
+                        { pathname: `/p/${prompt.id}/submit`, search },
+                        { preventScrollReset: true },
+                      );
+                    },
+                    { returnTo: `/p/${prompt.id}/submit` },
+                  );
+                }}
+              >
+                <Upload className="size-4" strokeWidth={1.75} />
+                提交答案
               </Button>
             )}
           </>

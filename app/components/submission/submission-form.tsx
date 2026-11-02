@@ -1,6 +1,7 @@
 import { FileText, X } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
+import { useGate } from "~/components/gate-dialog";
 import { Markdown } from "~/components/markdown";
 import { SectionHeading } from "~/components/section-heading";
 import { SessionLogHelp } from "~/components/session-log-help";
@@ -245,8 +246,15 @@ export function SubmissionForm({
   const [logError, setLogError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
 
+  const gate = useGate();
   const submitting = fetcher.state !== "idle";
   const serverError = fetcher.data && "error" in fetcher.data ? fetcher.data.error : null;
+
+  useEffect(() => {
+    if (serverError && (serverError.includes("最多") || serverError.includes("上限"))) {
+      gate.open({ reason: "daily_limit", action: "submit", message: serverError });
+    }
+  }, [serverError, gate]);
   const logMeta = log?.meta ?? null;
   const logModelHint = logMeta?.models[0] ?? null;
 

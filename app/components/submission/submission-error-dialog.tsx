@@ -1,13 +1,4 @@
-import { Button } from "~/components/ui/button";
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "~/components/ui/dialog";
+import { GateDialog } from "~/components/gate-dialog";
 
 export function SubmissionErrorDialog({
   open,
@@ -21,19 +12,12 @@ export function SubmissionErrorDialog({
   message: string;
 }) {
   return (
-    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-[420px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className="sr-only">{message}</DialogDescription>
-        </DialogHeader>
-        <DialogBody className="px-5 py-4 text-sm text-muted">{message}</DialogBody>
-        <DialogFooter className="justify-end">
-          <Button type="button" variant="primary" onClick={onClose}>
-            知道了
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <GateDialog
+      open={open}
+      onOpenChange={(next) => !next && onClose()}
+      reason="trust_level"
+      title={title}
+      message={message}
+    />
   );
 }

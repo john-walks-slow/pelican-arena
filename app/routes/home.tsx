@@ -1,8 +1,9 @@
 import { ArrowUpDown, Code2, PenLine, Search, Shapes, X } from "lucide-react";
 import { type CSSProperties, useCallback, useEffect, useState } from "react";
-import { Link, useFetcher, useLocation, useSearchParams } from "react-router";
+import { Link, useFetcher, useLocation, useNavigate, useSearchParams } from "react-router";
 import type { Route } from "./+types/home";
 import { Avatar } from "~/components/avatar";
+import { useGate } from "~/components/gate-dialog";
 import { LoadMore } from "~/components/load-more";
 import { PageHeader } from "~/components/page-header";
 import { SubmissionPreview } from "~/components/submission-preview";
@@ -123,6 +124,8 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const { prompts, nextPage, total, q, kind, sort, stats, usercontentOrigin } = loaderData;
   const { pathname, search } = useLocation();
   const [, setParams] = useSearchParams();
+  const navigate = useNavigate();
+  const gate = useGate();
   const user = useOptionalUser();
   const fetcher = useFetcher<MorePrompts>();
 
@@ -192,14 +195,23 @@ export default function Home({ loaderData }: Route.ComponentProps) {
           </>
         }
         actions={
-          can(user, "createPrompt") ? (
-            <Button asChild variant="primary" className="gap-1.5">
-              <Link to="/prompts/new" prefetch="intent">
-                <PenLine className="size-4" strokeWidth={1.75} />
-                出题
-              </Link>
-            </Button>
-          ) : undefined
+          <Button
+            type="button"
+            variant="primary"
+            className="gap-1.5"
+            onClick={() => {
+              gate.guard(
+                "createPrompt",
+                () => {
+                  navigate("/prompts/new");
+                },
+                { returnTo: "/prompts/new" },
+              );
+            }}
+          >
+            <PenLine className="size-4" strokeWidth={1.75} />
+            出题
+          </Button>
         }
       />
 
@@ -253,14 +265,21 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             ) : (
               <>
                 还没有题目。
-                {can(user, "createPrompt") && (
-                  <Link
-                    to="/prompts/new"
-                    className="ml-1 font-medium text-accent hover:underline"
-                  >
-                    出第一道题
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    gate.guard(
+                      "createPrompt",
+                      () => {
+                        navigate("/prompts/new");
+                      },
+                      { returnTo: "/prompts/new" },
+                    );
+                  }}
+                  className="ml-1 font-medium text-accent hover:underline cursor-pointer"
+                >
+                  出第一道题
+                </button>
               </>
             )}
           </p>

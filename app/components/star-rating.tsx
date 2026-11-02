@@ -2,6 +2,7 @@ import { Star } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useFetcher } from "react-router";
 import { toast } from "~/components/ui/toaster";
+import { useGate } from "~/components/gate-dialog";
 import { calculateRatingFromRatio, formatRatingLabel } from "~/lib/rating";
 
 export function StarRating({
@@ -11,6 +12,7 @@ export function StarRating({
   current: number | null;
   disabledReason?: string;
 }) {
+  const gate = useGate();
   const fetcher = useFetcher<{ stars: number } | { error: string }>();
   const [hover, setHover] = useState(0);
   const [optimistic, setOptimistic] = useState<number | null>(null);
@@ -26,12 +28,16 @@ export function StarRating({
     setOptimistic(null);
     setHover(0);
     if ("error" in result) {
-      toast.error(result.error);
+      if (result.error.includes("最多") || result.error.includes("上限")) {
+        gate.open({ reason: "daily_limit", action: "rate", message: result.error });
+      } else {
+        toast.error(result.error);
+      }
       return;
     }
     if (result.stars) toast.success(`已评 ${result.stars} 星`);
     else toast("评分已取消");
-  }, [fetcher.data]);
+  }, [fetcher.data, gate]);
 
   useEffect(() => {
     setOptimistic(null);
@@ -42,9 +48,21 @@ export function StarRating({
   const shown = hover || value;
 
   const commitRating = (stars: number) => {
-    setOptimistic(stars);
-    setHover(0);
-    fetcher.submit({ intent: "rate", stars: String(stars) }, { method: "post" });
+    if (disabledReason) return;
+    gate.guard(
+      "rate",
+      () => {
+        setOptimistic(stars);
+        setHover(0);
+        fetcher.submit({ intent: "rate", stars: String(stars) }, { method: "post" });
+      },
+      {
+        onBlocked: () => {
+          setOptimistic(null);
+          setHover(0);
+        },
+      },
+    );
   };
 
   const getScoreFromClientX = (clientX: number): number => {

@@ -15,6 +15,7 @@ import type { Route } from "./+types/root";
 import { AppShell, baseScreenKey } from "./components/app-shell";
 import { BootScreen } from "./components/boot-screen";
 import { Button } from "./components/ui/button";
+import { GateProvider } from "./components/gate-dialog";
 import { toast, Toaster } from "./components/ui/toaster";
 import { moderationCounts } from "./lib/moderation.server";
 import { clearRouteCache } from "./lib/route-cache";
@@ -146,14 +147,14 @@ export default function App({ loaderData }: Route.ComponentProps) {
   }
 
   return (
-    <>
+    <GateProvider user={loaderData.user}>
       <FlashToasts flash={loaderData.toast} />
       <AppShell user={loaderData.user} reviewCount={loaderData.review?.total}>
         <div key={screenKey} data-motion={motion} className="route-stage">
           <Outlet />
         </div>
       </AppShell>
-    </>
+    </GateProvider>
   );
 }
 

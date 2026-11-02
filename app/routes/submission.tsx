@@ -220,22 +220,10 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const live = s.status === "active" && prompt.status === "active";
   const ratingBlock = !live
     ? "答案未公开，暂不能打分"
-    : !user
-      ? "登录后可打分"
-      : user.id === s.author.id
-        ? "这是你提交的答案"
-        : !can(user, "rate")
-          ? denyReason(user, "rate")
-          : undefined;
-  const reportBlock =
-    !user || isAuthor
-      ? undefined
-      : !can(user, "report")
-        ? denyReason(user, "report")
-        : !live
-          ? "答案未公开，不能举报"
-          : undefined;
-  const showReport = Boolean(user && !isAuthor);
+    : isAuthor
+      ? "这是你提交的答案"
+      : undefined;
+  const showReport = Boolean(!isAuthor);
 
   return (
     <div className="mx-auto max-w-[1240px]">
@@ -480,7 +468,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                   target="submission"
                   targetId={s.id}
                   reported={reported}
-                  disabledReason={reportBlock}
                 />
               </div>
             )}

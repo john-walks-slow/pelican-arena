@@ -6,7 +6,7 @@ import {
   useParams,
 } from "react-router";
 import type { Route } from "./+types/submit";
-import { SubmissionErrorDialog } from "~/components/submission/submission-error-dialog";
+import { GateDialog, type GateReason } from "~/components/gate-dialog";
 import { SubmissionForm } from "~/components/submission/submission-form";
 import { BundleError } from "~/lib/bundle";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
@@ -87,17 +87,29 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   const { promptId = "" } = useParams();
   const { search } = useLocation();
   const { open, close } = useDialogClose(promptId ? `/p/${promptId}${search}` : "/");
-  let title = "无法提交答案";
+  let reason: GateReason = "trust_level";
+  let title: string | undefined;
   let message = "加载失败，请稍后再试。";
+
   if (isRouteErrorResponse(error)) {
-    if (error.status === 403) title = "没有提交权限";
-    if (typeof error.data === "string") message = error.data;
+    if (error.status === 403) {
+      reason = "trust_level";
+      if (typeof error.data === "string") message = error.data;
+    } else if (error.status === 429) {
+      reason = "daily_limit";
+      if (typeof error.data === "string") message = error.data;
+    } else {
+      title = "无法提交答案";
+      if (typeof error.data === "string") message = error.data;
+    }
   }
 
   return (
-    <SubmissionErrorDialog
+    <GateDialog
       open={open}
-      onClose={close}
+      onOpenChange={(next) => !next && close()}
+      reason={reason}
+      action="submit"
       title={title}
       message={message}
     />

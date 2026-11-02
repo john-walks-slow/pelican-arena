@@ -41,6 +41,13 @@ export const LIMIT_NOUNS: Record<LimitedAction, string> = {
   report: "举报",
 };
 
+export const ACTION_LABELS: Record<Action, string> = {
+  createPrompt: "出题",
+  submit: "提交答案",
+  rate: "评分",
+  report: "举报",
+};
+
 export function can(user: Pick<User, "trustLevel" | "silenced" | "role"> | null, action: Action) {
   if (!user) return false;
   if (user.role === "admin") return true;
