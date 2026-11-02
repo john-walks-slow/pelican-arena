@@ -14,12 +14,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover";
-import {
-  PROVIDER_CATEGORIES,
-  providerCategoryLabel,
-  type CatalogEntry,
-  type CatalogKind,
-} from "~/lib/catalog";
+import type { CatalogEntry, CatalogKind } from "~/lib/catalog";
 import { cn } from "~/lib/utils";
 
 interface ComboboxProps {
@@ -83,14 +78,7 @@ export function Combobox({
             const data = raw as { items?: CatalogEntry[] } | null;
             if (!data || controller.signal.aborted) return;
             if (Array.isArray(data?.items))
-              setList(
-                data.items.map(({ id, name, category, reasoning }) => ({
-                  id,
-                  name,
-                  category,
-                  reasoning,
-                })),
-              );
+              setList(data.items.map(({ id, name, reasoning }) => ({ id, name, reasoning })));
           })
           .catch(() => {})
           .finally(() => {
@@ -113,17 +101,6 @@ export function Combobox({
   const isCustomNew =
     query.trim().length > 0 &&
     !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
-
-  const groups = React.useMemo(() => {
-    if (!list.some((option) => option.category)) return null;
-    const order: string[] = PROVIDER_CATEGORIES.map((category) => category.id);
-    const buckets = new Map<string, CatalogEntry[]>();
-    for (const option of list) {
-      const key = option.category ?? "other";
-      buckets.set(key, [...(buckets.get(key) ?? []), option]);
-    }
-    return [...buckets.entries()].sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]));
-  }, [list]);
 
   function renderOption(option: CatalogEntry) {
     const isSelected = value.toLowerCase() === option.name.toLowerCase();
@@ -244,13 +221,7 @@ export function Combobox({
                 </CommandGroup>
               )}
 
-              {groups
-                ? groups.map(([category, options]) => (
-                    <CommandGroup key={category} heading={providerCategoryLabel(category)}>
-                      {options.map(renderOption)}
-                    </CommandGroup>
-                  ))
-                : <CommandGroup>{list.map(renderOption)}</CommandGroup>}
+              <CommandGroup>{list.map(renderOption)}</CommandGroup>
             </CommandList>
           </Command>
         </PopoverContent>

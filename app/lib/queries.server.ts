@@ -131,22 +131,19 @@ export async function searchCatalog(
   }
 
   if (kind === "providers") {
-    const where = query ? nameLike(providers.name, query) : undefined;
+    const where = query
+      ? and(eq(providers.hidden, false), nameLike(providers.name, query))
+      : eq(providers.hidden, false);
     const [rows, [total]] = await Promise.all([
       d
-        .select({
-          id: providers.id,
-          name: providers.name,
-          category: providers.category,
-          uses: count(submissions.id),
-        })
+        .select({ id: providers.id, name: providers.name, uses: count(submissions.id) })
         .from(providers)
         .leftJoin(
           submissions,
           and(eq(submissions.providerId, providers.id), eq(submissions.status, "active")),
         )
         .where(where)
-        .groupBy(providers.id, providers.name, providers.category, providers.rank)
+        .groupBy(providers.id, providers.name, providers.rank)
         .orderBy(asc(providers.rank), desc(count(submissions.id)), asc(providers.name))
         .limit(limit),
       d.select({ n: count() }).from(providers).where(where),
@@ -205,7 +202,7 @@ export async function getCatalog(): Promise<Catalog> {
   ]);
   return {
     models: m.items.map(({ id, name, reasoning }) => ({ id, name, reasoning })),
-    providers: p.items.map(({ id, name, category }) => ({ id, name, category })),
+    providers: p.items.map(({ id, name }) => ({ id, name })),
     harnesses: h.items.map(({ id, name }) => ({ id, name })),
     mods: md.items.map(({ id, name }) => ({ id, name })),
   };

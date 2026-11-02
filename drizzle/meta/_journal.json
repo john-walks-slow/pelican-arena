@@ -71,6 +71,13 @@
       "when": 1793584872115,
       "tag": "0011_reasoning",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1793585538680,
+      "tag": "0012_provider_curation",
+      "breakpoints": true
     }
   ]
 }
