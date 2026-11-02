@@ -61,13 +61,11 @@ export function Combobox({
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const [list, setList] = React.useState<CatalogEntry[]>(options);
-  const [total, setTotal] = React.useState(options.length);
   const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
     if (open) return;
     setList(options);
-    setTotal(options.length);
     setQuery("");
   }, [open, options]);
 
@@ -82,7 +80,7 @@ export function Combobox({
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((raw: unknown) => {
-            const data = raw as { items?: CatalogEntry[]; total?: number } | null;
+            const data = raw as { items?: CatalogEntry[] } | null;
             if (!data || controller.signal.aborted) return;
             if (Array.isArray(data?.items))
               setList(
@@ -93,7 +91,6 @@ export function Combobox({
                   reasoning,
                 })),
               );
-            if (typeof data?.total === "number") setTotal(data.total);
           })
           .catch(() => {})
           .finally(() => {
@@ -255,11 +252,6 @@ export function Combobox({
                   ))
                 : <CommandGroup>{list.map(renderOption)}</CommandGroup>}
             </CommandList>
-            {kind && total > list.length && (
-              <p className="border-t border-rule px-3 py-1.5 text-[11px] text-muted">
-                共 {total} 项，继续输入以搜索
-              </p>
-            )}
           </Command>
         </PopoverContent>
       </Popover>
