@@ -18,7 +18,7 @@ export function shareSnippet({ pageUrl, cardUrl, title }: ShareTarget, format: S
   switch (format) {
     case "card":
       // Discourse 原生渲染 <picture>，发帖后直接显示卡片
-      return `<a href="${pageUrl}">\n<picture><source type="image/svg+xml" srcset="${cardUrl} 1x"><img width="600" height="315" alt="${escapeAttr(title)}"></picture>\n</a>`;
+      return `<a href="${pageUrl}">\n<picture><source type="image/svg+xml" srcset="${cardUrl} 1x"><img width="600" height="380" alt="${escapeAttr(title)}"></picture>\n</a>`;
     case "markdown":
       return `[![${escapeMdAlt(title)}](${cardUrl})](${pageUrl})`;
   }

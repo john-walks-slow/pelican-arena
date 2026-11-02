@@ -65,10 +65,19 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
           <DialogTitle>分享到社区</DialogTitle>
           <DialogDescription className="sr-only">复制卡片代码直接发帖</DialogDescription>
         </DialogHeader>
-        <DialogBody className="space-y-3.5 px-5 py-4">
+        <DialogBody className="space-y-3 px-5 py-4">
           <ShareCardPreview data={cardData} />
 
-          <Segmented label="分享格式" value={format} options={SHARE_FORMATS} onChange={setFormat} />
+          <div className="flex items-center justify-between gap-2 pt-0.5">
+            <span className="text-xs text-muted">分享格式</span>
+            <Segmented
+              label="分享格式"
+              value={format}
+              options={SHARE_FORMATS}
+              onChange={setFormat}
+            />
+          </div>
+
           <textarea
             readOnly
             value={snippet}
