@@ -42,7 +42,7 @@ import {
   setRating,
 } from "~/lib/queries.server";
 import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
-import { submissionUrl, usercontentUrl } from "~/lib/sandbox";
+import { submissionUrl, thumbnailUrl, usercontentUrl } from "~/lib/sandbox";
 import { previewGrantFor } from "~/lib/preview-grant.server";
 import { hasReported } from "~/lib/moderation.server";
 import { flashToast, getUser, requireUser } from "~/lib/session.server";
@@ -53,12 +53,22 @@ import { useOptionalUser } from "~/lib/use-user";
 
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "找不到答案 · Pelican Arena" }];
-  const { submission: s, prompt } = loaderData;
+  const { submission: s, prompt, usercontentOrigin } = loaderData;
   const title = `${s.model.name} · ${s.provider.name} — ${prompt.title}`;
+  const image = prompt.kind === "markdown" ? null : thumbnailUrl(usercontentOrigin, s.id);
   return [
     { title: `${title} · Pelican Arena` },
     { property: "og:title", content: title },
-    { property: "og:description", promptTitle: prompt.title, content: prompt.body.slice(0, 160) },
+    { property: "og:description", content: prompt.body.slice(0, 160) },
+    ...(image
+      ? [
+          { property: "og:image", content: image },
+          { property: "og:image:width", content: "1200" },
+          { property: "og:image:height", content: "630" },
+          { name: "twitter:card", content: "summary_large_image" },
+          { name: "twitter:image", content: image },
+        ]
+      : [{ name: "twitter:card", content: "summary" }]),
   ];
 }
 
@@ -304,8 +314,8 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
       )}
 
       <div className="mt-2.5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <section className="reveal-tier-1 min-w-0 overflow-hidden rounded-card border border-border bg-surface">
-          <div className="flex h-10 items-center border-b border-border px-1.5">
+        <section className="reveal-tier-1 flex min-w-0 flex-col overflow-hidden rounded-card border border-border bg-surface">
+          <div className="flex h-10 shrink-0 items-center border-b border-border px-1.5">
             {(
               [
                 ["preview", <Eye key="e" className="size-3.5" strokeWidth={1.75} />, "预览"],
@@ -366,7 +376,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
           {tab === "preview" ? (
             <div
               id="work-panel"
-              className="h-[min(74vh,860px)] bg-surface"
+              className="min-h-[min(74vh,860px)] flex-1 bg-surface"
             >
               {kind === "web" ? (
                 <LiveFrame src={pageUrl} title={`${s.model.name} 的答案`} className="size-full" />

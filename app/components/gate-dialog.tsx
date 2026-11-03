@@ -1,5 +1,6 @@
 import * as React from "react";
 import { useLocation } from "react-router";
+import { ContentRulesDialog } from "~/components/content-rules-dialog";
 import { Button } from "~/components/ui/button";
 import {
   Dialog,
@@ -135,11 +136,16 @@ interface GateContextValue {
     onAllowed: () => void,
     options?: { returnTo?: string; onBlocked?: (reason: GateReason) => void },
   ) => boolean;
+  rulesAccepted: boolean;
+  openRules: (onAccepted?: () => void) => void;
+  viewRules: () => void;
 }
 
 const GateContext = React.createContext<GateContextValue | null>(null);
 
-export type GateUser = Pick<User, "trustLevel" | "silenced" | "role">;
+export type GateUser = Pick<User, "trustLevel" | "silenced" | "role"> & {
+  rulesAccepted?: boolean;
+};
 
 export function GateProvider({
   user,
@@ -152,6 +158,12 @@ export function GateProvider({
   const [dialogState, setDialogState] = React.useState<
     (GateOptions & { open: boolean }) | null
   >(null);
+  const [localRulesAccepted, setLocalRulesAccepted] = React.useState<boolean | null>(null);
+  const [rulesDialogOpen, setRulesDialogOpen] = React.useState(false);
+  const [rulesDialogMode, setRulesDialogMode] = React.useState<"mandatory" | "view">("mandatory");
+  const pendingAllowedRef = React.useRef<(() => void) | null>(null);
+
+  const isRulesAccepted = localRulesAccepted ?? Boolean(user?.rulesAccepted);
 
   const open = React.useCallback((options: GateOptions) => {
     setDialogState({ ...options, open: true });
@@ -159,6 +171,17 @@ export function GateProvider({
 
   const close = React.useCallback(() => {
     setDialogState((prev) => (prev ? { ...prev, open: false } : null));
+  }, []);
+
+  const openRules = React.useCallback((onAccepted?: () => void) => {
+    pendingAllowedRef.current = onAccepted ?? null;
+    setRulesDialogMode("mandatory");
+    setRulesDialogOpen(true);
+  }, []);
+
+  const viewRules = React.useCallback(() => {
+    setRulesDialogMode("view");
+    setRulesDialogOpen(true);
   }, []);
 
   const guard = React.useCallback(
@@ -194,15 +217,28 @@ export function GateProvider({
         return false;
       }
 
+      if ((action === "createPrompt" || action === "submit") && !isRulesAccepted) {
+        pendingAllowedRef.current = onAllowed;
+        setRulesDialogOpen(true);
+        return false;
+      }
+
       onAllowed();
       return true;
     },
-    [user, location.pathname, location.search, open],
+    [user, location.pathname, location.search, open, isRulesAccepted],
   );
 
   const contextValue = React.useMemo<GateContextValue>(
-    () => ({ open, close, guard }),
-    [open, close, guard],
+    () => ({
+      open,
+      close,
+      guard,
+      rulesAccepted: isRulesAccepted,
+      openRules,
+      viewRules,
+    }),
+    [open, close, guard, isRulesAccepted, openRules, viewRules],
   );
 
   return (
@@ -223,6 +259,23 @@ export function GateProvider({
           currentTrustLevel={dialogState.currentTrustLevel}
         />
       )}
+      <ContentRulesDialog
+        open={rulesDialogOpen}
+        mode={rulesDialogMode}
+        onOpenChange={(next) => {
+          if (!next) {
+            setRulesDialogOpen(false);
+            pendingAllowedRef.current = null;
+          }
+        }}
+        onAccepted={() => {
+          setLocalRulesAccepted(true);
+          const next = pendingAllowedRef.current;
+          pendingAllowedRef.current = null;
+          setRulesDialogOpen(false);
+          next?.();
+        }}
+      />
     </GateContext.Provider>
   );
 }

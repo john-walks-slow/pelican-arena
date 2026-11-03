@@ -78,30 +78,9 @@ async function svgToWebpBlob(svgText: string): Promise<Blob | null> {
 }
 
 /**
- * Extracts an SVG element from an HTML string if present, returning its XML string.
- */
-function extractSvgFromHtml(html: string): string | null {
-  try {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, "text/html");
-    const svg = doc.querySelector("svg");
-    if (svg) {
-      // Ensure essential namespace
-      if (!svg.getAttribute("xmlns")) {
-        svg.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-      }
-      return new XMLSerializer().serializeToString(svg);
-    }
-  } catch {
-    // Ignore parse errors
-  }
-  return null;
-}
-
-/**
  * Renders an HTML string inside an off-screen sandbox iframe and retrieves its visual snapshot.
  */
-async function captureHtmlViaIframe(html: string, timeoutMs = 1200): Promise<Blob | null> {
+async function captureHtmlViaIframe(html: string, timeoutMs = 2500): Promise<Blob | null> {
   return new Promise((resolve) => {
     let resolved = false;
     let timer: number | null = null;
@@ -159,28 +138,76 @@ async function captureHtmlViaIframe(html: string, timeoutMs = 1200): Promise<Blo
       const injectedScript = `
 <script>
 (() => {
+  // Only a graphic that actually covers the viewport is the artwork; icon-sized
+  // <svg>s scattered in the page chrome must never become the thumbnail.
+  const MIN_COVERAGE = 0.35;
+  const viewport = innerWidth * innerHeight;
+  const coverage = (el) => {
+    const r = el.getBoundingClientRect();
+    const w = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+    const h = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+    return (w * h) / viewport;
+  };
+  const dominant = (selector) =>
+    [...document.querySelectorAll(selector)]
+      .map((el) => ({ el, cover: coverage(el) }))
+      .filter((item) => item.cover >= MIN_COVERAGE)
+      .sort((a, b) => b.cover - a.cover);
+
+  const hasContent = (dataUrl) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const probe = document.createElement('canvas');
+        probe.width = 32;
+        probe.height = 18;
+        const ctx = probe.getContext('2d');
+        ctx.drawImage(img, 0, 0, 32, 18);
+        const data = ctx.getImageData(0, 0, 32, 18).data;
+        let min = 255;
+        let max = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i + 3] < 8) continue;
+          const l = (data[i] + data[i + 1] + data[i + 2]) / 3;
+          if (l < min) min = l;
+          if (l > max) max = l;
+        }
+        resolve(max - min > 6);
+      } catch {
+        resolve(false);
+      }
+    };
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
+
+  const capture = async () => {
+    for (const { el } of dominant('canvas')) {
+      try {
+        const dataUrl = el.toDataURL('image/webp', 0.85);
+        if (dataUrl.length > 2000 && (await hasContent(dataUrl))) {
+          window.parent.postMessage({ type: 'PELICAN_CAPTURE_DATA', dataUrl }, '*');
+          return;
+        }
+      } catch {}
+    }
+
+    const svg = dominant('svg')[0];
+    if (svg) {
+      if (!svg.el.getAttribute('xmlns')) svg.el.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      const xml = new XMLSerializer().serializeToString(svg.el);
+      window.parent.postMessage({ type: 'PELICAN_CAPTURE_SVG', xml }, '*');
+      return;
+    }
+
+    window.parent.postMessage({ type: 'PELICAN_CAPTURE_NONE' }, '*');
+  };
+
   window.addEventListener('load', () => {
     requestAnimationFrame(() => {
       setTimeout(() => {
-        try {
-          const canvas = document.querySelector('canvas');
-          if (canvas) {
-            try {
-              const dataUrl = canvas.toDataURL('image/webp', 0.85);
-              window.parent.postMessage({ type: 'PELICAN_CAPTURE_DATA', dataUrl }, '*');
-              return;
-            } catch (err) {}
-          }
-          const svg = document.querySelector('svg');
-          if (svg) {
-            if (!svg.getAttribute('xmlns')) svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-            const xml = new XMLSerializer().serializeToString(svg);
-            window.parent.postMessage({ type: 'PELICAN_CAPTURE_SVG', xml }, '*');
-            return;
-          }
-        } catch (e) {}
-        window.parent.postMessage({ type: 'PELICAN_CAPTURE_NONE' }, '*');
-      }, 200);
+        capture().catch(() => window.parent.postMessage({ type: 'PELICAN_CAPTURE_NONE' }, '*'));
+      }, 400);
     });
   });
 })();
@@ -220,16 +247,10 @@ export async function captureClientThumbnail(
       return await svgToWebpBlob(text);
     }
 
-    // 2. Web (HTML) input
+    // 2. Web (HTML) input: always render the page, then trust only a dominant
+    // canvas or SVG. Scraping the source HTML directly picks up whatever icon
+    // happens to appear first, so it is not used.
     if (kind === "web") {
-      // Fast path: Check if the HTML directly contains an SVG graphic
-      const svgXml = extractSvgFromHtml(text);
-      if (svgXml) {
-        const blob = await svgToWebpBlob(svgXml);
-        if (blob) return blob;
-      }
-
-      // Offscreen iframe path for interactive/animated/canvas components
       return await captureHtmlViaIframe(text);
     }
   } catch (err) {

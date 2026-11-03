@@ -12,7 +12,7 @@ describe("outputRequirements", () => {
     expect(rules).toContain("禁止读取 Skill。");
     expect(rules).toContain("首屏就要呈现主要效果，不要用引导页占位。");
     expect(rules).toContain(
-      "可以使用 Canvas、WebGL、CSS 动画，以及公开 CDN 上的库。",
+      "可以使用 Canvas、WebGL、CSS 动画；如需第三方库，直接使用公开 CDN 的完整链接引入，不要使用 import map。",
     );
   });
 
@@ -22,7 +22,7 @@ describe("outputRequirements", () => {
       "禁止使用任何外部库或框架，全部使用原生 HTML、CSS 与 JavaScript 实现（可使用 Canvas、WebGL、CSS 动画等原生特性）。",
     );
     expect(rules).not.toContain(
-      "可以使用 Canvas、WebGL、CSS 动画，以及公开 CDN 上的库。",
+      "可以使用 Canvas、WebGL、CSS 动画；如需第三方库，直接使用公开 CDN 的完整链接引入，不要使用 import map。",
     );
   });
 

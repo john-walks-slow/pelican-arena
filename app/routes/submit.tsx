@@ -1,3 +1,4 @@
+import * as React from "react";
 import {
   data,
   isRouteErrorResponse,
@@ -6,14 +7,17 @@ import {
   useParams,
 } from "react-router";
 import type { Route } from "./+types/submit";
-import { GateDialog, type GateReason } from "~/components/gate-dialog";
+import { GateDialog, useGate, type GateReason } from "~/components/gate-dialog";
 import { SubmissionForm } from "~/components/submission/submission-form";
 import { BundleError } from "~/lib/bundle";
+import { cloudflareContext } from "~/lib/cloudflare-context";
+import { hasAcceptedContentRules } from "~/lib/content-rules";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { safeFrom, withFrom } from "~/lib/navigation";
 import { getCatalog, getPrompt } from "~/lib/queries.server";
 import { flashToast } from "~/lib/session.server";
 import { parseSubmissionMeta } from "~/lib/submission-input";
+import { ensureThumbnail } from "~/lib/screenshot.server";
 import { createSubmission, readBundleEntries } from "~/lib/submissions.server";
 import { useDialogClose } from "~/lib/use-dialog-close";
 
@@ -36,11 +40,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   };
 }
 
-export async function action({ request, params }: Route.ActionArgs) {
+export async function action({ request, params, context }: Route.ActionArgs) {
   const user = await requirePermission(request, "submit");
   const prompt = await getPrompt(params.promptId);
   if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
 
+  if (!hasAcceptedContentRules(user)) return data({ error: "请先阅读并同意内容规则" }, { status: 403 });
   const limitError = await dailyLimitError(user, "submit");
   if (limitError) return data({ error: limitError }, { status: 429 });
 
@@ -64,6 +69,16 @@ export async function action({ request, params }: Route.ActionArgs) {
       meta,
       thumbnail,
     });
+    if (!thumbnail) {
+      // The client could not capture a poster; render one once, off the
+      // critical path of this submission.
+      context.get(cloudflareContext).ctx.waitUntil(
+        ensureThumbnail(id, prompt.kind).catch((err) =>
+          console.error("Background thumbnail rendering failed:", id, err),
+        ),
+      );
+    }
+
     const from = safeFrom(new URL(request.url).searchParams.get("from"));
     return replace(withFrom(`/s/${id}`, from), {
       headers: { "Set-Cookie": await flashToast(request, "已提交，感谢你的参与") },
@@ -78,6 +93,13 @@ export default function Submit({ loaderData }: Route.ComponentProps) {
   const { prompt, catalog } = loaderData;
   const { search } = useLocation();
   const { open, close } = useDialogClose(`/p/${prompt.id}${search}`);
+  const gate = useGate();
+
+  React.useEffect(() => {
+    if (!gate.rulesAccepted) {
+      gate.openRules();
+    }
+  }, [gate.rulesAccepted, gate.openRules]);
 
   return (
     <SubmissionForm

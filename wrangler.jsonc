@@ -15,15 +15,13 @@
 		"LINUXDO_CLIENT_ID": "WEeAp0GneHGJhKT3jWhtSnMPAFhs7BH4",
 		"ADMIN_USERNAMES": "JohnnRen",
 		// New prompts publish immediately; set to "true" to review them first.
-		"PROMPT_REVIEW": "false"
+		"PROMPT_REVIEW": "false",
+		"RENDER_ORIGIN": "https://render.johnnren.qzz.io"
 	},
 	"routes": [
 		{ "pattern": "pelicanarena.dpdns.org", "custom_domain": true },
 		{ "pattern": "elsewhere.dpdns.org", "custom_domain": true }
 	],
-	"browser": {
-		"binding": "BROWSER"
-	},
 	"r2_buckets": [
 		{
 			"binding": "FILES",

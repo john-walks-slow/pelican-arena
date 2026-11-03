@@ -77,6 +77,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         trustLevel: user.trustLevel,
         silenced: user.silenced,
         role: user.role,
+        rulesAccepted: Boolean(user.rulesAcceptedAt),
       },
     },
     { headers },

@@ -51,6 +51,36 @@ describe("share cards", () => {
   it("strips Markdown from the excerpt", () => {
     expect(plainExcerpt("# 标题\n\n```js\ncode()\n```\n**粗体** [链接](http://x)")).toBe("标题 粗体 链接");
   });
+
+  it("renders a bare brand mark in cardShell without a background disc", () => {
+    const svg = renderAnswerCard(answer);
+    expect(svg).not.toContain('id="disc-shadow"');
+    expect(svg).toContain('translate(14 12) scale(0.85)');
+  });
+
+  it("renders full prompt content without multi-column split for markdown prompts", () => {
+    const markdownSvg = renderPromptCard({
+      title: "数据库迁移的心智模型",
+      body: "讲清楚为什么迁移只能向前，回滚为什么危险。",
+      kind: "markdown",
+      answers: 5,
+      author: "alice",
+      topSubmissions: [
+        { modelName: "Model A" },
+        { modelName: "Model B" },
+      ],
+    });
+
+    // 不应有作品预览分栏
+    expect(markdownSvg).not.toContain("作品预览");
+    // 上半部分直接展示题目内容与标签
+    expect(markdownSvg).toContain("Markdown</text>");
+    expect(markdownSvg).toContain("数据库迁移的心智模型");
+    expect(markdownSvg).toContain("讲清楚为什么迁移只能向前");
+    // 文本题按钮为“看看谁答得最好 →”
+    expect(markdownSvg).toContain("看看谁答得最好 →");
+    expect(markdownSvg).toContain("出题者 · @alice");
+  });
 });
 
 describe("share snippets", () => {

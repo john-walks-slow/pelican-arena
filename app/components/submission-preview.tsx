@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState } from "react";
 import { Markdown } from "~/components/markdown";
 import { PagePreview } from "~/components/page-preview";
-import { PreviewSkeleton } from "~/components/preview-skeleton";
+import { PreviewFrame } from "~/components/preview-frame";
 import type { PromptKind } from "~/lib/kinds";
 import { previewUrl, thumbnailUrl } from "~/lib/sandbox";
 import { cn } from "~/lib/utils";
@@ -15,44 +14,13 @@ function SvgPreview({
   alt: string;
   className?: string;
 }) {
-  const [loaded, setLoaded] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  useEffect(() => {
-    setLoaded(false);
-    if (imgRef.current?.complete && imgRef.current?.naturalWidth > 0) {
-      setLoaded(true);
-    }
-  }, [src]);
-
   return (
-    <div
-      className={cn(
-        "relative flex aspect-[16/10] items-center justify-center overflow-hidden border-b border-rule bg-surface p-6",
-        className,
-      )}
-    >
-      <div
-        className={cn(
-          "absolute inset-0 transition-opacity duration-300 ease-out",
-          loaded ? "pointer-events-none opacity-0" : "opacity-100",
-        )}
-      >
-        <PreviewSkeleton />
-      </div>
-      <img
-        ref={imgRef}
-        src={src}
-        alt={alt}
-        loading="lazy"
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        className={cn(
-          "max-h-full max-w-full object-contain transition-opacity duration-300 ease-out",
-          loaded ? "opacity-100" : "opacity-0",
-        )}
-      />
-    </div>
+    <PreviewFrame
+      title={alt}
+      posterSrc={src}
+      posterClassName="object-contain p-6"
+      className={cn("aspect-[16/10] border-b border-rule bg-surface", className)}
+    />
   );
 }
 

@@ -47,7 +47,9 @@ import { canViewPrompt, isAdmin } from "~/lib/moderation";
 import { hasReported, promptReviewEnabled } from "~/lib/moderation.server";
 import { origins } from "~/lib/origins.server";
 import { promptWithRequirements } from "~/lib/output-requirements";
+import { thumbnailUrl } from "~/lib/sandbox";
 import { can, denyReason } from "~/lib/permissions";
+import { promptShouldRevalidate } from "~/lib/prompt-revalidate";
 import {
   getPrompt,
   getPromptFacets,
@@ -62,13 +64,24 @@ const MAX_COMPARE = 4;
 
 export function meta({ loaderData }: Route.MetaArgs) {
   if (!loaderData) return [{ title: "找不到题目 · Pelican Arena" }];
-  const { prompt, total } = loaderData;
+  const { prompt, total, submissions, usercontentOrigin } = loaderData;
   const description = `${total} 份答案。${prompt.body.slice(0, 120)}`;
+  const top = prompt.kind === "markdown" ? null : submissions[0];
+  const image = top ? thumbnailUrl(usercontentOrigin, top.id) : null;
   return [
     { title: `${prompt.title} · Pelican Arena` },
     { name: "description", content: description },
     { property: "og:title", content: prompt.title },
     { property: "og:description", content: description },
+    ...(image
+      ? [
+          { property: "og:image", content: image },
+          { property: "og:image:width", content: "1200" },
+          { property: "og:image:height", content: "630" },
+          { name: "twitter:card", content: "summary_large_image" },
+          { name: "twitter:image", content: image },
+        ]
+      : [{ name: "twitter:card", content: "summary" }]),
   ];
 }
 
@@ -118,18 +131,8 @@ export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) 
 }
 
 /** The submit dialog is a child route; the gallery behind it must not reload on pure client route toggles. */
-export function shouldRevalidate({
-  formMethod,
-  actionResult,
-  currentUrl,
-  nextUrl,
-  defaultShouldRevalidate,
-}: ShouldRevalidateFunctionArgs) {
-  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
-  if (actionResult !== undefined) return defaultShouldRevalidate;
-  const withoutDialog = (pathname: string) => pathname.replace(/\/submit$/, "");
-  if (withoutDialog(currentUrl.pathname) === withoutDialog(nextUrl.pathname)) return false;
-  return defaultShouldRevalidate;
+export function shouldRevalidate(args: ShouldRevalidateFunctionArgs) {
+  return promptShouldRevalidate(args);
 }
 
 type Facets = Route.ComponentProps["loaderData"]["facets"];
@@ -248,10 +251,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
   const [items, setItems] = useState(submissions);
   const [next, setNext] = useState(nextPage);
   const [source, setSource] = useState(submissions);
+  const [sourceKey, setSourceKey] = useState(key);
   const [selected, setSelected] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
 
-  if (source !== submissions) {
+  if (sourceKey !== key || source !== submissions) {
+    setSourceKey(key);
     setSource(submissions);
     setItems(submissions);
     setNext(nextPage);

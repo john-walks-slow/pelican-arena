@@ -65,27 +65,18 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   const clean = normalizePath(path);
   if (!clean) return new Response("Not Found", { status: 404 });
 
-  let object = await bucket.get(bundleKey(id, clean));
-  if (!object && clean === "thumb.webp") {
-    try {
-      const [row] = await db()
-        .select({ kind: submissions.kind })
-        .from(submissions)
-        .where(eq(submissions.id, id));
-      if (row) {
-        const { getOrGenerateThumbnail } = await import("~/lib/screenshot.server");
-        await getOrGenerateThumbnail(id, row.kind);
-        object = await bucket.get(bundleKey(id, clean));
-      }
-    } catch (e) {
-      console.error("On-demand thumbnail generation failed for", id, e);
-    }
+  const object = await bucket.get(bundleKey(id, clean));
+  if (!object) {
+    // A missing thumbnail is a normal state, not a request to render one. The
+    // short cache keeps galleries from re-requesting it on every visit.
+    const headers =
+      clean === "thumb.webp" ? { "Cache-Control": "public, max-age=60" } : undefined;
+    return new Response("Not Found", { status: 404, headers });
   }
-  if (!object) return new Response("Not Found", { status: 404 });
 
   // Cache strategy to maximize CDN hits and minimize Worker invocations:
   // 1. Granted URLs are private/sensitive and must never be cached publicly.
-  // 2. Gallery previews (?preview=1) get short public CDN caching (60s) for rapid navigation.
+  // 2. Gallery previews (?preview=1) are revived for five minutes and cached at the edge for an hour.
   // 3. Static asset sub-resources (js, css, images, fonts, wasm) are immutable within a bundle
   //    and can be safely cached on edge and browser.
   // 4. Entry documents (HTML / SVG / Markdown) without preview stay `no-store` to ensure retracted

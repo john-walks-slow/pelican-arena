@@ -3,7 +3,7 @@ import type { Route } from "./+types/prompt.card";
 import { countActiveAnswers, getPrompt, listSubmissions } from "~/lib/queries.server";
 import { renderPromptCard } from "~/lib/share-card";
 import { cardResponse } from "~/lib/share-card.server";
-import { getOrGenerateThumbnail } from "~/lib/screenshot.server";
+import { thumbnailDataUri } from "~/lib/screenshot.server";
 
 export async function loader({ params }: Route.LoaderArgs) {
   const prompt = await getPrompt(params.promptId);
@@ -16,7 +16,7 @@ export async function loader({ params }: Route.LoaderArgs) {
 
   const topSubmissions = await Promise.all(
     topResult.submissions.map(async (sub) => {
-      const previewImage = await getOrGenerateThumbnail(sub.id, prompt.kind).catch(() => null);
+      const previewImage = await thumbnailDataUri(sub.id, prompt.kind).catch(() => null);
       return {
         modelName: sub.model.name,
         previewImage,

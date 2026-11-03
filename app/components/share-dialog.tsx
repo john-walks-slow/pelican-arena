@@ -13,6 +13,7 @@ import {
 } from "~/components/ui/dialog";
 import { Segmented } from "~/components/ui/segmented";
 import { toast } from "~/components/ui/toaster";
+import { THUMBNAIL_VERSION } from "~/lib/sandbox";
 import { SHARE_FORMATS, shareSnippet, type ShareFormat } from "~/lib/share";
 
 interface ShareDialogProps {
@@ -22,7 +23,7 @@ interface ShareDialogProps {
 }
 
 const CARD_WIDTH = 600;
-const CARD_HEIGHT = 380;
+const CARD_HEIGHT = 400;
 
 /** Previews the exact asset the snippet points at, so the dialog cannot drift from what gets posted. */
 function CardPreview({ src, alt }: { src: string; alt: string }) {
@@ -32,7 +33,7 @@ function CardPreview({ src, alt }: { src: string; alt: string }) {
 
   return (
     <div
-      className="relative aspect-[600/380] w-full overflow-hidden rounded-[14px] bg-white"
+      className="relative aspect-[600/400] w-full overflow-hidden rounded-[14px] bg-white"
       aria-busy={state === "loading"}
     >
       {state === "loading" && (
@@ -82,7 +83,8 @@ export function ShareDialog({ path, title, appOrigin }: ShareDialogProps) {
   useEffect(() => setOrigin(window.location.origin), []);
 
   const pageUrl = `${origin}${path}`;
-  const cardUrl = `${pageUrl}/card.svg`;
+  // Same version as the poster: a regenerated thumbnail must also refresh cards.
+  const cardUrl = `${pageUrl}/card.svg?v=${THUMBNAIL_VERSION}`;
   const snippet = shareSnippet({ pageUrl, cardUrl, title }, format);
 
   const copy = async () => {

@@ -27,4 +27,5 @@ export default [
   route("api/catalog", "routes/api.catalog.ts"),
   route("api/mine/prompts", "routes/api.mine.prompts.ts"),
   route("api/mine/submissions", "routes/api.mine.submissions.ts"),
+  route("api/rules/accept", "routes/api.rules.accept.ts"),
 ] satisfies RouteConfig;

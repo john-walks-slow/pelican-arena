@@ -38,6 +38,7 @@ export const users = sqliteTable("users", {
   banned: integer("banned", { mode: "boolean" }).notNull().default(false),
   createdAt: createdAt(),
   lastLoginAt: integer("last_login_at", { mode: "timestamp_ms" }),
+  rulesAcceptedAt: integer("rules_accepted_at", { mode: "timestamp_ms" }),
 });
 
 export const prompts = sqliteTable(

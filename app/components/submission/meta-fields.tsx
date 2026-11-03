@@ -1,4 +1,4 @@
-import { AppWindow, Brain, Cpu, Server } from "lucide-react";
+import { AppWindow, Brain, Cpu, Server, X } from "lucide-react";
 import { use, useEffect, useState } from "react";
 import { Combobox } from "~/components/ui/combobox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
@@ -43,7 +43,6 @@ export function SubmissionMetaFields({
 }) {
   const resolved = use(catalog);
   const [modelLevels, setModelLevels] = useState<string[] | null | undefined>(undefined);
-  const modOptions = [...new Set([...resolved.mods.map((m) => m.name), ...mods])];
 
   useEffect(() => {
     const name = model.trim();
@@ -75,9 +74,10 @@ export function SubmissionMetaFields({
   const reasoningOptions =
     reasoning && !levels.includes(reasoning) ? [...levels, reasoning] : levels;
 
-  function addMod(name: string) {
+  function toggleMod(name: string) {
     const clean = name.trim();
-    if (clean && !mods.includes(clean)) setMods([...mods, clean]);
+    if (!clean) return;
+    setMods(mods.includes(clean) ? mods.filter((m) => m !== clean) : [...mods, clean]);
   }
 
   return (
@@ -147,32 +147,26 @@ export function SubmissionMetaFields({
       <div>
         <label className="block text-xs font-medium text-muted">增强</label>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-          {modOptions.map((name) => {
-            const on = mods.includes(name);
-            return (
-              <button
-                key={name}
-                type="button"
-                aria-pressed={on}
-                onClick={() =>
-                  on ? setMods(mods.filter((m) => m !== name)) : setMods([...mods, name])
-                }
-                className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs transition-colors ${
-                  on
-                    ? "border-accent/30 bg-accent-soft font-medium text-accent-ink"
-                    : "border-control bg-surface text-muted hover:bg-raised hover:text-ink"
-                }`}
-              >
-                {name}
-              </button>
-            );
-          })}
+          {mods.map((name) => (
+            <button
+              key={name}
+              type="button"
+              title={`移除 ${name}`}
+              aria-label={`移除 ${name}`}
+              onClick={() => setMods(mods.filter((m) => m !== name))}
+              className="group inline-flex h-7 items-center gap-1 rounded-full border border-accent/30 bg-accent-soft px-2.5 text-xs font-medium text-accent-ink transition-colors hover:border-accent/50"
+            >
+              {name}
+              <X className="size-3 opacity-50 transition-opacity group-hover:opacity-100" strokeWidth={2} />
+            </button>
+          ))}
           <Combobox
             options={resolved.mods}
             kind="mods"
             value=""
-            onChange={addMod}
-            placeholder={mods.length > 0 ? "更多" : "添加增强"}
+            selected={mods}
+            onChange={toggleMod}
+            placeholder="添加增强"
             searchPlaceholder="搜索或新建增强"
             trigger="chip"
           />

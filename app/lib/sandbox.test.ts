@@ -58,7 +58,7 @@ describe("sandbox security policy and url builder", () => {
     const origin = "https://usercontent.example.com";
     const subId = "sub1234567890";
     expect(thumbnailUrl(origin, subId)).toBe(
-      "https://usercontent.example.com/sub1234567890/thumb.webp",
+      "https://usercontent.example.com/sub1234567890/thumb.webp?v=2",
     );
   });
 });

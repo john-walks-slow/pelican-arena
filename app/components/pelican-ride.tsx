@@ -43,7 +43,7 @@ export function PelicanRide({
         <Wheel className="pelican-ride-wheel-front" cx={23} />
 
         <path
-          d="M9 23l5-8h7l2 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.5 2-5 2.9-8 2.5"
+          d="M9 23l5-8h7l2 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.32 2.56-5.24 3.5-8 2.5"
           stroke="currentColor"
           strokeWidth="2"
           strokeLinecap="round"

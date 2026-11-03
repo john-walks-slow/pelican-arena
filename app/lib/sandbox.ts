@@ -48,11 +48,17 @@ export function previewUrl(
   return `${submissionUrl(origin, submissionId, kind, grant)}?preview=1`;
 }
 
+/**
+ * Bump when thumbnails are regenerated in bulk: the version becomes part of the
+ * URL, so browsers and the edge stop serving the previous render.
+ */
+export const THUMBNAIL_VERSION = "2";
+
 /** Static thumbnail preview URL for a submission. */
 export function thumbnailUrl(
   origin: string,
   submissionId: string,
   grant?: string | null,
 ) {
-  return usercontentUrl(origin, submissionId, "thumb.webp", grant);
+  return `${usercontentUrl(origin, submissionId, "thumb.webp", grant)}?v=${THUMBNAIL_VERSION}`;
 }

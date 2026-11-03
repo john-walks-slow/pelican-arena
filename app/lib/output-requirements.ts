@@ -18,11 +18,11 @@ export function outputRequirements(
 
   if (kind === "web") {
     const libraryRule = allowLibraries
-      ? "可以使用 Canvas、WebGL、CSS 动画，以及公开 CDN 上的库。"
+      ? "可以使用 Canvas、WebGL、CSS 动画；如需第三方库，直接使用公开 CDN 的完整链接引入，不要使用 import map。"
       : "禁止使用任何外部库或框架，全部使用原生 HTML、CSS 与 JavaScript 实现（可使用 Canvas、WebGL、CSS 动画等原生特性）。";
 
     return [
-      "输出单个 HTML 文件，CSS 与 JavaScript 内联；需要多文件时打包成 zip，入口为 index.html。",
+      "输出自包含的单个 HTML 文件（CSS 与 JavaScript 内联），或打包成多文件 zip（入口为 index.html），在浏览器中可直接运行而无需构建步骤。",
       "首屏就要呈现主要效果，不要用引导页占位。",
       libraryRule,
       SKILL_DISALLOW_RULE,

@@ -377,9 +377,11 @@ body {
   transform: scale(0.85);
   transition: opacity 280ms ease-out, transform 280ms var(--ease-spatial);
 }
-.arena-card:hover {
-  transform: translate3d(0, -2px, 0);
-  box-shadow: var(--card-shadow);
+@media (hover: hover) {
+  .arena-card:hover {
+    transform: translate3d(0, -2px, 0);
+    box-shadow: var(--card-shadow);
+  }
 }
 .arena-card:active {
   transform: translate3d(0, 0, 0) scale(0.993);
@@ -764,8 +766,10 @@ html[data-booting="true"] .boot-screen {
   color: var(--color-ink);
 }
 
-.page-header[data-compact="true"] .page-header-back-icon:hover {
-  background: var(--color-active);
+@media (hover: hover) {
+  .page-header[data-compact="true"] .page-header-back-icon:hover {
+    background: var(--color-active);
+  }
 }
 
 .page-header-actions {

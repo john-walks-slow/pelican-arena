@@ -940,8 +940,9 @@ lines.push(
 );
 
 for (const user of USERS) {
+  const rulesAccepted = user.id === 99005 ? "NULL" : (NOW - 2 * DAY);
   lines.push(
-    `INSERT OR IGNORE INTO users (id, username, name, avatar_template, trust_level, silenced, role, banned, created_at, last_login_at) VALUES (${user.id}, ${q(user.username)}, ${q(user.name)}, NULL, ${user.trustLevel}, 0, ${q(user.role)}, 0, ${NOW - 120 * DAY}, ${NOW - 2 * DAY});`,
+    `INSERT OR IGNORE INTO users (id, username, name, avatar_template, trust_level, silenced, role, banned, created_at, last_login_at, rules_accepted_at) VALUES (${user.id}, ${q(user.username)}, ${q(user.name)}, NULL, ${user.trustLevel}, 0, ${q(user.role)}, 0, ${NOW - 120 * DAY}, ${NOW - 2 * DAY}, ${rulesAccepted});`,
   );
 }
 

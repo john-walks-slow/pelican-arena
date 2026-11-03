@@ -115,7 +115,7 @@ export function ReportDialog({
           className,
         )}
       >
-        <Flag className="size-3.5" strokeWidth={1.75} />
+        <Flag className="size-3.5 text-negative fill-negative/20 shrink-0" strokeWidth={1.85} />
         {copy.trigger}
       </button>
 

@@ -34,6 +34,8 @@ interface ComboboxProps {
   icon?: React.ReactNode;
   /** field: full-width form control. chip: inline pill that sits with other tags. */
   trigger?: "field" | "chip";
+  /** Multi-select values, shown as checks; `value` is ignored while set. */
+  selected?: string[];
   className?: string;
 }
 
@@ -51,6 +53,7 @@ export function Combobox({
   required,
   icon,
   trigger = "field",
+  selected,
   className,
 }: ComboboxProps) {
   const [open, setOpen] = React.useState(false);
@@ -96,14 +99,17 @@ export function Combobox({
 
   const selectedEntry = list.find((o) => o.name.toLowerCase() === value.toLowerCase());
   const displayLabel = value || placeholder;
-  const showSelected = Boolean(value && !selectedEntry);
+  const showSelected = Boolean(value && !selected && !selectedEntry);
   const isChip = trigger === "chip";
+  const isSelected = (option: CatalogEntry) =>
+    selected
+      ? selected.some((s) => s.toLowerCase() === option.name.toLowerCase())
+      : value.toLowerCase() === option.name.toLowerCase();
   const isCustomNew =
     query.trim().length > 0 &&
     !list.some((o) => o.name.toLowerCase() === query.trim().toLowerCase());
 
   function renderOption(option: CatalogEntry) {
-    const isSelected = value.toLowerCase() === option.name.toLowerCase();
     return (
       <CommandItem
         key={option.id}
@@ -117,7 +123,7 @@ export function Combobox({
         <Check
           className={cn(
             "mr-2 h-4 w-4",
-            isSelected ? "text-accent opacity-100" : "opacity-0",
+            isSelected(option) ? "text-accent opacity-100" : "opacity-0",
           )}
         />
         <span className="truncate">{option.name}</span>

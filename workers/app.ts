@@ -1,6 +1,7 @@
-import { createRequestHandler } from "react-router";
+import { createRequestHandler, RouterContextProvider } from "react-router";
 import { syncModelCatalog } from "~/lib/catalog-sync.server";
 import { preheatLeaderboards } from "~/lib/leaderboard.server";
+import { cloudflareContext } from "~/lib/cloudflare-context";
 import { serveUsercontent } from "~/lib/usercontent.server";
 
 const requestHandler = createRequestHandler(
@@ -9,7 +10,7 @@ const requestHandler = createRequestHandler(
 );
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const usercontentHost = new URL(env.USERCONTENT_ORIGIN).host;
     const appHost = new URL(env.APP_ORIGIN).host;
@@ -34,7 +35,9 @@ export default {
       return serveUsercontent(new Request(rewritten, request), env.FILES);
     }
 
-    return requestHandler(request);
+    const loadContext = new RouterContextProvider();
+    loadContext.set(cloudflareContext, { env, ctx });
+    return requestHandler(request, loadContext);
   },
 
   async scheduled(_controller, _env, ctx) {

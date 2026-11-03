@@ -1,6 +1,14 @@
-# Pelican Arena
+<p align="center">
+  <img src="assets/logo.gif" alt="Pelican Arena" width="420" />
+</p>
 
-支持 [L站](https://linux.do/) 登录的娱乐性模型竞技场。用于对比不同模型的鹈鹕。
+<p align="center">
+  <b>支持 <a href="https://linux.do/">L站</a> 登录的娱乐性模型竞技场。用于对比不同模型的鹈鹕。</b>
+</p>
+
+<p align="center">
+  <img src="assets/showcase.png" alt="Pelican Arena Showcase" width="100%" />
+</p>
 
 ## 功能
 

@@ -1,9 +1,13 @@
+import * as React from "react";
+import { CircleAlert } from "lucide-react";
 import { data, redirect } from "react-router";
 import type { Route } from "./+types/prompts.new";
+import { useGate } from "~/components/gate-dialog";
 import { PageHeader } from "~/components/page-header";
 import { PromptForm } from "~/components/prompt-form";
 import { db } from "~/db/client.server";
 import { prompts } from "~/db/schema";
+import { hasAcceptedContentRules } from "~/lib/content-rules";
 import { dailyLimitError, requirePermission } from "~/lib/guards.server";
 import { newId } from "~/lib/ids";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
@@ -48,6 +52,7 @@ export async function action({ request }: Route.ActionArgs) {
   else if (title.length > LIMITS.title) errors.title = `标题最多 ${LIMITS.title} 字`;
   if (!body) errors.body = "请填写提示词";
   else if (body.length > LIMITS.body) errors.body = `提示词最多 ${LIMITS.body} 字`;
+  if (!hasAcceptedContentRules(user)) errors.form = "请先阅读并同意内容规则";
   const limitError = await dailyLimitError(user, "createPrompt");
   if (limitError) errors.form = limitError;
   if (Object.keys(errors).length > 0) {
@@ -80,9 +85,31 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function NewPrompt({ loaderData, actionData }: Route.ComponentProps) {
+  const gate = useGate();
+
+  React.useEffect(() => {
+    if (!gate.rulesAccepted) {
+      gate.openRules();
+    }
+  }, [gate.rulesAccepted, gate.openRules]);
+
   return (
     <div className="mx-auto max-w-[1240px]">
-      <PageHeader title="出题" subtitle="写一段让模型产出同一类作品的提示词。" />
+      <PageHeader
+        title="出题"
+        subtitle="写一段让模型产出同一类作品的提示词。"
+        actions={
+          <button
+            type="button"
+            onClick={gate.viewRules}
+            title="查看内容规则"
+            aria-label="查看内容规则"
+            className="inline-flex size-8 items-center justify-center rounded-control border border-border bg-surface text-muted transition-colors hover:border-rule hover:bg-raised hover:text-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            <CircleAlert className="size-4 text-accent" strokeWidth={2} />
+          </button>
+        }
+      />
 
       <PromptForm
         mode="create"

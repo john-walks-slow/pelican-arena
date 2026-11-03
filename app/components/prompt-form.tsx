@@ -64,6 +64,8 @@ export function PromptForm({
   useEffect(() => {
     if (errors?.form && (errors.form.includes("最多") || errors.form.includes("上限"))) {
       gate.open({ reason: "daily_limit", action: "createPrompt", message: errors.form });
+    } else if (errors?.form && errors.form.includes("内容规则")) {
+      gate.openRules();
     }
   }, [errors?.form, gate]);
   const submitting = navigation.state !== "idle";

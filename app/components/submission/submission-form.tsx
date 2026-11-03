@@ -1,4 +1,4 @@
-import { FileText, Undo2, X } from "lucide-react";
+import { CircleAlert, FileText, Undo2, X } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
 import { ConfirmDialog } from "~/components/confirm-dialog";
@@ -263,6 +263,8 @@ export function SubmissionForm({
   useEffect(() => {
     if (serverError && (serverError.includes("最多") || serverError.includes("上限"))) {
       gate.open({ reason: "daily_limit", action: "submit", message: serverError });
+    } else if (serverError && serverError.includes("内容规则")) {
+      gate.openRules();
     }
   }, [serverError, gate]);
   const logMeta = log?.meta ?? null;
@@ -411,11 +413,24 @@ export function SubmissionForm({
         }}
       >
         <DialogHeader>
-          <div className="min-w-0">
-            <DialogTitle>{isEdit ? "编辑答案" : "提交答案"}</DialogTitle>
-            <DialogDescription className="mt-0.5 truncate">
-              给「{prompt.title}」
-            </DialogDescription>
+          <div className="flex items-center justify-between gap-3 min-w-0 pr-8">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <DialogTitle>{isEdit ? "编辑答案" : "提交答案"}</DialogTitle>
+                <button
+                  type="button"
+                  onClick={gate.viewRules}
+                  title="查看内容规则"
+                  aria-label="查看内容规则"
+                  className="inline-flex size-6 items-center justify-center rounded-control text-muted transition-colors hover:bg-raised hover:text-accent focus-visible:outline-none"
+                >
+                  <CircleAlert className="size-4 text-accent" strokeWidth={2} />
+                </button>
+              </div>
+              <DialogDescription className="mt-0.5 truncate">
+                给「{prompt.title}」
+              </DialogDescription>
+            </div>
           </div>
         </DialogHeader>
 
