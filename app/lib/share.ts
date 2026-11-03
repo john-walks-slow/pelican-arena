@@ -17,8 +17,8 @@ const escapeMdAlt = (s: string) => s.replace(/[[\]\\]/g, "\\$&");
 export function shareSnippet({ pageUrl, cardUrl, title }: ShareTarget, format: ShareFormat) {
   switch (format) {
     case "card":
-      // Discourse 原生渲染 <picture>，发帖后直接显示卡片
-      return `<a href="${pageUrl}">\n<picture><source type="image/svg+xml" srcset="${cardUrl} 1x"><img width="600" height="380" alt="${escapeAttr(title)}"></picture>\n</a>`;
+      // Discourse 原生渲染 <picture>，发帖后直接显示卡片；补齐 src 保底
+      return `<a href="${pageUrl}">\n<picture><source type="image/svg+xml" srcset="${cardUrl} 1x"><img src="${cardUrl}" width="600" height="380" alt="${escapeAttr(title)}"></picture>\n</a>`;
     case "markdown":
       return `[![${escapeMdAlt(title)}](${cardUrl})](${pageUrl})`;
   }

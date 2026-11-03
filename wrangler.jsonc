@@ -21,6 +21,9 @@
 		{ "pattern": "pelicanarena.dpdns.org", "custom_domain": true },
 		{ "pattern": "elsewhere.dpdns.org", "custom_domain": true }
 	],
+	"browser": {
+		"binding": "BROWSER"
+	},
 	"r2_buckets": [
 		{
 			"binding": "FILES",

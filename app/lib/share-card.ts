@@ -1,20 +1,20 @@
 import { KIND_META, type PromptKind } from "./kinds";
 
 export const CARD_WIDTH = 600;
-export const CARD_HEIGHT = 315;
+export const CARD_HEIGHT = 380;
+export const ARTWORK_HEIGHT = 315;
 
-const PADDING = 36;
-const CONTENT_WIDTH = CARD_WIDTH - PADDING * 2;
 const FONT = `-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Noto Sans CJK SC', 'Microsoft YaHei', sans-serif`;
 
-// Mirrors the design tokens in app.css; a standalone SVG cannot read CSS variables.
 const COLOR = {
   surface: "#ffffff",
-  border: "#e6e8ec",
-  raised: "#f2f3f5",
-  ink: "#101318",
-  muted: "#626874",
+  border: "#e5e7eb",
+  outerBorder: "#e2e4e8",
+  ink: "#111827",
+  muted: "#6b7280",
+  faint: "#9ca3af",
   accent: "#c2410c",
+  btnBg: "#18181b",
 };
 
 export interface AnswerCardData {
@@ -25,7 +25,13 @@ export interface AnswerCardData {
   kind: PromptKind;
   starSum: number;
   votes: number;
-  author: string;
+  author?: string;
+  previewImage?: string | null;
+}
+
+export interface PromptSubmissionPreview {
+  modelName: string;
+  previewImage?: string | null;
 }
 
 export interface PromptCardData {
@@ -33,7 +39,8 @@ export interface PromptCardData {
   body: string;
   kind: PromptKind;
   answers: number;
-  author: string;
+  author?: string;
+  topSubmissions?: PromptSubmissionPreview[];
 }
 
 export function escapeXml(text: string) {
@@ -60,22 +67,6 @@ function fit(text: string, maxWidth: number, size: number, bold = false) {
   return `${chars.join("").trimEnd()}…`;
 }
 
-function wrap(text: string, maxWidth: number, size: number, maxLines: number, bold = false) {
-  const rows: string[] = [];
-  let row = "";
-  const chars = [...text.replace(/\s+/g, " ").trim()];
-  let i = 0;
-  for (; i < chars.length; i++) {
-    if (textWidth(row + chars[i], size, bold) > maxWidth && row) {
-      if (rows.length === maxLines - 1) break;
-      rows.push(row.trimEnd());
-      row = chars[i] === " " ? "" : chars[i];
-    } else row += chars[i];
-  }
-  rows.push(i < chars.length ? fit(`${row}${chars.slice(i).join("")}`, maxWidth, size, bold) : row);
-  return rows;
-}
-
 /** Plain text for the prompt excerpt: Markdown syntax removed, code blocks dropped. */
 export function plainExcerpt(markdown: string) {
   return markdown
@@ -88,119 +79,192 @@ export function plainExcerpt(markdown: string) {
     .trim();
 }
 
-function text(
-  x: number,
-  y: number,
-  value: string,
-  attrs: { size: number; fill: string; weight?: number; anchor?: "start" | "middle" | "end" },
-) {
-  return `<text x="${x}" y="${y}" font-size="${attrs.size}" font-weight="${attrs.weight ?? 400}" fill="${attrs.fill}"${
-    attrs.anchor ? ` text-anchor="${attrs.anchor}"` : ""
-  }>${escapeXml(value)}</text>`;
-}
-
-function lines(x: number, y: number, rows: string[], size: number, lineHeight: number, fill: string, weight = 400) {
-  return rows.map((row, i) => text(x, y + i * lineHeight, row, { size, fill, weight })).join("");
-}
-
-function header(kind: PromptKind) {
-  const label = KIND_META[kind].label;
-  const pillWidth = Math.round(textWidth(label, 12) + 20);
+/** Accent Orange PelicanRide Bike Mark (no background, no box) */
+function pelicanRideMark(x: number, y: number) {
   return [
-    `<g transform="translate(${PADDING} 22) scale(0.75)" fill="none" stroke="${COLOR.ink}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">`,
-    `<circle cx="9" cy="23" r="5.5"/><circle cx="23" cy="23" r="5.5"/>`,
-    `<path d="M9 23l5-8h7l2 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.5 2-5 2.9-8 2.5"/>`,
+    `<g transform="translate(${x} ${y}) scale(0.85)" stroke="${COLOR.accent}" fill="none">`,
+    `  <circle cx="9" cy="23" r="5.5" stroke-width="2"/>`,
+    `  <line x1="9" y1="18.6" x2="9" y2="27.4" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <line x1="5.19" y1="20.8" x2="12.81" y2="25.2" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <line x1="5.19" y1="25.2" x2="12.81" y2="20.8" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <circle cx="9" cy="23" r="1.15" fill="${COLOR.accent}"/>`,
+    `  <circle cx="23" cy="23" r="5.5" stroke-width="2"/>`,
+    `  <line x1="23" y1="18.6" x2="23" y2="27.4" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <line x1="19.19" y1="20.8" x2="26.81" y2="25.2" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <line x1="19.19" y1="25.2" x2="26.81" y2="20.8" stroke-width="1.25" stroke-linecap="round"/>`,
+    `  <circle cx="23" cy="23" r="1.15" fill="${COLOR.accent}"/>`,
+    `  <path d="M9 23l5-8h7l2 8M14 15c-1.5-3 0-6.5 3.5-6.5 2 0 3 1 3.5 2.5l8 1.5c-1.5 2-5 2.9-8 2.5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>`,
     `</g>`,
-    text(PADDING + 30, 40, "Pelican Arena", { size: 14, fill: COLOR.ink, weight: 600 }),
-    `<rect x="${CARD_WIDTH - PADDING - pillWidth}" y="24" width="${pillWidth}" height="22" rx="11" fill="${COLOR.raised}"/>`,
-    text(CARD_WIDTH - PADDING - pillWidth / 2, 39.5, label, { size: 12, fill: COLOR.muted, anchor: "middle" }),
   ].join("");
 }
 
-const STAR_PATH = "M8 1.2l2.1 4.5 4.9.6-3.6 3.4.9 4.9L8 12.2l-4.3 2.4.9-4.9L1 6.3l4.9-.6z";
-
-/** Footer copy sits on the same baseline as the call-to-action button. */
-const FOOTER_LINE_Y = 250;
-const FOOTER_BASELINE = 296;
-
-function footer(left: string, ...right: string[]) {
-  return [
-    `<line x1="${PADDING}" y1="${FOOTER_LINE_Y}" x2="${CARD_WIDTH - PADDING}" y2="${FOOTER_LINE_Y}" stroke="${COLOR.border}"/>`,
-    text(PADDING, FOOTER_BASELINE, left, { size: 13, fill: COLOR.muted }),
-    ...right,
-  ].join("");
-}
-
-/** The dark pill shared by both cards, mirroring the in-app preview. */
-function cta(label: string, y: number) {
-  const width = Math.ceil(textWidth(label, 12, true)) + 28;
-  const x = CARD_WIDTH - PADDING - width;
-  return [
-    `<rect x="${x}" y="${y}" width="${width}" height="24" rx="12" fill="${COLOR.ink}"/>`,
-    text(x + width / 2, y + 16, label, { size: 12, fill: "#ffffff", weight: 600, anchor: "middle" }),
-  ].join("");
-}
-
-function frame(label: string, body: string) {
+function cardShell(label: string, artworkContent: string, footerContent: string) {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="${CARD_WIDTH}" height="${CARD_HEIGHT}" viewBox="0 0 ${CARD_WIDTH} ${CARD_HEIGHT}" font-family="${FONT}" role="img" aria-label="${escapeXml(label)}">`,
-    `<rect x=".5" y=".5" width="${CARD_WIDTH - 1}" height="${CARD_HEIGHT - 1}" rx="14" fill="${COLOR.surface}" stroke="${COLOR.border}"/>`,
-    body,
+    `  <defs>`,
+    `    <clipPath id="card-top-clip">`,
+    `      <path d="M0,14 A14,14 0 0,1 14,0 L586,0 A14,14 0 0,1 600,14 L600,${ARTWORK_HEIGHT} L0,${ARTWORK_HEIGHT} Z" />`,
+    `    </clipPath>`,
+    `    <clipPath id="card-outer-clip">`,
+    `      <rect width="${CARD_WIDTH}" height="${CARD_HEIGHT}" rx="14" />`,
+    `    </clipPath>`,
+    `  </defs>`,
+    `  <rect width="${CARD_WIDTH}" height="${CARD_HEIGHT}" rx="14" fill="${COLOR.surface}" />`,
+    `  <!-- Top Artwork Section (1200:630 ratio equivalent to 600:315) -->`,
+    `  <g clip-path="url(#card-top-clip)">`,
+    `    <rect width="${CARD_WIDTH}" height="${ARTWORK_HEIGHT}" fill="#fafafa" />`,
+    artworkContent,
+    `  </g>`,
+    pelicanRideMark(14, 12),
+    `  <!-- Separator Line -->`,
+    `  <line x1="0" y1="${ARTWORK_HEIGHT}" x2="${CARD_WIDTH}" y2="${ARTWORK_HEIGHT}" stroke="${COLOR.border}" stroke-width="1" />`,
+    `  <!-- Bottom Info Bar -->`,
+    footerContent,
+    `  <!-- Card Outer Border -->`,
+    `  <rect x="0.5" y="0.5" width="${CARD_WIDTH - 1}" height="${CARD_HEIGHT - 1}" rx="13.5" fill="none" stroke="${COLOR.outerBorder}" stroke-width="1" />`,
     `</svg>`,
-  ].join("");
+  ].join("\n");
 }
 
 export function renderAnswerCard(d: AnswerCardData) {
   const subtitle = [d.provider, d.harness].filter(Boolean).join(" · ");
   const average = d.votes === 0 ? null : (d.starSum / d.votes).toFixed(1);
-  const modelLines = wrap(d.model, CONTENT_WIDTH, 34, 2, true);
-  const modelY = 150;
-  const subtitleY = modelY + (modelLines.length - 1) * 40 + 30;
 
-  const scoreY = 272;
-  let score = text(CARD_WIDTH - PADDING, scoreY, "暂无评分", { size: 13, fill: COLOR.muted, anchor: "end" });
-  if (average !== null) {
-    const votesLabel = `${d.votes} 票`;
-    const averageRight = CARD_WIDTH - PADDING - Math.ceil(textWidth(votesLabel, 13)) - 10;
-    const starX = averageRight - Math.ceil(textWidth(average, 20, true)) - 24;
-    score = [
-      text(CARD_WIDTH - PADDING, scoreY, votesLabel, { size: 13, fill: COLOR.muted, anchor: "end" }),
-      text(averageRight, scoreY + 1, average, { size: 20, fill: COLOR.ink, weight: 700, anchor: "end" }),
-      `<path transform="translate(${starX} ${scoreY - 16})" d="${STAR_PATH}" fill="${COLOR.accent}"/>`,
+  // Artwork
+  let artwork = "";
+  if (d.previewImage) {
+    artwork = `<image href="${d.previewImage}" x="0" y="0" width="${CARD_WIDTH}" height="${ARTWORK_HEIGHT}" preserveAspectRatio="xMidYMid slice" />`;
+  } else {
+    artwork = [
+      `<rect width="${CARD_WIDTH}" height="${ARTWORK_HEIGHT}" fill="#f8fafc" />`,
+      `<text x="${CARD_WIDTH / 2}" y="${ARTWORK_HEIGHT / 2}" font-size="14" fill="${COLOR.faint}" font-weight="500" text-anchor="middle">${escapeXml(KIND_META[d.kind].label)}作品预览</text>`,
     ].join("");
   }
 
-  return frame(
+  // Footer Right: Rating & Button
+  const btnText = "你会打几分 →";
+  const btnWidth = Math.ceil(textWidth(btnText, 11, true)) + 20;
+  const btnX = CARD_WIDTH - 20 - btnWidth;
+
+  const scoreText = average !== null ? average : "暂无评分";
+  const votesLabel = d.votes > 0 ? `${d.votes} 票` : "未评分";
+
+  const footerRight = [
+    `  <g transform="translate(${CARD_WIDTH - 20} 338)" text-anchor="end">`,
+    average !== null
+      ? [
+          `    <path d="M-68 -9.5 l1.8 3.6 4 .5 -2.9 2.8 .7 4 -3.6 -1.9 -3.6 1.9 .7 -4 -2.9 -2.8 4 -.5 z" fill="#f97316" stroke="#ea580c" stroke-width="0.5" />`,
+          `    <text x="-48" y="0" font-size="14" font-weight="700" fill="${COLOR.ink}">${scoreText}</text>`,
+          `    <text x="0" y="0" font-size="11" font-weight="400" fill="${COLOR.muted}">${votesLabel}</text>`,
+        ].join("\n")
+      : `    <text x="0" y="0" font-size="12" font-weight="500" fill="${COLOR.faint}">暂无评分</text>`,
+    `  </g>`,
+    `  <!-- Button -->`,
+    `  <rect x="${btnX}" y="347" width="${btnWidth}" height="24" rx="5" fill="${COLOR.btnBg}" />`,
+    `  <text x="${btnX + btnWidth / 2}" y="363" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">${btnText}</text>`,
+  ].join("\n");
+
+  // Footer Left: Title, Model, Provider
+  const maxLeftWidth = btnX - 40;
+  const promptTitleFit = fit(d.promptTitle, maxLeftWidth, 11);
+  const modelNameFit = fit(d.model, maxLeftWidth, 16, true);
+  const subtitleFit = fit(subtitle, maxLeftWidth, 11);
+
+  const footerLeft = [
+    `  <text x="20" y="333" font-size="11" fill="${COLOR.muted}" font-weight="400">${escapeXml(promptTitleFit)}</text>`,
+    `  <text x="20" y="353" font-size="16" fill="${COLOR.ink}" font-weight="800">${escapeXml(modelNameFit)}</text>`,
+    subtitleFit
+      ? `  <text x="20" y="369" font-size="11" fill="${COLOR.faint}" font-weight="400">${escapeXml(subtitleFit)}</text>`
+      : "",
+  ].join("\n");
+
+  return cardShell(
     `${d.model} · ${subtitle} — ${d.promptTitle}`,
-    [
-      header(d.kind),
-      text(PADDING, 104, fit(d.promptTitle, CONTENT_WIDTH, 14), { size: 14, fill: COLOR.muted }),
-      lines(PADDING, modelY, modelLines, 34, 40, COLOR.ink, 700),
-      subtitle && text(PADDING, subtitleY, fit(subtitle, CONTENT_WIDTH, 16), { size: 16, fill: COLOR.muted }),
-      footer(`提交者 ${fit(d.author, 200, 13)}`, score, cta("你会打几分 →", 280)),
-    ].join(""),
+    artwork,
+    `${footerLeft}\n${footerRight}`,
   );
 }
 
 export function renderPromptCard(d: PromptCardData) {
-  const titleLines = wrap(d.title, CONTENT_WIDTH, 26, 2, true);
-  const excerptY = 100 + titleLines.length * 34;
-  const excerptLines = wrap(plainExcerpt(d.body), CONTENT_WIDTH, 14, titleLines.length === 1 ? 4 : 3);
-  return frame(
+  const top = (d.topSubmissions || []).slice(0, 3);
+  const hasSubmissions = d.answers > 0 || top.length > 0;
+
+  // Artwork
+  let artwork = "";
+  if (top.length > 0) {
+    const n = top.length;
+    const colW = CARD_WIDTH / n;
+    const parts: string[] = [];
+
+    for (let i = 0; i < n; i++) {
+      const item = top[i];
+      const x = i * colW;
+      if (item.previewImage) {
+        parts.push(
+          `<g transform="translate(${x} 0)">`,
+          `  <image href="${item.previewImage}" x="0" y="0" width="${colW}" height="${ARTWORK_HEIGHT}" preserveAspectRatio="xMidYMid slice" />`,
+          `</g>`,
+        );
+      } else {
+        parts.push(
+          `<rect x="${x}" y="0" width="${colW}" height="${ARTWORK_HEIGHT}" fill="#f8fafc" />`,
+          `<text x="${x + colW / 2}" y="${ARTWORK_HEIGHT / 2}" font-size="13" fill="${COLOR.faint}" text-anchor="middle">作品预览</text>`,
+        );
+      }
+      if (i > 0) {
+        parts.push(`<line x1="${x}" y1="0" x2="${x}" y2="${ARTWORK_HEIGHT}" stroke="${COLOR.border}" stroke-width="1" />`);
+      }
+      // Model badge pill at bottom of column
+      const pillLabel = fit(item.modelName, colW - 24, 11, true);
+      const pillW = Math.min(colW - 20, Math.ceil(textWidth(pillLabel, 11, true)) + 18);
+      parts.push(
+        `<g transform="translate(${x + 10} ${ARTWORK_HEIGHT - 32})">`,
+        `  <rect width="${pillW}" height="22" rx="11" fill="rgba(255,255,255,0.95)" stroke="rgba(0,0,0,0.1)" stroke-width="1" />`,
+        `  <text x="${pillW / 2}" y="15" font-size="11" font-weight="600" fill="${COLOR.ink}" text-anchor="middle">${escapeXml(pillLabel)}</text>`,
+        `</g>`,
+      );
+    }
+    artwork = parts.join("\n");
+  } else {
+    artwork = [
+      `<rect width="${CARD_WIDTH}" height="${ARTWORK_HEIGHT}" fill="#f8fafc" />`,
+      `<text x="${CARD_WIDTH / 2}" y="${ARTWORK_HEIGHT / 2}" font-size="13" fill="${COLOR.faint}" font-weight="500" text-anchor="middle">暂无答案</text>`,
+    ].join("");
+  }
+
+  // Footer Right: Counts & Button
+  const btnText = hasSubmissions ? "看看谁画得最好 →" : "来答这道题 →";
+  const btnWidth = Math.ceil(textWidth(btnText, 11, true)) + 20;
+  const btnX = CARD_WIDTH - 20 - btnWidth;
+
+  const countDisplay =
+    d.answers === 0 ? "还没有答案" : `${d.answers} 份答案`;
+
+  const footerRight = [
+    `  <g transform="translate(${CARD_WIDTH - 20} 338)" text-anchor="end">`,
+    `    <text x="0" y="0" font-size="12" font-weight="600" fill="${COLOR.ink}"><tspan font-weight="800" fill="${COLOR.accent}">${d.answers}</tspan> 个模型同题作答 (${countDisplay})</text>`,
+    `  </g>`,
+    `  <!-- Button -->`,
+    `  <rect x="${btnX}" y="347" width="${btnWidth}" height="24" rx="5" fill="${COLOR.btnBg}" />`,
+    `  <text x="${btnX + btnWidth / 2}" y="363" font-size="11" font-weight="600" fill="#ffffff" text-anchor="middle">${btnText}</text>`,
+  ].join("\n");
+
+  // Footer Left: Category, Title, Excerpt
+  const maxLeftWidth = btnX - 40;
+  const titleFit = fit(d.title, maxLeftWidth, 16, true);
+  const excerptFit = fit(plainExcerpt(d.body), maxLeftWidth, 11);
+
+  const footerLeft = [
+    `  <text x="20" y="333" font-size="11" fill="${COLOR.muted}" font-weight="400">题目</text>`,
+    `  <text x="20" y="353" font-size="16" fill="${COLOR.ink}" font-weight="800">${escapeXml(titleFit)}</text>`,
+    excerptFit
+      ? `  <text x="20" y="369" font-size="11" fill="${COLOR.muted}" font-weight="400">${escapeXml(excerptFit)}</text>`
+      : "",
+  ].join("\n");
+
+  return cardShell(
     d.title,
-    [
-      header(d.kind),
-      lines(PADDING, 120, titleLines, 26, 34, COLOR.ink, 700),
-      lines(PADDING, excerptY + 14, excerptLines, 14, 22, COLOR.muted),
-      footer(
-        `出题者 ${fit(d.author, 200, 13)}`,
-        text(CARD_WIDTH - PADDING, 272, d.answers === 0 ? "还没有答案" : `${d.answers} 份答案`, {
-          size: 12,
-          fill: COLOR.muted,
-          anchor: "end",
-        }),
-        cta(d.answers === 0 ? "来答这道题 →" : "看看谁画得最好 →", 280),
-      ),
-    ].join(""),
+    artwork,
+    `${footerLeft}\n${footerRight}`,
   );
 }
