@@ -32,7 +32,7 @@ import { createPreviewGrant } from "~/lib/preview-grant.server";
 /**
  * JSON API for automated moderators. Authenticate with
  * `Authorization: Bearer pa_…`; every mutation is attributed to the token in the
- * moderation log. See docs/references/261029-moderation-api.md.
+ * moderation log.
  */
 
 const json = (body: unknown, status = 200) =>

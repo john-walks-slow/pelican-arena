@@ -392,8 +392,7 @@ function ApiPanel({ tokens }: { tokens: TokenRow[] }) {
         <p className="text-muted">
           供自动审核使用。请求带{" "}
           <code className="font-mono text-xs">Authorization: Bearer &lt;token&gt;</code>，每个动作都会记入
-          「记录」。完整说明见仓库{" "}
-          <code className="font-mono text-xs">docs/references/261029-moderation-api.md</code>。
+          「记录」。
         </p>
         <dl className="mt-3 grid gap-1.5 font-mono text-xs">
           {[
