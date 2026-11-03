@@ -13,7 +13,7 @@ import {
 import { newId } from "./ids";
 import type { PromptKind } from "./kinds";
 import { ensureCatalogEntry } from "./queries.server";
-import { getOrGenerateThumbnail } from "./screenshot.server";
+import { getOrGenerateThumbnail, thumbnailKey } from "./screenshot.server";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
 
@@ -37,6 +37,7 @@ export async function createSubmission(input: {
   kind: PromptKind;
   entries: BundleEntry[];
   meta: SubmissionMeta;
+  thumbnail?: Uint8Array | null;
 }) {
   const files = buildBundle(input.entries, input.kind);
   const text = input.kind === "web" ? null : readTextBundle(input.kind, files[0].data);
@@ -51,13 +52,21 @@ export async function createSubmission(input: {
     Promise.all(meta.mods.map((m) => ensureCatalogEntry("mods", m))),
   ]);
 
-  await Promise.all(
-    files.map((f) =>
-      env.FILES.put(bundleKey(id, f.path), f.data, {
-        httpMetadata: { contentType: contentTypeFor(f.path) },
-      }),
-    ),
+  const writes: Promise<unknown>[] = files.map((f) =>
+    env.FILES.put(bundleKey(id, f.path), f.data, {
+      httpMetadata: { contentType: contentTypeFor(f.path) },
+    }),
   );
+
+  if (input.thumbnail && input.thumbnail.byteLength > 0) {
+    writes.push(
+      env.FILES.put(thumbnailKey(id), input.thumbnail, {
+        httpMetadata: { contentType: "image/webp" },
+      }).catch((err) => console.warn("Failed to save client thumbnail to R2:", err)),
+    );
+  }
+
+  await Promise.all(writes);
 
   const manifest = describeBundle(files);
   try {
