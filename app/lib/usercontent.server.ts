@@ -65,7 +65,22 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   const clean = normalizePath(path);
   if (!clean) return new Response("Not Found", { status: 404 });
 
-  const object = await bucket.get(bundleKey(id, clean));
+  let object = await bucket.get(bundleKey(id, clean));
+  if (!object && clean === "thumb.webp") {
+    try {
+      const [row] = await db()
+        .select({ kind: submissions.kind })
+        .from(submissions)
+        .where(eq(submissions.id, id));
+      if (row) {
+        const { getOrGenerateThumbnail } = await import("~/lib/screenshot.server");
+        await getOrGenerateThumbnail(id, row.kind);
+        object = await bucket.get(bundleKey(id, clean));
+      }
+    } catch (e) {
+      console.error("On-demand thumbnail generation failed for", id, e);
+    }
+  }
   if (!object) return new Response("Not Found", { status: 404 });
 
   // Cache strategy to maximize CDN hits and minimize Worker invocations:

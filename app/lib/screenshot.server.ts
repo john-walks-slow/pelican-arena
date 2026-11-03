@@ -72,10 +72,14 @@ export async function getOrGenerateThumbnail(
       await page.setViewport({ width: 1200, height: 630 });
 
       const url = submissionUrl(env.USERCONTENT_ORIGIN, submissionId, kind);
-      await page.goto(url, {
-        waitUntil: "networkidle0",
-        timeout: 9000,
-      });
+      try {
+        await page.goto(url, {
+          waitUntil: "networkidle2",
+          timeout: 6000,
+        });
+      } catch (navErr) {
+        console.warn("Page navigation timed out, capturing current state:", submissionId, navErr);
+      }
 
       const screenshotBuf = await page.screenshot({
         type: "webp",
