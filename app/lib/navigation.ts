@@ -41,14 +41,6 @@ export function backTarget(
   return { label, to: target, explicit: true };
 }
 
-/** Identifies routes that render as dialogs/modals over an underlying page rather than standalone pages. */
-export function isModalPath(pathname: string): boolean {
-  return (
-    /^\/p\/[^/]+\/submit(?:\/.*)?$/.test(pathname) ||
-    /^\/s\/[^/]+\/edit(?:\/.*)?$/.test(pathname)
-  );
-}
-
 /** Strips modal sub-routes down to their parent screen identity. */
 export function baseScreenKey(pathname: string): string {
   return (

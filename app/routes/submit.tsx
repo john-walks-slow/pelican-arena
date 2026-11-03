@@ -1,7 +1,7 @@
 import {
   data,
   isRouteErrorResponse,
-  redirect,
+  replace,
   useLocation,
   useParams,
 } from "react-router";
@@ -50,15 +50,22 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   try {
     const entries = await readBundleEntries(form);
+    const thumbFile = form.get("thumbnail");
+    const thumbnail =
+      thumbFile instanceof File && thumbFile.size > 0
+        ? new Uint8Array(await thumbFile.arrayBuffer())
+        : null;
+
     const id = await createSubmission({
       promptId: prompt.id,
       authorId: user.id,
       kind: prompt.kind,
       entries,
       meta,
+      thumbnail,
     });
     const from = safeFrom(new URL(request.url).searchParams.get("from"));
-    return redirect(withFrom(`/s/${id}`, from), {
+    return replace(withFrom(`/s/${id}`, from), {
       headers: { "Set-Cookie": await flashToast(request, "已提交，感谢你的参与") },
     });
   } catch (e) {

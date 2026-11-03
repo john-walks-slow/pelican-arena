@@ -1,7 +1,7 @@
 import {
   data,
   isRouteErrorResponse,
-  redirect,
+  replace,
   useLocation,
   useParams,
 } from "react-router";
@@ -67,7 +67,7 @@ export async function action({ params, request }: Route.ActionArgs) {
     const result = await setSubmissionStatus(submission.id, user.id, "hidden");
     if (result === "ok") {
       const from = safeFrom(new URL(request.url).searchParams.get("from"));
-      return redirect(from ?? `/p/${prompt.id}`, {
+      return replace(from ?? `/p/${prompt.id}`, {
         headers: { "Set-Cookie": await flashToast(request, "答案已撤回") },
       });
     }
@@ -89,7 +89,7 @@ export async function action({ params, request }: Route.ActionArgs) {
   }
 
   const from = safeFrom(new URL(request.url).searchParams.get("from"));
-  return redirect(from ?? `/s/${submission.id}`, {
+  return replace(from ?? `/s/${submission.id}`, {
     headers: { "Set-Cookie": await flashToast(request, "答案已更新") },
   });
 }

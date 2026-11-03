@@ -1,6 +1,6 @@
 import type { ComponentProps, MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
-import { getBackDelta } from "~/lib/navigation-history";
+import { canGoBackInApp } from "~/lib/navigation-history";
 
 /**
  * Follows the in-app history when there is one, otherwise falls back to an
@@ -30,9 +30,8 @@ export function BackLink({
       return;
     }
     event.preventDefault();
-    const delta = getBackDelta();
-    if (delta !== null) {
-      navigate(delta);
+    if (canGoBackInApp()) {
+      navigate(-1);
     } else {
       // Opening a detail in a new tab leaves no in-app entry to pop. Replace
       // the orphan entry so its fallback page does not point back at it.
