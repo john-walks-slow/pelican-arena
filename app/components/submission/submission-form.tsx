@@ -40,6 +40,7 @@ import { matchModel } from "~/lib/model-match";
 import { SANDBOX } from "~/lib/sandbox";
 import { LOG_SOURCE_LABELS, LogParseError, type LogMeta } from "~/lib/session-log";
 import { readSessionLogFile } from "~/lib/session-log-file";
+import { captureClientThumbnail } from "~/lib/client-thumbnail";
 import { FIELDS } from "~/lib/submission-input";
 import { useFileBundle } from "~/lib/use-file-bundle";
 
@@ -252,6 +253,7 @@ export function SubmissionForm({
   const [draggingLog, setDraggingLog] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
+  const [capturing, setCapturing] = useState(false);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const gate = useGate();
@@ -342,7 +344,7 @@ export function SubmissionForm({
     }
   }
 
-  function onSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setClientError(null);
     const form = new FormData(event.currentTarget);
@@ -363,7 +365,24 @@ export function SubmissionForm({
           form.append("file", new Blob([entry.data as BlobPart]), entry.path);
           form.append("path", entry.path);
         }
+
+        // 尝试在客户端生成缩略图（双轨制：客户端优先，失败则由服务端兜底）
+        const entryFile = entries.find((e) => e.path === meta.entry) ?? entries[0];
+        if (entryFile) {
+          setCapturing(true);
+          try {
+            const thumbBlob = await captureClientThumbnail(kind, entryFile.data);
+            if (thumbBlob) {
+              form.append("thumbnail", thumbBlob, "thumb.webp");
+            }
+          } catch (e) {
+            console.warn("Client thumbnail capture skipped:", e);
+          } finally {
+            setCapturing(false);
+          }
+        }
       } catch (err) {
+        setCapturing(false);
         setClientError(err instanceof BundleError ? err.message : String(err));
         return;
       }
@@ -548,7 +567,7 @@ export function SubmissionForm({
                         icon={FileText}
                         accept=".jsonl,.json,.log,.txt,.zstd,.zst"
                         label="拖入或选择日志文件"
-                        hint="支持 Claude Code、Codex、pi、DSH 与 OpenCode。在浏览器本地读取 token 和用时，自动填写模型与客户端，日志文件不会上传。"
+                        hint="支持 Claude Code、Codex、pi、DSH 与 OpenCode，在浏览器本地解析 token 消耗与耗时信息，日志文件不会上传。"
                         error={logError}
                         onPick={pickLog}
                         className="min-h-[84px] py-4"
@@ -620,15 +639,17 @@ export function SubmissionForm({
               <Button
                 type="submit"
                 variant="primary"
-                disabled={!ready || submitting}
+                disabled={!ready || submitting || capturing}
               >
                 {submitting
                   ? isEdit
                     ? "保存中…"
                     : "提交中…"
-                  : isEdit
-                    ? "保存修改"
-                    : "提交"}
+                  : capturing
+                    ? "生成预览中…"
+                    : isEdit
+                      ? "保存修改"
+                      : "提交"}
               </Button>
             </div>
           </DialogFooter>
