@@ -20,7 +20,7 @@ import {
   siteStats,
   type PromptSort,
 } from "~/lib/queries.server";
-import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
+import { cachedClientLoader, primeRouteCache, updateRouteCache } from "~/lib/route-cache";
 import { useOptionalUser } from "~/lib/use-user";
 
 export const meta: Route.MetaFunction = () => [
@@ -147,10 +147,19 @@ export default function Home({ loaderData }: Route.ComponentProps) {
     if (!more || more.q !== q || more.kind !== kind || more.sort !== sort) return;
     setItems((current) => {
       const seen = new Set(current.map((p) => p.id));
-      return [...current, ...more.prompts.filter((p) => !seen.has(p.id))];
+      const nextItems = [...current, ...more.prompts.filter((p) => !seen.has(p.id))];
+      updateRouteCache<Route.ComponentProps["loaderData"]>(
+        `${pathname}${search}`,
+        (prev) => ({
+          ...prev,
+          prompts: nextItems,
+          nextPage: more.nextPage,
+        }),
+      );
+      return nextItems;
     });
     setNext(more.nextPage);
-  }, [more, q, kind, sort]);
+  }, [more, q, kind, sort, pathname, search]);
 
   const update = useCallback(
     (key: string, value: string | null) => {

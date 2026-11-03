@@ -55,7 +55,7 @@ import {
   listSubmissions,
   type SubmissionSort,
 } from "~/lib/queries.server";
-import { cachedClientLoader, primeRouteCache } from "~/lib/route-cache";
+import { cachedClientLoader, primeRouteCache, updateRouteCache } from "~/lib/route-cache";
 import { getUser } from "~/lib/session.server";
 import { useOptionalUser } from "~/lib/use-user";
 
@@ -118,12 +118,16 @@ export function clientLoader({ request, serverLoader }: Route.ClientLoaderArgs) 
   return cachedClientLoader(request, serverLoader);
 }
 
-/** The submit dialog is a child route; the gallery behind it must not reload. */
+/** The submit dialog is a child route; the gallery behind it must not reload on pure client route toggles. */
 export function shouldRevalidate({
+  formMethod,
+  actionResult,
   currentUrl,
   nextUrl,
   defaultShouldRevalidate,
 }: ShouldRevalidateFunctionArgs) {
+  if (formMethod && formMethod !== "GET") return defaultShouldRevalidate;
+  if (actionResult !== undefined) return defaultShouldRevalidate;
   const withoutDialog = (pathname: string) => pathname.replace(/\/submit$/, "");
   if (withoutDialog(currentUrl.pathname) === withoutDialog(nextUrl.pathname)) return false;
   return defaultShouldRevalidate;
@@ -259,10 +263,19 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
     if (!more || more.key !== key || more.page !== next) return;
     setItems((current) => {
       const seen = new Set(current.map((s) => s.id));
-      return [...current, ...more.submissions.filter((s) => !seen.has(s.id))];
+      const nextItems = [...current, ...more.submissions.filter((s) => !seen.has(s.id))];
+      updateRouteCache<Route.ComponentProps["loaderData"]>(
+        `${pathname}${search}`,
+        (prev) => ({
+          ...prev,
+          submissions: nextItems,
+          nextPage: more.nextPage,
+        }),
+      );
+      return nextItems;
     });
     setNext(more.nextPage);
-  }, [more, key, next]);
+  }, [more, key, next, pathname, search]);
 
   const loadMore = useCallback(() => {
     if (!next || fetcher.state !== "idle") return;

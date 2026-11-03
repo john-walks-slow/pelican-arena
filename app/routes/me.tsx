@@ -26,14 +26,13 @@ import {
   SUBMISSION_STATUS_LABELS,
 } from "~/lib/moderation";
 import { createPreviewGrant } from "~/lib/preview-grant.server";
-import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
+import { cachedClientLoader, clearRouteCache, primeRouteCache, updateRouteCache } from "~/lib/route-cache";
+import type { loader as apiMineSubmissionsLoader } from "./api.mine.submissions";
 import { setSubmissionStatus } from "~/lib/submissions.server";
 import { requireUser } from "~/lib/session.server";
 
 type PromptRow = Awaited<ReturnType<typeof listOwnPrompts>>["prompts"][number];
-type AnswerRow = Awaited<ReturnType<typeof listOwnSubmissions>>["submissions"][number] & {
-  grant?: string | null;
-};
+type AnswerRow = Extract<Route.ComponentProps["loaderData"], { tab: "answers" }>["result"]["submissions"][number];
 type ActionResult = { ok: true; message: string } | { error: string };
 
 export function meta() {
@@ -247,6 +246,7 @@ function PromptList({
   const [items, setItems] = useState(result.prompts);
   const [next, setNext] = useState(result.nextPage);
   const [source, setSource] = useState(result);
+  const { pathname, search } = useLocation();
   const fetcher = useFetcher<Awaited<ReturnType<typeof listOwnPrompts>>>();
 
   if (source !== result) {
@@ -260,10 +260,25 @@ function PromptList({
     if (!more || !("prompts" in more)) return;
     setItems((current) => {
       const seen = new Set(current.map((p) => p.id));
-      return [...current, ...more.prompts.filter((p) => !seen.has(p.id))];
+      const nextItems = [...current, ...more.prompts.filter((p) => !seen.has(p.id))];
+      updateRouteCache<Route.ComponentProps["loaderData"]>(
+        `${pathname}${search}`,
+        (prev) =>
+          prev.tab === "prompts"
+            ? {
+                ...prev,
+                result: {
+                  ...prev.result,
+                  prompts: nextItems,
+                  nextPage: more.nextPage,
+                },
+              }
+            : prev,
+      );
+      return nextItems;
     });
     setNext(more.nextPage);
-  }, [more]);
+  }, [more, pathname, search]);
 
   const loadMore = useCallback(() => {
     if (!next || fetcher.state !== "idle") return;
@@ -438,7 +453,7 @@ function AnswerList({
   from,
   onAction,
 }: {
-  result: Awaited<ReturnType<typeof listOwnSubmissions>>;
+  result: Extract<Route.ComponentProps["loaderData"], { tab: "answers" }>["result"];
   origin: string;
   from: string;
   onAction: (pending: PendingAction) => void;
@@ -446,7 +461,8 @@ function AnswerList({
   const [items, setItems] = useState(result.submissions);
   const [next, setNext] = useState(result.nextPage);
   const [source, setSource] = useState(result);
-  const fetcher = useFetcher<Awaited<ReturnType<typeof listOwnSubmissions>>>();
+  const { pathname, search } = useLocation();
+  const fetcher = useFetcher<Awaited<ReturnType<typeof apiMineSubmissionsLoader>>>();
 
   if (source !== result) {
     setSource(result);
@@ -459,10 +475,28 @@ function AnswerList({
     if (!more || !("submissions" in more)) return;
     setItems((current) => {
       const seen = new Set(current.map((s) => s.id));
-      return [...current, ...more.submissions.filter((s) => !seen.has(s.id))];
+      const nextItems: AnswerRow[] = [
+        ...current,
+        ...more.submissions.filter((s) => !seen.has(s.id)),
+      ];
+      updateRouteCache<Route.ComponentProps["loaderData"]>(
+        `${pathname}${search}`,
+        (prev) =>
+          prev.tab === "answers"
+            ? {
+                ...prev,
+                result: {
+                  ...prev.result,
+                  submissions: nextItems,
+                  nextPage: more.nextPage,
+                },
+              }
+            : prev,
+      );
+      return nextItems;
     });
     setNext(more.nextPage);
-  }, [more]);
+  }, [more, pathname, search]);
 
   const loadMore = useCallback(() => {
     if (!next || fetcher.state !== "idle") return;
