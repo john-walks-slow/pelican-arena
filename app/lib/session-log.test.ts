@@ -49,7 +49,7 @@ describe("parseSessionLog", () => {
       reasoningTokens: 70,
       turns: 2,
       toolCalls: 2,
-      durationMs: 60_000,
+      durationMs: 50_000,
     });
   });
 

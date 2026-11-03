@@ -138,6 +138,9 @@ function parseCodex(rows: Json[]): LogMeta {
   const records = rows.filter((r) => r.type === "token_usage_record");
   const turnIds = new Set<string>();
   let userTurns = 0;
+  let taskDurationMs = 0;
+  let hasTaskDuration = false;
+  const activeTimestamps: unknown[] = [];
 
   for (const row of rows) {
     const payload = row.payload ?? {};
@@ -155,6 +158,19 @@ function parseCodex(rows: Json[]): LogMeta {
       ) {
         userTurns += 1;
       }
+      if (payload.type === "task_complete" && typeof payload.duration_ms === "number") {
+        taskDurationMs += payload.duration_ms;
+        hasTaskDuration = true;
+      }
+    }
+    if (
+      row.type === "session_meta" ||
+      row.type === "turn_context" ||
+      row.type === "response_item" ||
+      row.type === "token_usage_record" ||
+      (row.type === "event_msg" && payload.type !== "thread_settings_applied")
+    ) {
+      activeTimestamps.push(row.timestamp);
     }
     if (
       row.type === "response_item" &&
@@ -194,7 +210,9 @@ function parseCodex(rows: Json[]): LogMeta {
   }
 
   meta.models = [...models];
-  meta.durationMs = spanMs(rows.map((r) => r.timestamp));
+  meta.durationMs = hasTaskDuration && taskDurationMs > 0
+    ? taskDurationMs
+    : spanMs(activeTimestamps);
   return meta;
 }
 
