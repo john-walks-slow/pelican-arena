@@ -945,7 +945,7 @@ for (const user of USERS) {
 for (const prompt of PROMPTS) {
   const createdAt = NOW - prompt.ageDays * DAY;
   lines.push(
-    `INSERT INTO prompts (id, author_id, title, body, kind, allow_search, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, ${prompt.allowSearch ? 1 : 0}, 'active', NULL, ${createdAt}, NULL);`,
+    `INSERT INTO prompts (id, author_id, title, body, kind, allow_search, allow_libraries, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, ${prompt.allowSearch ? 1 : 0}, ${prompt.allowLibraries === false ? 0 : 1}, 'active', NULL, ${createdAt}, NULL);`,
   );
 }
 

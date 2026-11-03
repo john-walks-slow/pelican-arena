@@ -299,6 +299,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
       await navigator.clipboard.writeText(
         promptWithRequirements(prompt.body, prompt.kind, {
           allowSearch: prompt.allowSearch,
+          allowLibraries: prompt.allowLibraries,
         }),
       );
       setCopied(true);
@@ -319,6 +320,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
             <span>{KIND_META[prompt.kind].label}</span>
             <span>·</span>
             <span>{prompt.allowSearch ? "允许联网" : "禁止联网"}</span>
+            {prompt.kind !== "markdown" && (
+              <>
+                <span>·</span>
+                <span>{prompt.allowLibraries ? "允许外部库" : "禁止外部库"}</span>
+              </>
+            )}
             <span>·</span>
             <Avatar template={prompt.author.avatarTemplate} username={prompt.author.username} size={18} />
             <span>{prompt.author.username}</span>
@@ -425,6 +432,7 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           <OutputRequirements
             kind={prompt.kind}
             allowSearch={prompt.allowSearch}
+            allowLibraries={prompt.allowLibraries}
             className="mt-3"
           />
           {showReport && canAnswer && (

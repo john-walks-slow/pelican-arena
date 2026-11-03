@@ -321,6 +321,7 @@ export async function listPrompts(query: PromptQuery = {}) {
         body: prompts.body,
         kind: prompts.kind,
         allowSearch: prompts.allowSearch,
+        allowLibraries: prompts.allowLibraries,
         createdAt: prompts.createdAt,
         lastActivityAt,
         author,
@@ -353,6 +354,7 @@ export async function getPrompt(id: string) {
       body: prompts.body,
       kind: prompts.kind,
       allowSearch: prompts.allowSearch,
+      allowLibraries: prompts.allowLibraries,
       status: prompts.status,
       moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
@@ -378,6 +380,7 @@ export async function listOwnPrompts(authorId: number, page = 1, limit = 18) {
       title: prompts.title,
       kind: prompts.kind,
       allowSearch: prompts.allowSearch,
+      allowLibraries: prompts.allowLibraries,
       status: prompts.status,
       moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
@@ -463,6 +466,7 @@ export async function getPromptForEdit(id: string) {
       body: prompts.body,
       kind: prompts.kind,
       allowSearch: prompts.allowSearch,
+      allowLibraries: prompts.allowLibraries,
       status: prompts.status,
       moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,
@@ -490,10 +494,12 @@ export async function updatePrompt(input: {
   body: string;
   kind: PromptKind;
   allowSearch?: boolean;
+  allowLibraries?: boolean;
   locked: boolean;
   /** True when the author's changes must be reviewed again before going public. */
   reviewed: boolean;
 }) {
+  const allowLibraries = input.kind === "markdown" ? false : input.allowLibraries;
   const set = input.locked
     ? { title: input.title, updatedAt: new Date() }
     : {
@@ -501,6 +507,7 @@ export async function updatePrompt(input: {
         body: input.body,
         kind: input.kind,
         ...(input.allowSearch !== undefined ? { allowSearch: input.allowSearch } : {}),
+        ...(allowLibraries !== undefined ? { allowLibraries } : {}),
         ...(input.reviewed ? { status: "pending" as const, moderationNote: null } : {}),
         updatedAt: new Date(),
       };
