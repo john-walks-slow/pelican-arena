@@ -52,6 +52,8 @@ function resolveMotion(prevKey: string, nextKey: string): RouteMotion {
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  { rel: "manifest", href: "/manifest.webmanifest" },
+  { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -108,6 +110,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="color-scheme" content="light dark" />
         <meta name="theme-color" content="#f8f9fb" />
+        <meta name="application-name" content="Pelican Arena" />
+        <meta name="apple-mobile-web-app-title" content="Pelican" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <Meta />
         <Links />
         {/* Resolve the appearance before the browser paints the first frame. */}
@@ -133,8 +139,18 @@ function FlashToasts({ flash }: { flash: FlashToast | null }) {
   return null;
 }
 
+function useRegisterServiceWorker() {
+  useEffect(() => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
+    if (import.meta.env.PROD || window.location.search.includes("pwa=1")) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {});
+    }
+  }, []);
+}
+
 export default function App({ loaderData }: Route.ComponentProps) {
   useTrackNavigationHistory();
+  useRegisterServiceWorker();
   const location = useLocation();
   const screenKey = baseScreenKey(location.pathname);
   const prevScreenRef = useRef(screenKey);
