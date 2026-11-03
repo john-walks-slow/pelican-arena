@@ -16,7 +16,7 @@ import {
 } from "~/lib/queries.server";
 import { flashToast, requireUser } from "~/lib/session.server";
 import { parseSubmissionMeta } from "~/lib/submission-input";
-import { updateSubmission } from "~/lib/submissions.server";
+import { setSubmissionStatus, updateSubmission } from "~/lib/submissions.server";
 import { useDialogClose } from "~/lib/use-dialog-close";
 
 export function meta({ loaderData }: Route.MetaArgs) {
@@ -37,6 +37,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     submission: {
       id: submission.id,
       promptId: submission.promptId,
+      status: submission.status,
       model: submission.model.name,
       provider: submission.provider.name,
       harness: submission.harness?.name ?? "",
@@ -62,6 +63,19 @@ export async function action({ params, request }: Route.ActionArgs) {
   if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
 
   const form = await request.formData();
+  if (form.get("intent") === "withdraw") {
+    const result = await setSubmissionStatus(submission.id, user.id, "hidden");
+    if (result === "ok") {
+      const from = safeFrom(new URL(request.url).searchParams.get("from"));
+      return redirect(from ?? `/p/${prompt.id}`, {
+        headers: { "Set-Cookie": await flashToast(request, "答案已撤回") },
+      });
+    }
+    if (result === "not_found") throw data("答案不存在", { status: 404 });
+    if (result === "conflict") return data({ error: "答案正在处理或已下架，请联系管理员" }, { status: 409 });
+    return data({ error: "只能操作自己的答案" }, { status: 403 });
+  }
+
   const { meta, error } = parseSubmissionMeta(form);
   if (!meta) return data({ error }, { status: 400 });
 

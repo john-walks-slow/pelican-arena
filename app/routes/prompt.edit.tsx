@@ -4,7 +4,7 @@ import { PageHeader } from "~/components/page-header";
 import { PromptForm } from "~/components/prompt-form";
 import { initialPromptStatus, PROMPT_STATUS_LABELS } from "~/lib/moderation";
 import { promptReviewEnabled } from "~/lib/moderation.server";
-import { getPromptForEdit, updatePrompt } from "~/lib/queries.server";
+import { deletePrompt, getPromptForEdit, updatePrompt } from "~/lib/queries.server";
 import { requireOwnership } from "~/lib/guards.server";
 import { isPromptKind, type PromptKind } from "~/lib/kinds";
 import { backTarget, safeFrom } from "~/lib/navigation";
@@ -34,6 +34,22 @@ export async function action({ params, request }: Route.ActionArgs) {
   requireOwnership(user, prompt.authorId);
 
   const form = await request.formData();
+  if (form.get("intent") === "delete") {
+    const result = await deletePrompt(prompt.id, user.id);
+    if (result === "ok") {
+      const from = safeFrom(new URL(request.url).searchParams.get("from"));
+      return redirect(from ?? "/me", {
+        headers: { "Set-Cookie": await flashToast(request, "题目已删除") },
+      });
+    }
+    if (result === "not_found") throw data("题目不存在", { status: 404 });
+    if (result === "forbidden") throw data("只能删除自己的题目", { status: 403 });
+    return data(
+      { errors: { form: "已有答案的题目不能删除" }, values: { title: prompt.title, body: prompt.body, kind: prompt.kind, allowSearch: prompt.allowSearch, allowLibraries: prompt.allowLibraries } },
+      { status: 409 },
+    );
+  }
+
   const title = String(form.get("title") ?? "").trim();
   const body = String(form.get("body") ?? "").trim();
   const kindRaw = String(form.get("kind") ?? prompt.kind);

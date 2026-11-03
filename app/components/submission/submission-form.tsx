@@ -1,6 +1,7 @@
-import { FileText, X } from "lucide-react";
+import { FileText, Undo2, X } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useFetcher } from "react-router";
+import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useGate } from "~/components/gate-dialog";
 import { Markdown } from "~/components/markdown";
 import { SectionHeading } from "~/components/section-heading";
@@ -11,6 +12,7 @@ import { PickedBundleCard } from "~/components/submission/picked-bundle-card";
 import { SessionLogSummary } from "~/components/submission/session-log-summary";
 import { MetaFieldsSkeleton, SubmissionMetaFields } from "~/components/submission/meta-fields";
 import { Button } from "~/components/ui/button";
+import { DisabledTooltip } from "~/components/ui/tooltip";
 import {
   Dialog,
   DialogBody,
@@ -41,6 +43,7 @@ import { FIELDS } from "~/lib/submission-input";
 import { useFileBundle } from "~/lib/use-file-bundle";
 
 export interface SubmissionInitial {
+  status?: string;
   model: string;
   provider: string;
   harness: string;
@@ -245,6 +248,7 @@ export function SubmissionForm({
   );
   const [logError, setLogError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
 
   const gate = useGate();
   const submitting = fetcher.state !== "idle";
@@ -509,6 +513,25 @@ export function SubmissionForm({
           </DialogBody>
 
           <DialogFooter className="max-sm:flex-col max-sm:items-stretch max-sm:gap-2.5">
+            {isEdit && (
+              <div className="mr-auto">
+                <DisabledTooltip
+                  disabled={Boolean(initial?.status && initial.status !== "active")}
+                  content="处理中或已下架的答案不支持撤回"
+                >
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={Boolean(initial?.status && initial.status !== "active") || submitting}
+                    className="text-muted hover:text-negative"
+                    onClick={() => setWithdrawOpen(true)}
+                  >
+                    <Undo2 className="size-4" strokeWidth={1.75} />
+                    撤回答案
+                  </Button>
+                </DisabledTooltip>
+              </div>
+            )}
             {clientError || serverError ? (
               <p className="min-w-0 flex-1 text-xs text-negative max-sm:truncate" role="alert">
                 {clientError || serverError}
@@ -537,6 +560,19 @@ export function SubmissionForm({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <ConfirmDialog
+        open={withdrawOpen}
+        onOpenChange={setWithdrawOpen}
+        title="撤回这份答案？"
+        description="撤回后会从题目页与统计中消失。文件与评分记录会保留，你可以在「我的」里恢复。"
+        confirmLabel="撤回"
+        destructive
+        busy={submitting}
+        onConfirm={() => {
+          fetcher.submit({ intent: "withdraw" }, { method: "post" });
+        }}
+      />
     </Dialog>
   );
 }

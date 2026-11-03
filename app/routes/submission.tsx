@@ -264,6 +264,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                 kind="submission"
                 id={s.id}
                 status={s.status}
+                excludeActions={["keep"]}
                 className="header-collapse-fade"
               />
             )}

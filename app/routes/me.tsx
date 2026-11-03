@@ -8,6 +8,7 @@ import { PageHeader } from "~/components/page-header";
 import { StarScore } from "~/components/stars";
 import { SubmissionPreview } from "~/components/submission-preview";
 import { Button } from "~/components/ui/button";
+import { DisabledTooltip } from "~/components/ui/tooltip";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
 import { KIND_META } from "~/lib/kinds";
@@ -208,11 +209,15 @@ function PromptRowItem({
         <Button asChild variant="outline" size="sm">
           <Link to={withFrom(`/p/${prompt.id}/edit`, from)}>编辑</Link>
         </Button>
-        {prompt.submissions === 0 && (
+        <DisabledTooltip
+          disabled={prompt.submissions > 0}
+          content="已有答案的题目不支持删除"
+        >
           <Button
             type="button"
             variant="ghost"
             size="sm"
+            disabled={prompt.submissions > 0}
             className="text-muted hover:text-negative"
             onClick={() =>
               onDelete({
@@ -228,7 +233,7 @@ function PromptRowItem({
             <Trash2 className="size-3.5" strokeWidth={1.75} />
             删除
           </Button>
-        )}
+        </DisabledTooltip>
       </div>
     </li>
   );
@@ -403,7 +408,22 @@ function AnswerRowItem({
             <Link to={withFrom(`/s/${answer.id}/edit`, from)}>编辑</Link>
           </Button>
         )}
-        {moderated ? null : hidden ? (
+        {moderated ? (
+          <DisabledTooltip
+            disabled={true}
+            content="处理中或已下架的答案不支持删除"
+          >
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              disabled
+              className="text-muted"
+            >
+              撤回
+            </Button>
+          </DisabledTooltip>
+        ) : hidden ? (
           <Button
             type="button"
             variant="outline"

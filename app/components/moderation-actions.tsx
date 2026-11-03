@@ -92,12 +92,14 @@ export function ModerationActions({
   status,
   size = "sm",
   className,
+  excludeActions,
 }: {
   kind: Kind;
   id: string;
   status: PromptStatus | SubmissionStatus;
   size?: "sm" | "default";
   className?: string;
+  excludeActions?: Action[];
 }) {
   const fetcher = useFetcher<Result>();
   const revalidator = useRevalidator();
@@ -121,10 +123,14 @@ export function ModerationActions({
     }
   }, [fetcher.data, revalidator]);
 
-  const actions: Action[] =
+  const rawActions: Action[] =
     kind === "prompt"
       ? availablePromptActions(status as PromptStatus)
       : availableSubmissionActions(status as SubmissionStatus);
+
+  const actions = excludeActions
+    ? rawActions.filter((a) => !excludeActions.includes(a))
+    : rawActions;
 
   if (actions.length === 0) return null;
 

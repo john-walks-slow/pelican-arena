@@ -1,11 +1,13 @@
-import { Lock } from "lucide-react";
+import { Lock, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Form, useNavigation } from "react-router";
+import { Form, useNavigation, useSubmit } from "react-router";
 import { BackLink } from "~/components/back-link";
+import { ConfirmDialog } from "~/components/confirm-dialog";
 import { useGate } from "~/components/gate-dialog";
 import { Markdown } from "~/components/markdown";
 import { OutputRequirements } from "~/components/output-requirements";
 import { Button } from "~/components/ui/button";
+import { DisabledTooltip } from "~/components/ui/tooltip";
 import { Input } from "~/components/ui/input";
 import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
@@ -54,7 +56,9 @@ export function PromptForm({
   const [allowLibraries, setAllowLibraries] = useState<boolean>(
     values?.allowLibraries ?? initial?.allowLibraries ?? true,
   );
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const navigation = useNavigation();
+  const submit = useSubmit();
   const gate = useGate();
 
   useEffect(() => {
@@ -215,12 +219,28 @@ export function PromptForm({
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-3 border-t border-border px-5 py-3.5">
-          {hint && !errors?.form ? (
+          {mode === "edit" ? (
+            <div className="mr-auto">
+              <DisabledTooltip
+                disabled={locked}
+                content="已有答案的题目不支持删除"
+              >
+                <Button
+                  type="button"
+                  variant="ghost"
+                  disabled={locked || submitting}
+                  className="text-muted hover:text-negative"
+                  onClick={() => setDeleteOpen(true)}
+                >
+                  <Trash2 className="size-4" strokeWidth={1.75} />
+                  删除题目
+                </Button>
+              </DisabledTooltip>
+            </div>
+          ) : hint && !errors?.form ? (
             <p className="mr-auto text-xs text-muted">{hint}</p>
           ) : errors?.form ? (
             <p className="mr-auto text-xs text-negative">{errors.form}</p>
-          ) : mode === "edit" && !locked ? (
-            <p className="mr-auto text-xs text-muted">保存后立即生效。</p>
           ) : null}
           <div className="ml-auto flex items-center gap-1.5">
             <Button asChild variant="outline">
@@ -234,6 +254,19 @@ export function PromptForm({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title="删除这道题目？"
+        description={`「${title.trim() || initial?.title || "这道题目"}」从未收到过答案。删除后无法恢复。`}
+        confirmLabel="删除"
+        destructive
+        busy={submitting}
+        onConfirm={() => {
+          submit({ intent: "delete" }, { method: "post" });
+        }}
+      />
 
       <aside className="lg:sticky lg:top-8">
         <div className="overflow-hidden rounded-card border border-border bg-surface">
