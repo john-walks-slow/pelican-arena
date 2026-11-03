@@ -49,6 +49,8 @@ export const prompts = sqliteTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     kind: text("kind", { enum: PROMPT_KINDS }).notNull().default("web"),
+    allowSearch: integer("allow_search", { mode: "boolean" }).notNull().default(false),
+    allowLibraries: integer("allow_libraries", { mode: "boolean" }).notNull().default(false),
     status: text("status", { enum: PROMPT_STATUSES })
       .notNull()
       .default("active"),

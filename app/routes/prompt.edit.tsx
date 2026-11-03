@@ -21,7 +21,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   requireOwnership(user, prompt.authorId);
   return {
     prompt,
-    locked: prompt.answers > 0,
+    locked: prompt.submissions > 0,
     reviewed: initialPromptStatus(user, promptReviewEnabled()) === "pending",
     from: safeFrom(new URL(request.url).searchParams.get("from")),
   };
@@ -38,18 +38,29 @@ export async function action({ params, request }: Route.ActionArgs) {
   const body = String(form.get("body") ?? "").trim();
   const kindRaw = String(form.get("kind") ?? prompt.kind);
   const kind: PromptKind = isPromptKind(kindRaw) ? kindRaw : prompt.kind;
-  const locked = prompt.answers > 0;
+  const allowSearch = form.get("allowSearch") === "on" || form.get("allowSearch") === "true";
+  const allowLibraries = form.get("allowLibraries") === "on" || form.get("allowLibraries") === "true";
+  const locked = prompt.submissions > 0;
 
   const errors: Partial<Record<"title" | "body" | "form", string>> = {};
   if (!title) errors.title = "请填写标题";
   else if (title.length > 80) errors.title = "标题最多 80 字";
   if (!body) errors.body = "请填写提示词";
   else if (body.length > 8000) errors.body = "提示词最多 8000 字";
-  if (locked && (body !== prompt.body || kind !== prompt.kind)) {
-    errors.form = "已有答案，提示词和作品类型不能再修改";
+  if (
+    locked &&
+    (body !== prompt.body ||
+      kind !== prompt.kind ||
+      allowSearch !== prompt.allowSearch ||
+      allowLibraries !== prompt.allowLibraries)
+  ) {
+    errors.form = "已有答案，提示词、作品类型和作答规则不能再修改";
   }
   if (Object.keys(errors).length > 0) {
-    return data({ errors, values: { title, body, kind } }, { status: locked ? 409 : 400 });
+    return data(
+      { errors, values: { title, body, kind, allowSearch, allowLibraries } },
+      { status: locked ? 409 : 400 },
+    );
   }
 
   const reviewed = !locked && initialPromptStatus(user, promptReviewEnabled()) === "pending";
@@ -59,6 +70,8 @@ export async function action({ params, request }: Route.ActionArgs) {
     title,
     body,
     kind,
+    allowSearch,
+    allowLibraries,
     locked,
     reviewed,
   });
@@ -66,7 +79,10 @@ export async function action({ params, request }: Route.ActionArgs) {
     const lateError: Partial<Record<"title" | "body" | "form", string>> = {
       form: "题目刚刚收到答案，请刷新后再试",
     };
-    return data({ errors: lateError, values: { title, body, kind } }, { status: 409 });
+    return data(
+      { errors: lateError, values: { title, body, kind, allowSearch, allowLibraries } },
+      { status: 409 },
+    );
   }
 
   const from = safeFrom(new URL(request.url).searchParams.get("from"));

@@ -7,6 +7,7 @@ import { Markdown } from "~/components/markdown";
 import { OutputRequirements } from "~/components/output-requirements";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Switch } from "~/components/ui/switch";
 import { Textarea } from "~/components/ui/textarea";
 import { KIND_META, PROMPT_KINDS, type PromptKind } from "~/lib/kinds";
 
@@ -16,6 +17,8 @@ export interface PromptFormValues {
   title: string;
   body: string;
   kind: PromptKind;
+  allowSearch?: boolean;
+  allowLibraries?: boolean;
 }
 
 export function PromptForm({
@@ -44,6 +47,12 @@ export function PromptForm({
   const [kind, setKind] = useState<PromptKind>(values?.kind ?? initial?.kind ?? "web");
   const [title, setTitle] = useState(values?.title ?? initial?.title ?? "");
   const [body, setBody] = useState(values?.body ?? initial?.body ?? "");
+  const [allowSearch, setAllowSearch] = useState<boolean>(
+    values?.allowSearch ?? initial?.allowSearch ?? false,
+  );
+  const [allowLibraries, setAllowLibraries] = useState<boolean>(
+    values?.allowLibraries ?? initial?.allowLibraries ?? false,
+  );
   const navigation = useNavigation();
   const gate = useGate();
 
@@ -105,6 +114,42 @@ export function PromptForm({
             </div>
           </div>
 
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-surface px-3.5 py-3">
+              <div>
+                <span className="block text-sm font-medium">允许网络搜索</span>
+                <span className="mt-0.5 block text-xs leading-normal text-muted">
+                  默认关闭，模型不可联网
+                </span>
+              </div>
+              <Switch
+                id="allowSearch"
+                name="allowSearch"
+                checked={allowSearch}
+                onCheckedChange={setAllowSearch}
+                disabled={locked}
+                aria-label="允许网络搜索"
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-surface px-3.5 py-3">
+              <div>
+                <span className="block text-sm font-medium">允许外部库</span>
+                <span className="mt-0.5 block text-xs leading-normal text-muted">
+                  默认关闭，仅限原生实现
+                </span>
+              </div>
+              <Switch
+                id="allowLibraries"
+                name="allowLibraries"
+                checked={allowLibraries}
+                onCheckedChange={setAllowLibraries}
+                disabled={locked}
+                aria-label="允许外部库"
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium" htmlFor="title">
               标题
@@ -149,7 +194,12 @@ export function PromptForm({
           </div>
 
           <div className="rounded-control border border-border bg-raised/50 px-3.5 py-3">
-            <OutputRequirements kind={kind} className="border-t-0 pt-0" />
+            <OutputRequirements
+              kind={kind}
+              allowSearch={allowSearch}
+              allowLibraries={allowLibraries}
+              className="border-t-0 pt-0"
+            />
             <p className="mt-2 text-[11px] leading-relaxed text-muted">
               输出要求会自动拼接在题目提示词末尾。
             </p>
@@ -191,7 +241,12 @@ export function PromptForm({
               {body.trim() ? (
                 <>
                   <Markdown>{body}</Markdown>
-                  <OutputRequirements kind={kind} className="mt-3" />
+                  <OutputRequirements
+                    kind={kind}
+                    allowSearch={allowSearch}
+                    allowLibraries={allowLibraries}
+                    className="mt-3"
+                  />
                 </>
               ) : (
                 <p className="text-sm text-muted">提示词会显示在这里。</p>

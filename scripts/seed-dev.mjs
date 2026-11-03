@@ -55,6 +55,7 @@ const PROMPTS = [
     kind: "web",
     title: "把一句话做成排版海报",
     body: "以「真正重要的东西，用眼睛是看不见的」为文案，做一张可以在浏览器里直接看的海报页。字号、留白、行距要经得起近看。",
+    allowLibraries: true,
     authorId: 99002,
     ageDays: 7,
   },
@@ -71,6 +72,7 @@ const PROMPTS = [
     kind: "markdown",
     title: "写一份 D1 + Drizzle 的团队上手文档",
     body: "假设读者第一次在 Cloudflare Workers 上用 D1，覆盖建库、schema、迁移、本地与远端两条链路。要能照着做通。",
+    allowSearch: true,
     authorId: 99002,
     ageDays: 5,
   },
@@ -943,7 +945,7 @@ for (const user of USERS) {
 for (const prompt of PROMPTS) {
   const createdAt = NOW - prompt.ageDays * DAY;
   lines.push(
-    `INSERT INTO prompts (id, author_id, title, body, kind, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, 'active', NULL, ${createdAt}, NULL);`,
+    `INSERT INTO prompts (id, author_id, title, body, kind, allow_search, allow_libraries, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, ${prompt.allowSearch ? 1 : 0}, ${prompt.allowLibraries ? 1 : 0}, 'active', NULL, ${createdAt}, NULL);`,
   );
 }
 

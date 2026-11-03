@@ -37,6 +37,8 @@ export async function action({ request }: Route.ActionArgs) {
   const body = String(form.get("body") ?? "").trim();
   const kindRaw = String(form.get("kind") ?? "web");
   const kind: PromptKind = isPromptKind(kindRaw) ? kindRaw : "web";
+  const allowSearch = form.get("allowSearch") === "on" || form.get("allowSearch") === "true";
+  const allowLibraries = form.get("allowLibraries") === "on" || form.get("allowLibraries") === "true";
 
   const errors: Partial<Record<"title" | "body" | "form", string>> = {};
   if (!title) errors.title = "请填写标题";
@@ -46,12 +48,21 @@ export async function action({ request }: Route.ActionArgs) {
   const limitError = await dailyLimitError(user, "createPrompt");
   if (limitError) errors.form = limitError;
   if (Object.keys(errors).length > 0) {
-    return data({ errors, values: { title, body, kind } }, { status: 400 });
+    return data({ errors, values: { title, body, kind, allowSearch, allowLibraries } }, { status: 400 });
   }
 
   const id = newId(10);
   const status = initialPromptStatus(user, promptReviewEnabled());
-  await db().insert(prompts).values({ id, authorId: user.id, title, body, kind, status });
+  await db().insert(prompts).values({
+    id,
+    authorId: user.id,
+    title,
+    body,
+    kind,
+    allowSearch,
+    allowLibraries,
+    status,
+  });
   return redirect(`/p/${id}`, {
     headers: {
       "Set-Cookie": await flashToast(

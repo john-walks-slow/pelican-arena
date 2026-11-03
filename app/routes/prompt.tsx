@@ -296,7 +296,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(promptWithRequirements(prompt.body, prompt.kind));
+      await navigator.clipboard.writeText(
+        promptWithRequirements(prompt.body, prompt.kind, {
+          allowSearch: prompt.allowSearch,
+          allowLibraries: prompt.allowLibraries,
+        }),
+      );
       setCopied(true);
       toast.success("提示词已复制");
       setTimeout(() => setCopied(false), 1800);
@@ -311,8 +316,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
         back={{ to: back.to, label: back.label }}
         title={prompt.title}
         subtitle={
-          <div className="flex items-center gap-2 text-xs text-muted">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
             <span>{KIND_META[prompt.kind].label}</span>
+            <span>·</span>
+            <span>{prompt.allowSearch ? "允许联网" : "禁止联网"}</span>
+            <span>·</span>
+            <span>{prompt.allowLibraries ? "允许外部库" : "无外部库"}</span>
             <span>·</span>
             <Avatar template={prompt.author.avatarTemplate} username={prompt.author.username} size={18} />
             <span>{prompt.author.username}</span>
@@ -416,7 +425,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
           <div className="max-h-64 overflow-y-auto scroll-thin">
             <Markdown>{prompt.body}</Markdown>
           </div>
-          <OutputRequirements kind={prompt.kind} className="mt-3" />
+          <OutputRequirements
+            kind={prompt.kind}
+            allowSearch={prompt.allowSearch}
+            allowLibraries={prompt.allowLibraries}
+            className="mt-3"
+          />
           {showReport && canAnswer && (
             <div className="mt-3 flex justify-end border-t border-border pt-2.5">
               <ReportDialog
