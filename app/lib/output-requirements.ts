@@ -23,7 +23,6 @@ export function outputRequirements(
 
     return [
       "输出单个 HTML 文件，CSS 与 JavaScript 内联；需要多文件时打包成 zip，入口为 index.html。",
-      "按 1280×800 的桌面视口设计，首屏就要呈现主要效果。",
       libraryRule,
       SKILL_DISALLOW_RULE,
       searchRule,
