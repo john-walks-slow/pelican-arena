@@ -160,19 +160,33 @@ function parseCodex(rows: Json[]): LogMeta {
   const records = rows.filter((r) => r.type === "token_usage_record");
   const turnIds = new Set<string>();
   let userTurns = 0;
-  let taskDurationMs = 0;
-  let hasTaskDuration = false;
+  const turnTasks = new Map<string, number>();
+  const turnTimestamps = new Map<string, unknown[]>();
+  let firstSessionStart: number | null = null;
   const activeTimestamps: unknown[] = [];
 
   for (const row of rows) {
     const payload = row.payload ?? {};
+    const ts = toTime(row.timestamp);
+    const turnId = typeof payload.turn_id === "string" ? payload.turn_id : null;
+
+    if (row.type === "session_meta" && payload.timestamp) {
+      const metaTs = toTime(payload.timestamp);
+      if (!Number.isNaN(metaTs)) {
+        activeTimestamps.push(metaTs);
+        if (firstSessionStart === null || metaTs < firstSessionStart) {
+          firstSessionStart = metaTs;
+        }
+      }
+    }
+
     if (row.type === "turn_context") {
       if (payload.model) models.add(payload.model);
-      if (payload.turn_id) turnIds.add(payload.turn_id);
+      if (turnId) turnIds.add(turnId);
     }
     if (row.type === "event_msg") {
-      if (payload.type === "task_started" && payload.turn_id) {
-        turnIds.add(payload.turn_id);
+      if (payload.type === "task_started" && turnId) {
+        turnIds.add(turnId);
       }
       if (
         payload.type === "user_message" ||
@@ -180,9 +194,8 @@ function parseCodex(rows: Json[]): LogMeta {
       ) {
         userTurns += 1;
       }
-      if (payload.type === "task_complete" && typeof payload.duration_ms === "number") {
-        taskDurationMs += payload.duration_ms;
-        hasTaskDuration = true;
+      if (payload.type === "task_complete" && typeof payload.duration_ms === "number" && turnId) {
+        turnTasks.set(turnId, payload.duration_ms);
       }
     }
     if (
@@ -193,6 +206,14 @@ function parseCodex(rows: Json[]): LogMeta {
       (row.type === "event_msg" && payload.type !== "thread_settings_applied")
     ) {
       activeTimestamps.push(row.timestamp);
+      if (turnId && !Number.isNaN(ts)) {
+        let list = turnTimestamps.get(turnId);
+        if (!list) {
+          list = [];
+          turnTimestamps.set(turnId, list);
+        }
+        list.push(ts);
+      }
     }
     if (
       row.type === "response_item" &&
@@ -203,6 +224,28 @@ function parseCodex(rows: Json[]): LogMeta {
   }
 
   meta.turns = userTurns > 0 ? userTurns : turnIds.size;
+
+  const turnIdList = [...turnIds];
+  if (turnIdList.length > 0 && firstSessionStart !== null) {
+    const firstTurn = turnIdList[0];
+    let list = turnTimestamps.get(firstTurn);
+    if (!list) {
+      list = [];
+      turnTimestamps.set(firstTurn, list);
+    }
+    list.push(firstSessionStart);
+  }
+
+  let activeDurationMs = 0;
+  for (const tid of turnIdList) {
+    if (turnTasks.has(tid)) {
+      activeDurationMs += turnTasks.get(tid)!;
+    } else {
+      const times = turnTimestamps.get(tid);
+      const span = times ? spanMs(times) : null;
+      if (span !== null) activeDurationMs += span;
+    }
+  }
 
   if (records.length > 0) {
     const seen = new Set<string>();
@@ -232,8 +275,8 @@ function parseCodex(rows: Json[]): LogMeta {
   }
 
   meta.models = [...models];
-  meta.durationMs = hasTaskDuration && taskDurationMs > 0
-    ? taskDurationMs
+  meta.durationMs = activeDurationMs > 0
+    ? activeDurationMs
     : spanMs(activeTimestamps);
   return meta;
 }

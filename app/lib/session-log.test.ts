@@ -53,6 +53,22 @@ describe("parseSessionLog", () => {
     });
   });
 
+  it("accumulates multiple Codex turns even when earlier turns lack task_complete", () => {
+    const rows = [
+      { timestamp: "2026-11-03T07:58:00.000Z", type: "session_meta", payload: { timestamp: "2026-11-03T07:40:00.000Z" } },
+      { timestamp: "2026-11-03T07:58:00.100Z", type: "turn_context", payload: { model: "gpt-6-astra", turn_id: "t1" } },
+      { timestamp: "2026-11-03T07:58:01.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "t1" } },
+      { timestamp: "2026-11-03T07:58:30.000Z", type: "response_item", payload: { turn_id: "t1", type: "custom_tool_call" } },
+      { timestamp: "2026-11-03T07:59:00.000Z", type: "event_msg", payload: { type: "task_started", turn_id: "t2" } },
+      { timestamp: "2026-11-03T07:59:00.100Z", type: "turn_context", payload: { model: "gpt-6-astra", turn_id: "t2" } },
+      { timestamp: "2026-11-03T08:00:00.000Z", type: "event_msg", payload: { type: "task_complete", turn_id: "t2", duration_ms: 60_000 } },
+    ];
+    const meta = parseSessionLog(rows.map((r) => JSON.stringify(r)).join("\n"));
+    expect(meta.turns).toBe(2);
+    // t1 spans 07:40:00 to 07:58:30 (18m30s = 1110s), t2 task_complete duration is 60s -> total 1170s = 1,170,000ms
+    expect(meta.durationMs).toBe(1_170_000);
+  });
+
   it("prefers per-response records with ids over token_count events", () => {
     const rows = [
       { type: "turn_context", payload: { model: "gpt-5.1" } },
