@@ -25,7 +25,7 @@ export const LOG_SOURCE_LABELS: Record<LogSource, string> = {
   codex: "Codex CLI",
   pi: "pi",
   dsh: "DSH",
-  opencode: "opencode",
+  opencode: "OpenCode",
 };
 
 export function isLogSource(value: unknown): value is LogSource {

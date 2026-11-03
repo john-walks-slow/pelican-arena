@@ -195,7 +195,7 @@ export async function getCatalog(): Promise<Catalog> {
   const [m, p, h, md] = await Promise.all([
     searchCatalog("models", "", 20),
     searchCatalog("providers", "", 120),
-    searchCatalog("harnesses", "", 20),
+    searchCatalog("harnesses", "", 120),
     searchCatalog("mods", "", 20),
   ]);
   return {

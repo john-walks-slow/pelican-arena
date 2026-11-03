@@ -1,0 +1,38 @@
+-- 规范已有条目的官方正式名称
+UPDATE `harnesses` SET `name` = 'OpenCode' WHERE `id` = 'opencode';
+
+-- 收录主流 AI 编程与对话客户端（官方正式名称）
+INSERT OR IGNORE INTO `harnesses` (`id`, `name`) VALUES
+  ('windsurf', 'Windsurf'),
+  ('trae', 'Trae'),
+  ('qoder', 'Qoder'),
+  ('workbuddy', 'WorkBuddy'),
+  ('zed', 'Zed'),
+  ('void', 'Void'),
+  ('pearai', 'PearAI'),
+  ('roo-code', 'Roo Code'),
+  ('github-copilot', 'GitHub Copilot'),
+  ('continue', 'Continue'),
+  ('通义灵码', '通义灵码'),
+  ('文心快码', '文心快码'),
+  ('aider', 'Aider'),
+  ('command-code', 'Command Code'),
+  ('goose', 'Goose'),
+  ('kilo-code', 'Kilo Code'),
+  ('qwen-code', 'Qwen Code'),
+  ('hermes-agent', 'Hermes Agent'),
+  ('open-interpreter', 'Open Interpreter'),
+  ('chatbox', 'Chatbox'),
+  ('nextchat', 'NextChat'),
+  ('lobechat', 'LobeChat'),
+  ('open-webui', 'Open WebUI'),
+  ('librechat', 'LibreChat'),
+  ('claude-desktop', 'Claude Desktop'),
+  ('jan', 'Jan'),
+  ('lm-studio', 'LM Studio'),
+  ('ollama', 'Ollama'),
+  ('bolt.new', 'Bolt.new'),
+  ('v0', 'v0'),
+  ('lovable', 'Lovable'),
+  ('replit-agent', 'Replit Agent'),
+  ('devin', 'Devin');

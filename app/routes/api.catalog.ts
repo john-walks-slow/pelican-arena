@@ -20,7 +20,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   if (find) return { model: await getModelMeta(find.slice(0, 100)) };
 
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 60);
-  const fallback = kind === "providers" ? 120 : 20;
+  const fallback = kind === "providers" || kind === "harnesses" ? 120 : 20;
   const requested = Number(url.searchParams.get("limit") ?? fallback);
   const limit = Math.min(Math.max(Number.isFinite(requested) ? requested : fallback, 1), 200);
   return searchCatalog(kind, query, limit);
