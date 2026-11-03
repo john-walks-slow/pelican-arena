@@ -47,3 +47,12 @@ export function previewUrl(
 ) {
   return `${submissionUrl(origin, submissionId, kind, grant)}?preview=1`;
 }
+
+/** Static thumbnail preview URL for a submission. */
+export function thumbnailUrl(
+  origin: string,
+  submissionId: string,
+  grant?: string | null,
+) {
+  return usercontentUrl(origin, submissionId, "thumb.webp", grant);
+}

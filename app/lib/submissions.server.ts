@@ -13,6 +13,7 @@ import {
 import { newId } from "./ids";
 import type { PromptKind } from "./kinds";
 import { ensureCatalogEntry } from "./queries.server";
+import { getOrGenerateThumbnail } from "./screenshot.server";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
 
@@ -80,6 +81,13 @@ export async function createSubmission(input: {
       await db()
         .insert(submissionMods)
         .values(uniqueMods.map((modId) => ({ submissionId: id, modId })));
+    }
+
+    // 答案提交时立即生成缩略图存入 R2
+    try {
+      await getOrGenerateThumbnail(id, input.kind);
+    } catch (err) {
+      console.error("Failed to generate thumbnail at submission time:", id, err);
     }
   } catch (error) {
     await Promise.allSettled(files.map((f) => env.FILES.delete(bundleKey(id, f.path))));

@@ -4,6 +4,7 @@ import {
   previewUrl,
   SANDBOX,
   submissionUrl,
+  thumbnailUrl,
   usercontentUrl,
 } from "./sandbox";
 
@@ -50,6 +51,14 @@ describe("sandbox security policy and url builder", () => {
     const subId = "sub1234567890";
     expect(previewUrl(origin, subId, "web")).toBe(
       "https://usercontent.example.com/sub1234567890/index.html?preview=1",
+    );
+  });
+
+  it("builds static thumbnail preview url", () => {
+    const origin = "https://usercontent.example.com";
+    const subId = "sub1234567890";
+    expect(thumbnailUrl(origin, subId)).toBe(
+      "https://usercontent.example.com/sub1234567890/thumb.webp",
     );
   });
 });

@@ -3,7 +3,7 @@ import { Markdown } from "~/components/markdown";
 import { PagePreview } from "~/components/page-preview";
 import { PreviewSkeleton } from "~/components/preview-skeleton";
 import type { PromptKind } from "~/lib/kinds";
-import { previewUrl } from "~/lib/sandbox";
+import { previewUrl, thumbnailUrl } from "~/lib/sandbox";
 import { cn } from "~/lib/utils";
 
 function SvgPreview({
@@ -103,6 +103,7 @@ export function SubmissionPreview({
   return (
     <PagePreview
       src={previewUrl(origin, submissionId, kind, grant)}
+      thumbnailSrc={thumbnailUrl(origin, submissionId, grant)}
       title={title}
       className={className}
     />

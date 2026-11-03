@@ -14,16 +14,17 @@ const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayout
 const knownScales = new Map<string, number>();
 
 /**
- * A submitted page rendered at desktop size and scaled to fit its box. The
- * frame mounts only while on screen, so a long gallery does not run every
- * page's animations at once.
+ * A submitted page preview that displays a static thumbnail by default and
+ * mounts the live interactive iframe only when hovered.
  */
 export function PagePreview({
   src,
+  thumbnailSrc,
   title,
   className,
 }: {
   src: string;
+  thumbnailSrc?: string;
   title: string;
   className?: string;
 }) {
@@ -31,28 +32,37 @@ export function PagePreview({
   const cachedScale = knownScales.get(src) ?? 0;
   const [scale, setScale] = useState(cachedScale);
   const [visible, setVisible] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+
+  // Thumbnail states
+  const [thumbLoaded, setThumbLoaded] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
+
+  // Live iframe states
+  const [iframeLoaded, setIframeLoaded] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(false);
 
-  useEffect(() => {
-    setLoaded(false);
-  }, [src]);
+  const shouldMountIframe = visible && (isHovered || thumbError || !thumbnailSrc);
 
-  // A cached preview repaints within a frame or two; showing the skeleton for
-  // that instant reads as a flash. Only surface it once loading is slow enough
-  // to need an indicator.
   useEffect(() => {
-    if (loaded) {
+    setThumbLoaded(false);
+    setThumbError(false);
+  }, [thumbnailSrc]);
+
+  useEffect(() => {
+    setIframeLoaded(false);
+  }, [src, isHovered]);
+
+  // Skeleton indicator timer
+  useEffect(() => {
+    if (thumbLoaded || iframeLoaded) {
       setShowSkeleton(false);
       return;
     }
     const timer = setTimeout(() => setShowSkeleton(true), SKELETON_DELAY);
     return () => clearTimeout(timer);
-  }, [loaded, src]);
+  }, [thumbLoaded, iframeLoaded]);
 
-  // Cached scales say "seen before", not "on screen now". Check the geometry
-  // before the first paint so a restored list does not mount every off-screen
-  // preview at once (which re-requests them all behind skeletons).
   useIsoLayoutEffect(() => {
     const box = boxRef.current;
     if (!box) return;
@@ -90,30 +100,44 @@ export function PagePreview({
     };
   }, [src]);
 
-  useEffect(() => {
-    if (!visible) return;
-    const timer = setTimeout(() => setLoaded(true), 8000);
-    return () => clearTimeout(timer);
-  }, [src, visible]);
-
   return (
     <div
       ref={boxRef}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
       className={cn(
-        "relative aspect-[16/10] w-full overflow-hidden bg-raised [contain:layout_paint]",
+        "group relative aspect-[16/10] w-full overflow-hidden bg-raised [contain:layout_paint]",
         className,
       )}
     >
+      {/* Loading Skeleton */}
       <div
         className={cn(
           "absolute inset-0 transition-opacity duration-200 ease-out",
-          showSkeleton && !loaded ? "opacity-100" : "opacity-0",
+          showSkeleton && !thumbLoaded && !iframeLoaded ? "opacity-100" : "opacity-0",
         )}
       >
         <PreviewSkeleton />
       </div>
 
-      {visible && scale > 0 && (
+      {/* Static Thumbnail (Default state) */}
+      {thumbnailSrc && !thumbError && (
+        <img
+          src={thumbnailSrc}
+          alt={title}
+          loading="lazy"
+          decoding="async"
+          onLoad={() => setThumbLoaded(true)}
+          onError={() => setThumbError(true)}
+          className={cn(
+            "pointer-events-none absolute inset-0 size-full object-cover transition-opacity duration-300 ease-out",
+            thumbLoaded && (!isHovered || !iframeLoaded) ? "opacity-100" : "opacity-0",
+          )}
+        />
+      )}
+
+      {/* Live Iframe (Mounted only on hover or when thumbnail is unavailable) */}
+      {shouldMountIframe && scale > 0 && (
         <iframe
           src={src}
           title={title}
@@ -121,10 +145,10 @@ export function PagePreview({
           loading="lazy"
           tabIndex={-1}
           referrerPolicy="no-referrer"
-          onLoad={() => setLoaded(true)}
+          onLoad={() => setIframeLoaded(true)}
           className={cn(
             "pointer-events-none absolute top-0 left-0 origin-top-left border-0 bg-white transition-opacity duration-300 ease-out",
-            loaded ? "opacity-100" : "opacity-0",
+            iframeLoaded ? "opacity-100" : "opacity-0",
           )}
           style={{
             width: VIEWPORT_WIDTH,
