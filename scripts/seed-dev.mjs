@@ -165,7 +165,7 @@ for (let i = 0; i < 92; i++) {
 }
 PROMPTS.push(...generatedPrompts);
 
-const MOD_POOLS = [["联网搜索"], [], ["多轮修改"], ["skills"], ["mcp", "联网搜索"], [], [], ["多轮修改"]];
+const MOD_POOLS = [[]];
 
 const NOTES = [
   "一次成型，没改稿。",

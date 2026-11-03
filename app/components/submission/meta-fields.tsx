@@ -172,7 +172,7 @@ export function SubmissionMetaFields({
             kind="mods"
             value=""
             onChange={addMod}
-            placeholder="更多"
+            placeholder={mods.length > 0 ? "更多" : "添加增强"}
             searchPlaceholder="搜索或新建增强"
             trigger="chip"
           />
