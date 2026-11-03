@@ -76,7 +76,6 @@ export function GateDialog({
     primaryDesc ??= actionName
       ? `${actionName}需要信任等级 TL${req} 及以上，你当前为 TL${cur}。`
       : `该操作需要信任等级 TL${req} 及以上，你当前为 TL${cur}。`;
-    secondaryDesc = "在 Linux DO 社区积极参与讨论与浏览，可提升信任等级。";
   } else if (reason === "daily_limit") {
     resolvedTitle ??= "已达今日上限";
     if (!primaryDesc && action) {
