@@ -10,6 +10,7 @@ describe("outputRequirements", () => {
     const rules = outputRequirements("web");
     expect(rules).toContain("禁止进行网络搜索。");
     expect(rules).toContain("禁止读取 Skill。");
+    expect(rules).toContain("首屏就要呈现主要效果，不要用开场动画或引导页占位。");
     expect(rules).toContain(
       "可以使用 Canvas、WebGL、CSS 动画、ES module，以及公开 CDN 上的库。",
     );
