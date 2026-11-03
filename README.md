@@ -52,3 +52,7 @@ npm run typecheck
    npm run deploy
    ```
    Worker 部署后每天 03:17 UTC 自动同步模型目录；需要立即更新时运行 `npm run catalog:sync -- --remote`。
+
+## 许可
+
+MIT

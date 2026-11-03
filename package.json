@@ -60,5 +60,10 @@
 		"vitest": "^5.0.5",
 		"wrangler": "^4.155.0",
 		"xss": "^1.0.17"
+	},
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/john-walks-slow/pelican-arena"
 	}
 }

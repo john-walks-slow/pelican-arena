@@ -21,3 +21,6 @@ worker-configuration.d.ts
 .shots/
 
 .worktrees/
+
+tmp/
+runs/
