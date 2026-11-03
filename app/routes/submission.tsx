@@ -274,17 +274,6 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               path={`/s/${s.id}`}
               title={`${s.model.name} · ${s.provider.name} — ${prompt.title}`}
               appOrigin={appOrigin}
-              cardData={{
-                type: "answer",
-                promptTitle: prompt.title,
-                modelName: s.model.name,
-                providerName: s.provider.name,
-                harnessName: s.harness?.name,
-                kind: prompt.kind,
-                previewUrl: pageUrl,
-                starSum: s.starSum,
-                votes: s.votes,
-              }}
             />
             <Button asChild variant="outline" className="gap-1.5">
               <a href={pageUrl} target="_blank" rel="noreferrer">

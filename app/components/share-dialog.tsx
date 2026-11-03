@@ -14,16 +14,64 @@ import {
 import { Segmented } from "~/components/ui/segmented";
 import { toast } from "~/components/ui/toaster";
 import { SHARE_FORMATS, shareSnippet, type ShareFormat } from "~/lib/share";
-import { ShareCardPreview, type ShareCardData } from "~/components/share-card-preview";
 
 interface ShareDialogProps {
   path: string;
   title: string;
   appOrigin: string;
-  cardData: ShareCardData;
 }
 
-export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogProps) {
+const CARD_WIDTH = 600;
+const CARD_HEIGHT = 380;
+
+/** Previews the exact asset the snippet points at, so the dialog cannot drift from what gets posted. */
+function CardPreview({ src, alt }: { src: string; alt: string }) {
+  const [attempt, setAttempt] = useState(0);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const url = attempt === 0 ? src : `${src}?retry=${attempt}`;
+
+  return (
+    <div
+      className="relative aspect-[600/380] w-full overflow-hidden rounded-[14px] bg-white"
+      aria-busy={state === "loading"}
+    >
+      {state === "loading" && (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#fafafa] text-xs text-[#9ca3af]">
+          正在生成分享卡片…
+        </div>
+      )}
+      {state === "error" ? (
+        <div className="absolute inset-0 flex items-center justify-center bg-[#fafafa]">
+          <button
+            type="button"
+            className="text-xs text-[#6b7280] underline underline-offset-2 hover:text-[#111827]"
+            onClick={() => {
+              setState("loading");
+              setAttempt((n) => n + 1);
+            }}
+          >
+            卡片生成失败，重试
+          </button>
+        </div>
+      ) : (
+        <img
+          key={url}
+          src={url}
+          alt={alt}
+          width={CARD_WIDTH}
+          height={CARD_HEIGHT}
+          onLoad={() => setState("ready")}
+          onError={() => setState("error")}
+          className={`size-full object-contain transition-opacity duration-150 ${
+            state === "ready" ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      )}
+    </div>
+  );
+}
+
+export function ShareDialog({ path, title, appOrigin }: ShareDialogProps) {
   // 默认选中可直接在社区渲染成卡的代码
   const [format, setFormat] = useState<ShareFormat>("card");
   const [copied, setCopied] = useState(false);
@@ -66,7 +114,7 @@ export function ShareDialog({ path, title, appOrigin, cardData }: ShareDialogPro
           <DialogDescription className="sr-only">复制卡片代码直接发帖</DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3 px-5 py-4">
-          <ShareCardPreview data={cardData} />
+          <CardPreview src={cardUrl} alt={title} />
 
           <div className="flex items-center justify-between gap-2 pt-0.5">
             <span className="text-xs text-muted">分享格式</span>

@@ -42,7 +42,6 @@ import { CompactSelect } from "~/components/ui/compact-select";
 import { toast } from "~/components/ui/toaster";
 import { formatRelative } from "~/lib/format";
 import { backTarget, withFrom } from "~/lib/navigation";
-import { submissionUrl } from "~/lib/sandbox";
 import { KIND_META } from "~/lib/kinds";
 import { canViewPrompt, isAdmin } from "~/lib/moderation";
 import { hasReported, promptReviewEnabled } from "~/lib/moderation.server";
@@ -365,20 +364,6 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
               path={`/p/${prompt.id}`}
               title={prompt.title}
               appOrigin={appOrigin}
-              cardData={{
-                type: "prompt",
-                title: prompt.title,
-                body: prompt.body,
-                kind: prompt.kind,
-                totalSubmissions: total,
-                topSubmissions: submissions.slice(0, 3).map((item) => ({
-                  id: item.id,
-                  modelName: item.model.name,
-                  previewUrl: submissionUrl(usercontentOrigin, item.id, prompt.kind),
-                  starSum: item.starSum,
-                  votes: item.votes,
-                })),
-              }}
             />
             <Button
               variant="outline"
