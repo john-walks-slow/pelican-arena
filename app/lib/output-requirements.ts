@@ -18,7 +18,7 @@ export function outputRequirements(
 
   if (kind === "web") {
     const libraryRule = allowLibraries
-      ? "可以使用 Canvas、WebGL、CSS 动画、ES module，以及公开 CDN 上的库。"
+      ? "可以使用 Canvas、WebGL、CSS 动画，以及公开 CDN 上的库。"
       : "禁止使用任何外部库或框架，全部使用原生 HTML、CSS 与 JavaScript 实现（可使用 Canvas、WebGL、CSS 动画等原生特性）。";
 
     return [
