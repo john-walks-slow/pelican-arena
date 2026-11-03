@@ -82,14 +82,36 @@ function parseClaudeCode(rows: Json[]): LogMeta {
   const meta = emptyMeta("claude-code");
   const seen = new Set<string>();
   const models = new Set<string>();
+  let activeDurationMs = 0;
+  let turnStart: number | null = null;
+  let turnEnd: number | null = null;
+  const activeTimestamps: unknown[] = [];
 
   for (const row of rows) {
+    const ts = toTime(row.timestamp);
     if (row.type === "user" && !row.isMeta && !row.isSidechain) {
       const content = row.message?.content;
       const isToolResult =
         Array.isArray(content) && content.some((c: Json) => c?.type === "tool_result");
-      if (!isToolResult) meta.turns += 1;
+      if (!isToolResult) {
+        meta.turns += 1;
+        if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+          activeDurationMs += turnEnd - turnStart;
+        }
+        turnStart = !Number.isNaN(ts) ? ts : null;
+        turnEnd = turnStart;
+      }
     }
+
+    if (row.type === "assistant" || row.type === "user") {
+      if (!row.isMeta) {
+        activeTimestamps.push(row.timestamp);
+        if (turnStart !== null && !Number.isNaN(ts)) {
+          turnEnd = Math.max(turnEnd ?? ts, ts);
+        }
+      }
+    }
+
     if (row.type !== "assistant") continue;
     const message = row.message ?? {};
     for (const block of message.content ?? []) {
@@ -107,12 +129,12 @@ function parseClaudeCode(rows: Json[]): LogMeta {
     meta.reasoningTokens += num(usage.output_tokens_details?.thinking_tokens);
   }
 
+  if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+    activeDurationMs += turnEnd - turnStart;
+  }
+
   meta.models = [...models];
-  meta.durationMs = spanMs(
-    rows
-      .filter((r) => (r.type === "user" || r.type === "assistant") && !r.isMeta)
-      .map((r) => r.timestamp),
-  );
+  meta.durationMs = activeDurationMs > 0 ? activeDurationMs : spanMs(activeTimestamps);
   return meta;
 }
 
@@ -228,19 +250,32 @@ interface PiUsage {
 function parsePi(rows: Json[]): LogMeta {
   const meta = emptyMeta("pi");
   const models = new Set<string>();
-  const times: unknown[] = [];
+  let activeDurationMs = 0;
+  let turnStart: number | null = null;
+  let turnEnd: number | null = null;
+  const activeTimestamps: unknown[] = [];
 
   for (const row of rows) {
     if (row.type !== "message") continue;
     const message = row.message ?? {};
-    times.push(message.timestamp ?? row.timestamp);
+    const ts = toTime(message.timestamp ?? row.timestamp);
+    if (!Number.isNaN(ts)) activeTimestamps.push(ts);
     const content = Array.isArray(message.content) ? message.content : [];
 
     if (message.role === "user") {
       meta.turns += 1;
+      if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+        activeDurationMs += turnEnd - turnStart;
+      }
+      turnStart = !Number.isNaN(ts) ? ts : null;
+      turnEnd = turnStart;
       continue;
     }
     if (message.role !== "assistant") continue;
+
+    if (turnStart !== null && !Number.isNaN(ts)) {
+      turnEnd = Math.max(turnEnd ?? ts, ts);
+    }
 
     // responseModel is the model actually served; model may only be the route name.
     const model = message.responseModel ?? message.model;
@@ -256,8 +291,12 @@ function parsePi(rows: Json[]): LogMeta {
     meta.reasoningTokens += num(usage.reasoning);
   }
 
+  if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+    activeDurationMs += turnEnd - turnStart;
+  }
+
   meta.models = [...models];
-  meta.durationMs = spanMs(times);
+  meta.durationMs = activeDurationMs > 0 ? activeDurationMs : spanMs(activeTimestamps);
   return meta;
 }
 
@@ -273,12 +312,46 @@ interface DshUsage {
 function parseDsh(rows: Json[]): LogMeta {
   const meta = emptyMeta("dsh");
   const models = new Set<string>();
-  const times: unknown[] = [];
+  let activeDurationMs = 0;
+  let turnStart: number | null = null;
+  let turnEnd: number | null = null;
+  const activeTimestamps: unknown[] = [];
 
   for (const row of rows) {
-    times.push(row.time);
+    const ts = toTime(row.time);
     const data = row.data ?? {};
-    if (row.type === "user/message" && data.source?.kind === "user") meta.turns += 1;
+
+    const isUserTurnStart = row.type === "user/message" && data.source?.kind === "user";
+    if (isUserTurnStart) {
+      meta.turns += 1;
+    }
+
+    if (row.type === "turn/start" || isUserTurnStart) {
+      if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+        activeDurationMs += turnEnd - turnStart;
+      }
+      turnStart = !Number.isNaN(ts) ? ts : null;
+      turnEnd = turnStart;
+    }
+
+    if (turnStart !== null && !Number.isNaN(ts)) {
+      if (
+        row.type === "assistant/message" ||
+        row.type === "tool/call" ||
+        row.type === "step/end" ||
+        row.type === "turn/end" ||
+        row.type === "user/message"
+      ) {
+        turnEnd = Math.max(turnEnd ?? ts, ts);
+        activeTimestamps.push(row.time);
+        if (row.type === "turn/end") {
+          activeDurationMs += Math.max(0, turnEnd - turnStart);
+          turnStart = null;
+          turnEnd = null;
+        }
+      }
+    }
+
     if (row.type === "tool/call") meta.toolCalls += 1;
     if (row.type !== "assistant/message") continue;
 
@@ -293,8 +366,12 @@ function parseDsh(rows: Json[]): LogMeta {
     meta.reasoningTokens += num(usage.reasoningTokens);
   }
 
+  if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+    activeDurationMs += turnEnd - turnStart;
+  }
+
   meta.models = [...models];
-  meta.durationMs = spanMs(times);
+  meta.durationMs = activeDurationMs > 0 ? activeDurationMs : spanMs(activeTimestamps);
   return meta;
 }
 
@@ -304,18 +381,44 @@ function parseOpencode(exported: Json): LogMeta {
   const info = exported.info ?? {};
   const messages: Json[] = Array.isArray(exported.messages) ? exported.messages : [];
   const models = new Set<string>();
-  const times: unknown[] = [];
+  let activeDurationMs = 0;
+  let turnStart: number | null = null;
+  let turnEnd: number | null = null;
+  const messageTimes: unknown[] = [];
 
   if (info.model?.id) models.add(String(info.model.id));
   for (const message of messages) {
     const messageInfo = message?.info ?? {};
-    times.push(messageInfo.time?.created, messageInfo.time?.completed);
-    if (messageInfo.role === "user") meta.turns += 1;
+    const created = toTime(messageInfo.time?.created);
+    const completed = toTime(messageInfo.time?.completed);
+    if (!Number.isNaN(created)) messageTimes.push(created);
+    if (!Number.isNaN(completed)) messageTimes.push(completed);
+
+    if (messageInfo.role === "user") {
+      meta.turns += 1;
+      if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+        activeDurationMs += turnEnd - turnStart;
+      }
+      turnStart = !Number.isNaN(created) ? created : null;
+      turnEnd = turnStart;
+      continue;
+    }
     if (messageInfo.role !== "assistant") continue;
     if (messageInfo.modelID) models.add(String(messageInfo.modelID));
     for (const part of message?.parts ?? []) {
       if (part?.type === "tool") meta.toolCalls += 1;
     }
+
+    if (turnStart !== null) {
+      const endCandidate = !Number.isNaN(completed) ? completed : created;
+      if (!Number.isNaN(endCandidate)) {
+        turnEnd = Math.max(turnEnd ?? endCandidate, endCandidate);
+      }
+    }
+  }
+
+  if (turnStart !== null && turnEnd !== null && turnEnd >= turnStart) {
+    activeDurationMs += turnEnd - turnStart;
   }
 
   const tokens = info.tokens ?? {};
@@ -325,7 +428,7 @@ function parseOpencode(exported: Json): LogMeta {
   meta.cacheReadTokens = num(tokens.cache?.read);
   meta.cacheWriteTokens = num(tokens.cache?.write);
   meta.models = [...models];
-  meta.durationMs = spanMs(times.length > 1 ? times : [info.time?.created, info.time?.updated]);
+  meta.durationMs = activeDurationMs > 0 ? activeDurationMs : spanMs(messageTimes);
   return meta;
 }
 
