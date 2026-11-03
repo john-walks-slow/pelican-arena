@@ -127,11 +127,32 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
         actionsDx = innerRect.width - actRight;
         actionsDy = railCenterY - actCenterY;
 
-        const maxActionsWidth = innerRect.width - targetTitleX - 96;
-        if (actRect.width > maxActionsWidth && actRect.width > 0) {
-          actionsScale = Math.max(0.84, Math.min(1, maxActionsWidth / actRect.width));
+        // Determine which actions remain visible in the collapsed compact rail.
+        // Elements marked with (or containing) `.header-collapse-fade` fade out,
+        // so their width should NOT steal space from the collapsed/mid-scroll title.
+        const children = Array.from(actionsEl.children);
+        const keepChildren = children.filter(
+          (child) =>
+            !child.classList.contains("header-collapse-fade") &&
+            !child.querySelector(".header-collapse-fade"),
+        );
+
+        let keepWidth = 0;
+        if (keepChildren.length > 0) {
+          const keepLeft = Math.min(
+            ...keepChildren.map((el) => el.getBoundingClientRect().left),
+          );
+          const keepRight = Math.max(
+            ...keepChildren.map((el) => el.getBoundingClientRect().right),
+          );
+          keepWidth = Math.max(0, keepRight - keepLeft);
         }
-        compactRightReserve = Math.ceil(actRect.width * actionsScale) + 16;
+
+        const maxActionsWidth = innerRect.width - targetTitleX - 96;
+        if (keepWidth > maxActionsWidth && keepWidth > 0) {
+          actionsScale = Math.max(0.84, Math.min(1, maxActionsWidth / keepWidth));
+        }
+        compactRightReserve = keepWidth > 0 ? Math.ceil(keepWidth * actionsScale) + 16 : 0;
       }
 
       // Compute how much of the scaled single-line title overflows into actions.
@@ -234,7 +255,7 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
             <div className="min-w-0 flex-1 basis-60">
               <h1
                 ref={titleRef}
-                className="page-header-title w-fit max-w-full text-title font-bold tracking-tight text-ink"
+                className="page-header-title relative z-10 w-fit max-w-full text-title font-bold tracking-tight text-ink"
               >
                 {title}
               </h1>

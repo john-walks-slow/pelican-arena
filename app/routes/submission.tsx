@@ -260,7 +260,12 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               </Button>
             )}
             {admin && s.status === "active" && (
-              <ModerationActions kind="submission" id={s.id} status={s.status} />
+              <ModerationActions
+                kind="submission"
+                id={s.id}
+                status={s.status}
+                className="header-collapse-fade"
+              />
             )}
             <ShareDialog
               path={`/s/${s.id}`}

@@ -354,7 +354,12 @@ export default function PromptPage({ loaderData }: Route.ComponentProps) {
               </Button>
             )}
             {admin && prompt.status === "active" && (
-              <ModerationActions kind="prompt" id={prompt.id} status={prompt.status} />
+              <ModerationActions
+                kind="prompt"
+                id={prompt.id}
+                status={prompt.status}
+                className="header-collapse-fade"
+              />
             )}
             <ShareDialog
               path={`/p/${prompt.id}`}
