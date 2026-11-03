@@ -32,9 +32,9 @@ node scripts/forum-preview/index.js https://pelicanarena.dpdns.org/s/<id>
 ## 依赖
 
 - Node 22+
-- 一个 Chrome/Chromium（脚本会自动找本机与云端常见路径，也可以用 `CHROME_PATH` 指定）
+- 一个 Chrome/Chromium（脚本会在常见路径中查找，也可以用 `CHROME_PATH` 指定）
 - `xss`（devDependency）
 
 ## 什么时候它不够用
 
-这是离线近似：Onebox 的线上输出还取决于论坛部署的 Discourse 版本。要确认真实效果，用已登录的账号在 LinuxDO 编辑器里贴一次（预览即可，不必发布），或者看 `docs/freeform/261101-discourse-embed.md` 里的实测记录。
+这是离线近似：Onebox 的线上输出还取决于论坛部署的 Discourse 版本。要确认真实效果，用已登录的账号在 LinuxDO 编辑器里贴一次（预览即可，不必发布）。

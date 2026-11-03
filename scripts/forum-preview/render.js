@@ -88,10 +88,9 @@ body {
 
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
-  "/data/home/.cache/ms-playwright/chromium-1248/chrome-linux64/chrome",
-  "/root/.cache/ms-playwright/chromium-1243/chrome-linux-arm64/chrome",
   "/opt/chromium/chrome",
   "/usr/bin/chromium",
+  "/usr/bin/google-chrome",
 ].filter(Boolean);
 
 export function findChrome() {
