@@ -1,4 +1,5 @@
 import { Upload } from "lucide-react";
+import type { ComponentType } from "react";
 import { useRef, useState } from "react";
 
 /** Click, keyboard, and drag-and-drop entry for a single bundle file. */
@@ -7,6 +8,7 @@ export function FileDropZone({
   label,
   hint,
   error,
+  icon: Icon = Upload,
   onPick,
   className = "min-h-[168px] flex-1",
 }: {
@@ -14,6 +16,7 @@ export function FileDropZone({
   label: string;
   hint: string;
   error?: string | null;
+  icon?: ComponentType<{ className?: string; strokeWidth?: number }>;
   onPick: (file: File) => void;
   className?: string;
 }) {
@@ -34,6 +37,7 @@ export function FileDropZone({
         onDragLeave={() => setDragging(false)}
         onDrop={(e) => {
           e.preventDefault();
+          e.stopPropagation();
           setDragging(false);
           const file = e.dataTransfer.files[0];
           if (file) onPick(file);
@@ -42,9 +46,9 @@ export function FileDropZone({
           dragging ? "border-accent bg-accent-soft" : "border-control hover:bg-raised/60"
         }`}
       >
-        <Upload className="size-4 text-muted" strokeWidth={1.75} />
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-xs text-muted">{hint}</div>
+        <Icon className="size-4 text-muted pointer-events-none" strokeWidth={1.75} />
+        <div className="text-sm font-medium pointer-events-none">{label}</div>
+        <div className="text-xs text-muted pointer-events-none">{hint}</div>
         <input
           ref={inputRef}
           type="file"

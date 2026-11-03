@@ -242,10 +242,13 @@ export function SubmissionForm({
   const [mods, setMods] = useState<string[]>(initial?.mods ?? []);
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [text, setText] = useState("");
-  const [workMode, setWorkMode] = useState<"upload" | "paste">("upload");
+  const [workMode, setWorkMode] = useState<"upload" | "paste">(
+    kind === "markdown" ? "paste" : "upload",
+  );
   const [log, setLog] = useState<{ name: string | null; meta: LogMeta } | null>(
     initial?.logMeta ? { name: null, meta: initial.logMeta } : null,
   );
+  const [draggingLog, setDraggingLog] = useState(false);
   const [logError, setLogError] = useState<string | null>(null);
   const [clientError, setClientError] = useState<string | null>(null);
   const [withdrawOpen, setWithdrawOpen] = useState(false);
@@ -432,40 +435,72 @@ export function SubmissionForm({
                   </section>
                 )}
 
-                <section className="border-t border-border pt-6">
+                <section
+                  className="border-t border-border pt-6"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    const file = e.dataTransfer.files[0];
+                    if (file) {
+                      e.preventDefault();
+                      pickLog(file);
+                    }
+                  }}
+                >
                   <SectionHeading
                     title="Session log"
                     hint="可选"
                     aside={
-                      <Button asChild variant="outline" size="sm">
-                        <label className="cursor-pointer gap-1.5">
-                          <FileText className="size-3.5 text-muted" strokeWidth={1.75} />
-                          {log ? "更换日志文件" : "选择日志文件"}
-                          <input
-                            type="file"
-                            accept=".jsonl,.json,.log,.txt,.zstd,.zst"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
+                      log ? (
+                        <Button asChild variant="outline" size="sm">
+                          <label
+                            className="cursor-pointer gap-1.5"
+                            onDragOver={(e) => e.preventDefault()}
+                            onDrop={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              const file = e.dataTransfer.files[0];
                               if (file) pickLog(file);
-                              e.target.value = "";
                             }}
-                          />
-                        </label>
-                      </Button>
+                          >
+                            <FileText className="size-3.5 text-muted pointer-events-none" strokeWidth={1.75} />
+                            更换日志文件
+                            <input
+                              type="file"
+                              accept=".jsonl,.json,.log,.txt,.zstd,.zst"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) pickLog(file);
+                                e.target.value = "";
+                              }}
+                            />
+                          </label>
+                        </Button>
+                      ) : null
                     }
                   />
-                  <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                    在浏览器本地读取 token 和用时，自动填写模型与客户端，日志文件不会上传。
-                  </p>
 
-                  {logError && <p className="mt-1.5 text-xs text-negative">{logError}</p>}
-
-                  {logMeta && (
-                    <div className="mt-2.5 rounded-control border border-border bg-raised/60 px-3 py-2.5">
+                  {logMeta ? (
+                    <div
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        setDraggingLog(true);
+                      }}
+                      onDragLeave={() => setDraggingLog(false)}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setDraggingLog(false);
+                        const file = e.dataTransfer.files[0];
+                        if (file) pickLog(file);
+                      }}
+                      className={`mt-2.5 rounded-control border px-3 py-2.5 transition-colors ${
+                        draggingLog ? "border-accent bg-accent-soft" : "border-border bg-raised/60"
+                      }`}
+                    >
                       <div className="flex items-center gap-2.5">
-                        <FileText className="size-4 shrink-0 text-muted" strokeWidth={1.75} />
-                        <div className="min-w-0 flex-1 truncate text-sm font-medium">
+                        <FileText className="size-4 shrink-0 text-muted pointer-events-none" strokeWidth={1.75} />
+                        <div className="min-w-0 flex-1 truncate text-sm font-medium pointer-events-none">
                           {log?.name ?? `${LOG_SOURCE_LABELS[logMeta.source]} 日志`}
                         </div>
                         <Button
@@ -473,16 +508,33 @@ export function SubmissionForm({
                           variant="ghost"
                           size="icon-sm"
                           aria-label="移除日志"
-                          onClick={() => setLog(null)}
+                          onClick={() => {
+                            setLog(null);
+                            setLogError(null);
+                          }}
                         >
                           <X className="size-4" strokeWidth={1.75} />
                         </Button>
                       </div>
-                      <div className="mt-2.5 border-t border-border pt-2.5">
+                      <div className="mt-2.5 border-t border-border pt-2.5 pointer-events-none">
                         <SessionLogSummary meta={logMeta} />
                       </div>
                     </div>
+                  ) : (
+                    <div className="mt-2.5">
+                      <FileDropZone
+                        icon={FileText}
+                        accept=".jsonl,.json,.log,.txt,.zstd,.zst"
+                        label="拖入或选择日志文件"
+                        hint="在浏览器本地读取 token 和用时，自动填写模型与客户端，日志文件不会上传"
+                        error={logError}
+                        onPick={pickLog}
+                        className="min-h-[84px] py-4"
+                      />
+                    </div>
                   )}
+
+                  {logMeta && logError && <p className="mt-1.5 text-xs text-negative">{logError}</p>}
 
                   <SessionLogHelp />
                 </section>
