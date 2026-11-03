@@ -24,13 +24,8 @@ const NAV = [
 
 const ADMIN_NAV = { to: "/admin", label: "审核", icon: ShieldCheck, end: false };
 
-export function baseScreenKey(pathname: string) {
-  return (
-    pathname
-      .replace(/^(\/p\/[^/]+)\/submit$/, "$1")
-      .replace(/^(\/s\/[^/]+)\/edit$/, "$1") || "/"
-  );
-}
+import { baseScreenKey } from "~/lib/navigation";
+export { baseScreenKey };
 
 function Brand() {
   const { pathname } = useLocation();

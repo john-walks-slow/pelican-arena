@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backTarget, safeFrom, withFrom } from "./navigation";
+import { backTarget, baseScreenKey, isModalPath, safeFrom, withFrom } from "./navigation";
 
 describe("navigation return targets", () => {
   it("accepts only internal paths", () => {
@@ -31,5 +31,24 @@ describe("navigation return targets", () => {
       to: "/",
       explicit: false,
     });
+  });
+
+  it("distinguishes modal overlay routes from standalone pages", () => {
+    expect(isModalPath("/p/test-prompt/submit")).toBe(true);
+    expect(isModalPath("/s/test-submission/edit")).toBe(true);
+    expect(isModalPath("/p/test-prompt")).toBe(false);
+    expect(isModalPath("/p/test-prompt/edit")).toBe(false);
+    expect(isModalPath("/s/test-submission")).toBe(false);
+    expect(isModalPath("/")).toBe(false);
+    expect(isModalPath("/me")).toBe(false);
+  });
+
+  it("resolves base screen identity by stripping modal suffixes", () => {
+    expect(baseScreenKey("/p/test-prompt/submit")).toBe("/p/test-prompt");
+    expect(baseScreenKey("/s/test-submission/edit")).toBe("/s/test-submission");
+    expect(baseScreenKey("/p/test-prompt")).toBe("/p/test-prompt");
+    expect(baseScreenKey("/s/test-submission")).toBe("/s/test-submission");
+    expect(baseScreenKey("/")).toBe("/");
+    expect(baseScreenKey("/me")).toBe("/me");
   });
 });
