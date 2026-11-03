@@ -103,7 +103,7 @@ export function SubmissionMetaFields({
         options={resolved.providers}
         value={provider}
         onChange={setProvider}
-        placeholder="官方 API、OpenRouter、某中转站…"
+        placeholder="OpenAI、OpenRouter、中转站…"
         required
       />
 

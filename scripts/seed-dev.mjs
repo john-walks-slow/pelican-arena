@@ -102,22 +102,25 @@ const PROMPTS = [
 ];
 
 const SETUPS = [
-  { model: "Claude Opus 4.5", provider: "官方 API", harness: "Claude Code", reasoning: "high", source: "claude-code" },
-  { model: "GPT-5.1", provider: "官方 API", harness: "Codex CLI", reasoning: "medium", source: "codex" },
+  { model: "Claude Opus 4.5", provider: "API", harness: "Claude Code", reasoning: "high", source: "claude-code" },
+  { model: "GPT-5.1", provider: "API", harness: "Codex CLI", reasoning: "medium", source: "codex" },
   { model: "Gemini 3 Pro", provider: "OpenRouter", harness: "opencode", reasoning: "high", source: "opencode" },
   { model: "DeepSeek V3.2", provider: "火山引擎", harness: "DSH", reasoning: "medium", source: "dsh" },
   { model: "Kimi K2 Thinking", provider: "硅基流动", harness: "pi", reasoning: "xhigh", source: "pi" },
   { model: "GLM-4.6", provider: "阿里云百炼", harness: "裸 API", reasoning: "off", source: null },
   { model: "Qwen3 Coder", provider: "阿里云百炼", harness: "官方网页版", reasoning: "medium", source: null },
-  { model: "Grok 4", provider: "官方网页版", harness: "官方网页版", reasoning: "low", source: null },
-  { model: "Claude Opus 5.5", provider: "Anthropic 官方", harness: "Claude Code", reasoning: "high", source: "claude-code" },
-  { model: "GPT-6.1 Terra", provider: "OpenAI 官方", harness: "Codex CLI", reasoning: "medium", source: "codex" },
-  { model: "Gemini 4 Argon", provider: "Google Gemini 官方", harness: "opencode", reasoning: "high", source: "opencode" },
-  { model: "DeepSeek V4.1 Flash", provider: "DeepSeek 官方", harness: "DSH", reasoning: "medium", source: "dsh" },
-  { model: "Kimi K3.1 Pro", provider: "月之暗面 Kimi 官方", harness: "pi", reasoning: "high", source: "pi" },
-  { model: "GLM-5.3", provider: "智谱 GLM 官方", harness: "裸 API", reasoning: "off", source: null },
-  { model: "Qwen3.8 Max", provider: "阿里通义千问官方", harness: "官方网页版", reasoning: "medium", source: null },
-  { model: "MiniMax-M3.1-Flash", provider: "MiniMax 官方", harness: "Cursor", reasoning: "low", source: null },
+  { model: "Grok 4", provider: "网页版", harness: "官方网页版", reasoning: "low", source: null },
+  { model: "Claude Opus 5.5", provider: "Anthropic", harness: "Claude Code", reasoning: "high", source: "claude-code" },
+  { model: "GPT-6.1 Terra", provider: "OpenAI", harness: "Codex CLI", reasoning: "medium", source: "codex" },
+  { model: "Gemini 4 Argon", provider: "Google Gemini", harness: "opencode", reasoning: "high", source: "opencode" },
+  { model: "DeepSeek V4.1 Flash", provider: "DeepSeek", harness: "DSH", reasoning: "medium", source: "dsh" },
+  { model: "Kimi K3.1 Pro", provider: "月之暗面 Kimi", harness: "pi", reasoning: "high", source: "pi" },
+  { model: "GLM-5.3", provider: "智谱 GLM", harness: "裸 API", reasoning: "off", source: null },
+  { model: "Qwen3.8 Max", provider: "阿里通义千问", harness: "官方网页版", reasoning: "medium", source: null },
+  { model: "MiniMax-M3.1-Flash", provider: "MiniMax", harness: "Cursor", reasoning: "low", source: null },
+  { model: "Claude Opus 4.5", provider: "WorkBuddy", harness: "Claude Code", reasoning: "high", source: "claude-code" },
+  { model: "DeepSeek V3.2", provider: "Command Code", harness: "DSH", reasoning: "medium", source: "dsh" },
+  { model: "GPT-5.1", provider: "OpenCode", harness: "opencode", reasoning: "medium", source: "opencode" },
 ];
 
 // 题库：20 个主题循环到 92 道，标题加轮次后缀，避免手工铺 100 条。
