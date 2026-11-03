@@ -548,7 +548,7 @@ export function SubmissionForm({
                         icon={FileText}
                         accept=".jsonl,.json,.log,.txt,.zstd,.zst"
                         label="拖入或选择日志文件"
-                        hint="在浏览器本地读取 token 和用时，自动填写模型与客户端，日志文件不会上传"
+                        hint="支持 Claude Code、Codex、pi、DSH 与 OpenCode。在浏览器本地读取 token 和用时，自动填写模型与客户端，日志文件不会上传。"
                         error={logError}
                         onPick={pickLog}
                         className="min-h-[84px] py-4"
