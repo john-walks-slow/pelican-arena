@@ -1,5 +1,6 @@
 import { createRequestHandler } from "react-router";
 import { syncModelCatalog } from "~/lib/catalog-sync.server";
+import { preheatLeaderboards } from "~/lib/leaderboard.server";
 import { serveUsercontent } from "~/lib/usercontent.server";
 
 const requestHandler = createRequestHandler(
@@ -20,6 +21,14 @@ export default {
 
     // Single-host dev / tunnel / frp: match by path prefix
     if (url.pathname.startsWith("/__usercontent/")) {
+      // In dual-host production, reject serving usercontent from app host
+      // and redirect to the dedicated usercontent origin.
+      if (usercontentHost !== appHost && url.host === appHost) {
+        const targetUrl = new URL(env.USERCONTENT_ORIGIN);
+        targetUrl.pathname = url.pathname.replace(/^\/__usercontent/, "");
+        targetUrl.search = url.search;
+        return Response.redirect(targetUrl.toString(), 301);
+      }
       const rewritten = new URL(request.url);
       rewritten.pathname = url.pathname.replace(/^\/__usercontent/, "");
       return serveUsercontent(new Request(rewritten, request), env.FILES);
@@ -30,7 +39,10 @@ export default {
 
   async scheduled(_controller, _env, ctx) {
     ctx.waitUntil(
-      syncModelCatalog().catch((error) => console.error("catalog sync failed", error)),
+      Promise.allSettled([
+        syncModelCatalog().catch((error) => console.error("catalog sync failed", error)),
+        preheatLeaderboards().catch((error) => console.error("leaderboard preheat failed", error)),
+      ]),
     );
   },
 } satisfies ExportedHandler<Env>;

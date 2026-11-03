@@ -1,8 +1,15 @@
 /** Only internal paths are accepted as a return target. */
 export function safeFrom(value: string | null | undefined): string | null {
   if (!value) return null;
-  if (!value.startsWith("/") || value.startsWith("//")) return null;
-  return value;
+  if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
+  try {
+    const dummy = "http://localhost";
+    const parsed = new URL(value, dummy);
+    if (parsed.origin !== dummy) return null;
+    return value;
+  } catch {
+    return null;
+  }
 }
 
 /** Appends a return target without dropping an existing query string. */

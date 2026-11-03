@@ -5,6 +5,7 @@ describe("navigation return targets", () => {
   it("accepts only internal paths", () => {
     expect(safeFrom("/me?tab=answers")).toBe("/me?tab=answers");
     expect(safeFrom("//evil.example")).toBeNull();
+    expect(safeFrom("/\\evil.example")).toBeNull();
     expect(safeFrom("https://evil.example")).toBeNull();
     expect(safeFrom("")).toBeNull();
   });

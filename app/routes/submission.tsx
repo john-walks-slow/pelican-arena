@@ -132,6 +132,8 @@ export async function action({ params, request }: Route.ActionArgs) {
   const user = await requirePermission(request, "rate");
   const submission = await getSubmission(params.submissionId);
   if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
+  const prompt = await getPrompt(submission.promptId);
+  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
   if (submission.authorId === user.id) throw data("不能给自己的答案打分", { status: 403 });
 
   const stars = Number(form.get("stars"));

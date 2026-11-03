@@ -20,6 +20,9 @@ interface SessionData {
 let storage: ReturnType<typeof createCookieSessionStorage<SessionData>> | undefined;
 
 function sessionStorage() {
+  if (!env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET is required to initialize session storage");
+  }
   storage ??= createCookieSessionStorage<SessionData>({
     cookie: {
       name: "__pelican",

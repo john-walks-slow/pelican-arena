@@ -14,9 +14,13 @@ const encoder = new TextEncoder();
 let keyPromise: Promise<CryptoKey> | undefined;
 
 function signingKey() {
+  const secret = env.SESSION_SECRET;
+  if (!secret) {
+    throw new Error("SESSION_SECRET is required to sign or verify preview grants");
+  }
   keyPromise ??= crypto.subtle.importKey(
     "raw",
-    encoder.encode(`preview-grant:${env.SESSION_SECRET}`),
+    encoder.encode(`preview-grant:${secret}`),
     { name: "HMAC", hash: "SHA-256" },
     false,
     ["sign"],

@@ -99,8 +99,8 @@ export function shouldRevalidate({
   return false;
 }
 
-/** Marks the first paint as booting and records when it began. */
-const bootScript = `document.documentElement.dataset.booting="true";document.documentElement.dataset.bootAt=performance.now()`;
+/** Marks the first paint as booting and sets a fallback timer to prevent infinite splash on script failure. */
+const bootScript = `document.documentElement.dataset.booting="true";document.documentElement.dataset.bootAt=performance.now();setTimeout(function(){if(document.documentElement.dataset.booting){document.documentElement.removeAttribute("data-booting");delete document.documentElement.dataset.bootAt;}},4000);`;
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

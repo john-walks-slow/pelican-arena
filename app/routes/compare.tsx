@@ -26,7 +26,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   );
   if (submissions.length < 2) throw data("至少选择两份答案", { status: 400 });
   const prompt = await getPrompt(submissions[0].promptId);
-  if (!prompt) throw data("Not Found", { status: 404 });
+  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
   return {
     prompt: { id: prompt.id, title: prompt.title, kind: prompt.kind },
     submissions: submissions.filter((s) => s.promptId === prompt.id),

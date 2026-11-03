@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { prompts, submissions } from "~/db/schema";
 import { contentTypeFor, ENTRY_FILE, normalizePath } from "~/lib/bundle";
+import { KIND_META } from "~/lib/kinds";
 import { isSubmissionServable } from "~/lib/moderation";
 import { verifyPreviewGrant } from "~/lib/preview-grant.server";
 import { GRANT_SEGMENT, SANDBOX } from "~/lib/sandbox";
@@ -54,7 +55,12 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
     return Response.redirect(`${url.origin}${redirect}`, 301);
   }
 
-  const raw = decodeURIComponent(rest.join("/"));
+  let raw: string;
+  try {
+    raw = decodeURIComponent(rest.join("/"));
+  } catch {
+    return new Response("Not Found", { status: 404 });
+  }
   const path = raw === "" || raw.endsWith("/") ? `${raw}${ENTRY_FILE}` : raw;
   const clean = normalizePath(path);
   if (!clean) return new Response("Not Found", { status: 404 });
@@ -63,22 +69,25 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   if (!object) return new Response("Not Found", { status: 404 });
 
   // Cache strategy to maximize CDN hits and minimize Worker invocations:
-  // 1. Gallery previews (?preview=1) get public CDN caching so concurrent/repeated visits
-  //    are served by edge CDN directly without invoking the Worker.
-  // 2. Static asset sub-resources (js, css, images, fonts, wasm) are immutable within a bundle
+  // 1. Granted URLs are private/sensitive and must never be cached publicly.
+  // 2. Gallery previews (?preview=1) get short public CDN caching (60s) for rapid navigation.
+  // 3. Static asset sub-resources (js, css, images, fonts, wasm) are immutable within a bundle
   //    and can be safely cached on edge and browser.
-  // 3. Entry documents (HTML / root index) without preview stay `no-store` to ensure retracted
+  // 4. Entry documents (HTML / SVG / Markdown) without preview stay `no-store` to ensure retracted
   //    submissions take effect immediately.
   const preview = url.searchParams.has("preview");
+  const isEntryDocument = Object.values(KIND_META).some((m) => m.entry === clean);
   const isStaticSubResource =
-    clean !== ENTRY_FILE &&
+    !isEntryDocument &&
     /\.(?:js|mjs|css|png|jpg|jpeg|gif|webp|svg|ico|woff2?|ttf|otf|wasm|map)$/i.test(clean);
 
-  const cacheControl = preview
-    ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
-    : isStaticSubResource
-      ? "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
-      : "no-store";
+  const cacheControl = grant
+    ? "private, no-store"
+    : preview
+      ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+      : isStaticSubResource
+        ? "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+        : "no-store";
 
   const headers = new Headers({
     "Content-Type": contentTypeFor(clean),

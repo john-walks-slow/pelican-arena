@@ -6,12 +6,8 @@ import { PageHeader } from "~/components/page-header";
 import { ScoreMethod } from "~/components/score-method";
 import { CompactSelect } from "~/components/ui/compact-select";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
-import {
-  buildLeaderboard,
-  MIN_VOTES,
-  type LeaderboardEntry,
-} from "~/lib/leaderboard";
-import { answerCountsByKind, leaderboardData } from "~/lib/queries.server";
+import { MIN_VOTES, type LeaderboardEntry } from "~/lib/leaderboard";
+import { getCachedLeaderboard } from "~/lib/leaderboard.server";
 import { cachedClientLoader } from "~/lib/route-cache";
 import { cn } from "~/lib/utils";
 
@@ -24,43 +20,18 @@ export const meta: Route.MetaFunction = () => [
   { property: "og:title", content: "排名 · Pelican Arena" },
 ];
 
-type BoardSource = {
-  data: Awaited<ReturnType<typeof leaderboardData>>;
-  kindCounts: Awaited<ReturnType<typeof answerCountsByKind>>;
-};
-
-/**
- * The fit reads every active answer and rating, so it is served from a short
- * isolate-local cache instead of on every visit. Two minutes keeps D1 row reads
- * far inside the free daily budget, and a vote landing a minute late on a
- * month-long ranking is not something anyone notices.
- */
-const CACHE_TTL = 120_000;
-const cache = new Map<string, { at: number; value: BoardSource }>();
-
-async function boardSource(kind: PromptKind | null): Promise<BoardSource> {
-  const key = kind ?? "";
-  const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_TTL) return hit.value;
-  const [data, kindCounts] = await Promise.all([leaderboardData(kind), answerCountsByKind()]);
-  const value = { data, kindCounts };
-  cache.set(key, { at: Date.now(), value });
-  return value;
-}
-
 export async function loader({ request }: Route.LoaderArgs) {
   const params = new URL(request.url).searchParams;
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
 
-  const { data, kindCounts } = await boardSource(kind);
-  const board = buildLeaderboard(data);
+  const { board, kindCounts, answers } = await getCachedLeaderboard(kind);
 
   return {
     board,
     kind,
     kindCounts,
-    answers: data.submissions.length,
+    answers,
   };
 }
 

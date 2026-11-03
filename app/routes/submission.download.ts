@@ -11,7 +11,7 @@ export async function loader({ params }: Route.LoaderArgs) {
   const submission = await getSubmission(params.submissionId);
   if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
   const prompt = await getPrompt(submission.promptId);
-  if (!prompt) throw data("Not Found", { status: 404 });
+  if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
   if (prompt.kind === "web") throw data("Not Found", { status: 404 });
 
   const entry = KIND_META[prompt.kind].entry;

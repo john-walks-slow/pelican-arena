@@ -7,11 +7,12 @@ import { Input } from "~/components/ui/input";
 import { LinuxDoIcon } from "~/components/ui/linuxdo-icon";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { authorizeUrl, isOAuthConfigured } from "~/lib/linuxdo.server";
+import { safeFrom } from "~/lib/navigation";
 import { commitSession, getSession } from "~/lib/session.server";
 import { upsertUser } from "~/lib/users.server";
 
 function safeReturnTo(value: string | null) {
-  return value && value.startsWith("/") && !value.startsWith("//") ? value : "/";
+  return safeFrom(value) ?? "/";
 }
 
 const devLoginEnabled = () => import.meta.env.DEV && !isOAuthConfigured();

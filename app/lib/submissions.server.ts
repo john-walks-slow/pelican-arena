@@ -59,25 +59,31 @@ export async function createSubmission(input: {
   );
 
   const manifest = describeBundle(files);
-  await db().insert(submissions).values({
-    id,
-    promptId: input.promptId,
-    authorId: input.authorId,
-    modelId,
-    providerId,
-    harnessId,
-    reasoning: meta.reasoning,
-    files: manifest,
-    totalBytes: manifest.reduce((s, f) => s + f.size, 0),
-    notes: meta.notes,
-    content,
-    logMeta: meta.logMeta,
-  });
-  const uniqueMods = [...new Set(modIds)];
-  if (uniqueMods.length > 0) {
-    await db()
-      .insert(submissionMods)
-      .values(uniqueMods.map((modId) => ({ submissionId: id, modId })));
+  try {
+    await db().insert(submissions).values({
+      id,
+      promptId: input.promptId,
+      kind: input.kind,
+      authorId: input.authorId,
+      modelId,
+      providerId,
+      harnessId,
+      reasoning: meta.reasoning,
+      files: manifest,
+      totalBytes: manifest.reduce((s, f) => s + f.size, 0),
+      notes: meta.notes,
+      content,
+      logMeta: meta.logMeta,
+    });
+    const uniqueMods = [...new Set(modIds)];
+    if (uniqueMods.length > 0) {
+      await db()
+        .insert(submissionMods)
+        .values(uniqueMods.map((modId) => ({ submissionId: id, modId })));
+    }
+  } catch (error) {
+    await Promise.allSettled(files.map((f) => env.FILES.delete(bundleKey(id, f.path))));
+    throw error;
   }
   return id;
 }
