@@ -102,8 +102,8 @@ const PROMPTS = [
 ];
 
 const SETUPS = [
-  { model: "Claude Opus 4.5", provider: "API", harness: "Claude Code", reasoning: "high", source: "claude-code" },
-  { model: "GPT-5.1", provider: "API", harness: "Codex CLI", reasoning: "medium", source: "codex" },
+  { model: "Claude Opus 4.5", provider: "Anthropic", harness: "Claude Code", reasoning: "high", source: "claude-code" },
+  { model: "GPT-5.1", provider: "OpenAI", harness: "Codex CLI", reasoning: "medium", source: "codex" },
   { model: "Gemini 3 Pro", provider: "OpenRouter", harness: "opencode", reasoning: "high", source: "opencode" },
   { model: "DeepSeek V3.2", provider: "火山引擎", harness: "DSH", reasoning: "medium", source: "dsh" },
   { model: "Kimi K2 Thinking", provider: "硅基流动", harness: "pi", reasoning: "xhigh", source: "pi" },
