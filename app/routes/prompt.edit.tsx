@@ -39,7 +39,6 @@ export async function action({ params, request }: Route.ActionArgs) {
   const kindRaw = String(form.get("kind") ?? prompt.kind);
   const kind: PromptKind = isPromptKind(kindRaw) ? kindRaw : prompt.kind;
   const allowSearch = form.get("allowSearch") === "on" || form.get("allowSearch") === "true";
-  const allowLibraries = form.get("allowLibraries") === "on" || form.get("allowLibraries") === "true";
   const locked = prompt.submissions > 0;
 
   const errors: Partial<Record<"title" | "body" | "form", string>> = {};
@@ -51,14 +50,13 @@ export async function action({ params, request }: Route.ActionArgs) {
     locked &&
     (body !== prompt.body ||
       kind !== prompt.kind ||
-      allowSearch !== prompt.allowSearch ||
-      allowLibraries !== prompt.allowLibraries)
+      allowSearch !== prompt.allowSearch)
   ) {
     errors.form = "已有答案，提示词、作品类型和作答规则不能再修改";
   }
   if (Object.keys(errors).length > 0) {
     return data(
-      { errors, values: { title, body, kind, allowSearch, allowLibraries } },
+      { errors, values: { title, body, kind, allowSearch } },
       { status: locked ? 409 : 400 },
     );
   }
@@ -71,7 +69,6 @@ export async function action({ params, request }: Route.ActionArgs) {
     body,
     kind,
     allowSearch,
-    allowLibraries,
     locked,
     reviewed,
   });
@@ -80,7 +77,7 @@ export async function action({ params, request }: Route.ActionArgs) {
       form: "题目刚刚收到答案，请刷新后再试",
     };
     return data(
-      { errors: lateError, values: { title, body, kind, allowSearch, allowLibraries } },
+      { errors: lateError, values: { title, body, kind, allowSearch } },
       { status: 409 },
     );
   }

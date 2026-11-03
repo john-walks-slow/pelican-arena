@@ -356,7 +356,6 @@ export async function listPendingPrompts(page = 1, limit = PENDING_PAGE_SIZE) {
         body: prompts.body,
         kind: prompts.kind,
         allowSearch: prompts.allowSearch,
-        allowLibraries: prompts.allowLibraries,
         createdAt: prompts.createdAt,
         author: authorColumns,
       })
@@ -385,7 +384,6 @@ export async function getPromptForReview(id: string) {
       body: prompts.body,
       kind: prompts.kind,
       allowSearch: prompts.allowSearch,
-      allowLibraries: prompts.allowLibraries,
       status: prompts.status,
       moderationNote: prompts.moderationNote,
       createdAt: prompts.createdAt,

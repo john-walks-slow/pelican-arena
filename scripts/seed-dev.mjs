@@ -55,7 +55,6 @@ const PROMPTS = [
     kind: "web",
     title: "把一句话做成排版海报",
     body: "以「真正重要的东西，用眼睛是看不见的」为文案，做一张可以在浏览器里直接看的海报页。字号、留白、行距要经得起近看。",
-    allowLibraries: true,
     authorId: 99002,
     ageDays: 7,
   },
@@ -868,6 +867,7 @@ for (const [pIndex, prompt] of PROMPTS.entries()) {
     submissions.push({
       id,
       promptId: prompt.id,
+      kind: prompt.kind,
       authorId: author.id,
       model: setup.model,
       provider: setup.provider,
@@ -945,7 +945,7 @@ for (const user of USERS) {
 for (const prompt of PROMPTS) {
   const createdAt = NOW - prompt.ageDays * DAY;
   lines.push(
-    `INSERT INTO prompts (id, author_id, title, body, kind, allow_search, allow_libraries, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, ${prompt.allowSearch ? 1 : 0}, ${prompt.allowLibraries ? 1 : 0}, 'active', NULL, ${createdAt}, NULL);`,
+    `INSERT INTO prompts (id, author_id, title, body, kind, allow_search, status, moderation_note, created_at, updated_at) VALUES (${q(prompt.id)}, ${prompt.authorId}, ${q(prompt.title)}, ${q(prompt.body)}, ${q(prompt.kind)}, ${prompt.allowSearch ? 1 : 0}, 'active', NULL, ${createdAt}, NULL);`,
   );
 }
 
@@ -958,7 +958,7 @@ for (const submission of submissions) {
     },
   ];
   lines.push(
-    `INSERT INTO submissions (id, prompt_id, author_id, model_id, provider_id, harness_id, reasoning, files, total_bytes, notes, content, log_meta, has_raw_log, status, moderation_note, created_at, updated_at) VALUES (${q(submission.id)}, ${q(submission.promptId)}, ${submission.authorId}, ${q(slug(submission.model))}, ${q(slug(submission.provider))}, ${q(slug(submission.harness))}, ${q(submission.reasoning)}, ${q(JSON.stringify(manifest))}, ${submission.bytes}, ${q(submission.notes)}, ${q(submission.content)}, ${q(submission.logMeta ? JSON.stringify(submission.logMeta) : null)}, 0, 'active', NULL, ${submission.createdAt}, NULL);`,
+    `INSERT INTO submissions (id, prompt_id, kind, author_id, model_id, provider_id, harness_id, reasoning, files, total_bytes, notes, content, log_meta, has_raw_log, status, moderation_note, created_at, updated_at) VALUES (${q(submission.id)}, ${q(submission.promptId)}, ${q(submission.kind)}, ${submission.authorId}, ${q(slug(submission.model))}, ${q(slug(submission.provider))}, ${q(slug(submission.harness))}, ${q(submission.reasoning)}, ${q(JSON.stringify(manifest))}, ${submission.bytes}, ${q(submission.notes)}, ${q(submission.content)}, ${q(submission.logMeta ? JSON.stringify(submission.logMeta) : null)}, 0, 'active', NULL, ${submission.createdAt}, NULL);`,
   );
   for (const mod of submission.mods) {
     lines.push(

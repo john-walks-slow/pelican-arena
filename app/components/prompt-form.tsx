@@ -18,7 +18,6 @@ export interface PromptFormValues {
   body: string;
   kind: PromptKind;
   allowSearch?: boolean;
-  allowLibraries?: boolean;
 }
 
 export function PromptForm({
@@ -49,9 +48,6 @@ export function PromptForm({
   const [body, setBody] = useState(values?.body ?? initial?.body ?? "");
   const [allowSearch, setAllowSearch] = useState<boolean>(
     values?.allowSearch ?? initial?.allowSearch ?? false,
-  );
-  const [allowLibraries, setAllowLibraries] = useState<boolean>(
-    values?.allowLibraries ?? initial?.allowLibraries ?? false,
   );
   const navigation = useNavigation();
   const gate = useGate();
@@ -114,40 +110,21 @@ export function PromptForm({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-surface px-3.5 py-3">
-              <div>
-                <span className="block text-sm font-medium">允许网络搜索</span>
-                <span className="mt-0.5 block text-xs leading-normal text-muted">
-                  默认关闭，模型不可联网
-                </span>
-              </div>
-              <Switch
-                id="allowSearch"
-                name="allowSearch"
-                checked={allowSearch}
-                onCheckedChange={setAllowSearch}
-                disabled={locked}
-                aria-label="允许网络搜索"
-              />
+          <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-surface px-3.5 py-3">
+            <div>
+              <span className="block text-sm font-medium">允许网络搜索</span>
+              <span className="mt-0.5 block text-xs leading-normal text-muted">
+                默认关闭，模型不可进行网络搜索
+              </span>
             </div>
-
-            <div className="flex items-center justify-between gap-3 rounded-control border border-border bg-surface px-3.5 py-3">
-              <div>
-                <span className="block text-sm font-medium">允许外部库</span>
-                <span className="mt-0.5 block text-xs leading-normal text-muted">
-                  默认关闭，仅限原生实现
-                </span>
-              </div>
-              <Switch
-                id="allowLibraries"
-                name="allowLibraries"
-                checked={allowLibraries}
-                onCheckedChange={setAllowLibraries}
-                disabled={locked}
-                aria-label="允许外部库"
-              />
-            </div>
+            <Switch
+              id="allowSearch"
+              name="allowSearch"
+              checked={allowSearch}
+              onCheckedChange={setAllowSearch}
+              disabled={locked}
+              aria-label="允许网络搜索"
+            />
           </div>
 
           <div>
@@ -197,7 +174,6 @@ export function PromptForm({
             <OutputRequirements
               kind={kind}
               allowSearch={allowSearch}
-              allowLibraries={allowLibraries}
               className="border-t-0 pt-0"
             />
             <p className="mt-2 text-[11px] leading-relaxed text-muted">
@@ -244,7 +220,6 @@ export function PromptForm({
                   <OutputRequirements
                     kind={kind}
                     allowSearch={allowSearch}
-                    allowLibraries={allowLibraries}
                     className="mt-3"
                   />
                 </>

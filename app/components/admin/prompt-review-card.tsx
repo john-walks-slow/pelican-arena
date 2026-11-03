@@ -15,7 +15,6 @@ export interface PendingPrompt {
   body: string;
   kind: "web" | "markdown" | "svg";
   allowSearch?: boolean;
-  allowLibraries?: boolean;
   createdAt: Date;
   author: { id: number; username: string; avatarTemplate: string | null; trustLevel: number };
   history: { approved: number; rejected: number };
@@ -44,7 +43,6 @@ export function PromptReviewCard({ prompt }: { prompt: PendingPrompt }) {
           <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
             <span className="rounded bg-raised px-1.5 py-0.5">{KIND_META[prompt.kind].label}</span>
             <span className="rounded bg-raised px-1.5 py-0.5">{prompt.allowSearch ? "允许联网" : "禁止联网"}</span>
-            <span className="rounded bg-raised px-1.5 py-0.5">{prompt.allowLibraries ? "允许外部库" : "无外部库"}</span>
             <span>{formatRelative(prompt.createdAt)}</span>
           </div>
           <h3 className="mt-1 text-[15px] font-semibold leading-snug">
@@ -71,7 +69,6 @@ export function PromptReviewCard({ prompt }: { prompt: PendingPrompt }) {
           <OutputRequirements
             kind={prompt.kind}
             allowSearch={prompt.allowSearch}
-            allowLibraries={prompt.allowLibraries}
             className="mt-3"
           />
         </div>

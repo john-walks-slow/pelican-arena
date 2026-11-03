@@ -50,7 +50,6 @@ export const prompts = sqliteTable(
     body: text("body").notNull(),
     kind: text("kind", { enum: PROMPT_KINDS }).notNull().default("web"),
     allowSearch: integer("allow_search", { mode: "boolean" }).notNull().default(false),
-    allowLibraries: integer("allow_libraries", { mode: "boolean" }).notNull().default(false),
     status: text("status", { enum: PROMPT_STATUSES })
       .notNull()
       .default("active"),
@@ -120,6 +119,7 @@ export const submissions = sqliteTable(
     promptId: text("prompt_id")
       .notNull()
       .references(() => prompts.id),
+    kind: text("kind", { enum: PROMPT_KINDS }).notNull().default("web"),
     authorId: integer("author_id")
       .notNull()
       .references(() => users.id),
@@ -153,6 +153,7 @@ export const submissions = sqliteTable(
     index("submissions_model_idx").on(t.modelId),
     index("submissions_provider_idx").on(t.providerId),
     index("submissions_harness_idx").on(t.harnessId),
+    index("submissions_status_kind_idx").on(t.status, t.kind),
   ],
 );
 
