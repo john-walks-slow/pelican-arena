@@ -1,0 +1,13 @@
+{"timestamp": "2026-11-03T05:31:01.000Z", "type": "session_meta", "payload": {"id": "session-1", "cwd": "/work"}}
+{"timestamp": "2026-11-03T05:31:01.100Z", "type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn-1"}}
+{"timestamp": "2026-11-03T05:31:01.200Z", "type": "turn_context", "payload": {"model": "gpt-6.1-sol", "turn_id": "turn-1"}}
+{"timestamp": "2026-11-03T05:31:01.300Z", "type": "event_msg", "payload": {"type": "item_completed", "turn_id": "turn-1", "item": {"type": "UserMessage", "id": "msg-1"}}}
+{"timestamp": "2026-11-03T05:31:05.000Z", "type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "call_id": "call-1"}}
+{"timestamp": "2026-11-03T05:31:10.000Z", "type": "response_item", "payload": {"type": "function_call", "name": "wait", "call_id": "call-2"}}
+{"timestamp": "2026-11-03T05:31:15.000Z", "type": "token_usage_record", "payload": {"response_id": "resp-1", "usage": {"input_tokens": 1000, "cached_input_tokens": 700, "output_tokens": 200, "reasoning_output_tokens": 50}}}
+{"timestamp": "2026-11-03T05:31:20.000Z", "type": "event_msg", "payload": {"type": "task_complete", "turn_id": "turn-1"}}
+{"timestamp": "2026-11-03T05:31:30.000Z", "type": "event_msg", "payload": {"type": "task_started", "turn_id": "turn-2"}}
+{"timestamp": "2026-11-03T05:31:30.100Z", "type": "turn_context", "payload": {"model": "gpt-6.1-sol", "turn_id": "turn-2"}}
+{"timestamp": "2026-11-03T05:31:30.200Z", "type": "event_msg", "payload": {"type": "item_completed", "turn_id": "turn-2", "item": {"type": "UserMessage", "id": "msg-2"}}}
+{"timestamp": "2026-11-03T05:31:35.000Z", "type": "token_usage_record", "payload": {"response_id": "resp-2", "usage": {"input_tokens": 1500, "cached_input_tokens": 1200, "output_tokens": 100, "reasoning_output_tokens": 20}}}
+{"timestamp": "2026-11-03T05:32:01.000Z", "type": "event_msg", "payload": {"type": "task_complete", "turn_id": "turn-2"}}

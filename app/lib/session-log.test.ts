@@ -38,6 +38,21 @@ describe("parseSessionLog", () => {
     });
   });
 
+  it("parses modern Codex CLI sessions with item_completed UserMessage events", () => {
+    const meta = parseSessionLog(fixture("codex-modern.jsonl"));
+    expect(meta).toMatchObject({
+      source: "codex",
+      models: ["gpt-6.1-sol"],
+      inputTokens: 600,
+      cacheReadTokens: 1900,
+      outputTokens: 300,
+      reasoningTokens: 70,
+      turns: 2,
+      toolCalls: 2,
+      durationMs: 60_000,
+    });
+  });
+
   it("prefers per-response records with ids over token_count events", () => {
     const rows = [
       { type: "turn_context", payload: { model: "gpt-5.1" } },

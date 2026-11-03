@@ -136,11 +136,26 @@ function parseCodex(rows: Json[]): LogMeta {
   const meta = emptyMeta("codex");
   const models = new Set<string>();
   const records = rows.filter((r) => r.type === "token_usage_record");
+  const turnIds = new Set<string>();
+  let userTurns = 0;
 
   for (const row of rows) {
     const payload = row.payload ?? {};
-    if (row.type === "turn_context" && payload.model) models.add(payload.model);
-    if (row.type === "event_msg" && payload.type === "user_message") meta.turns += 1;
+    if (row.type === "turn_context") {
+      if (payload.model) models.add(payload.model);
+      if (payload.turn_id) turnIds.add(payload.turn_id);
+    }
+    if (row.type === "event_msg") {
+      if (payload.type === "task_started" && payload.turn_id) {
+        turnIds.add(payload.turn_id);
+      }
+      if (
+        payload.type === "user_message" ||
+        (payload.type === "item_completed" && payload.item?.type === "UserMessage")
+      ) {
+        userTurns += 1;
+      }
+    }
     if (
       row.type === "response_item" &&
       (payload.type === "function_call" || payload.type === "custom_tool_call")
@@ -148,6 +163,8 @@ function parseCodex(rows: Json[]): LogMeta {
       meta.toolCalls += 1;
     }
   }
+
+  meta.turns = userTurns > 0 ? userTurns : turnIds.size;
 
   if (records.length > 0) {
     const seen = new Set<string>();
