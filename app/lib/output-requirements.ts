@@ -10,7 +10,7 @@ const NOTES: Record<PromptKind, string[]> = {
     "外部请求仅限开放 CORS、无需登录的接口。",
   ],
   markdown: [
-    "输出单个 Markdown 文件，使用标准语法，支持表格与代码块。",
+    "直接输出文本回复，使用标准 Markdown 语法，支持表格与代码块。",
     "全文会被直接排版展示，不要省略内容或用「同上」代替。",
   ],
   svg: [
