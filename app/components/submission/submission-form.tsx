@@ -22,6 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import type { ModelCost } from "~/lib/cost";
 import { Segmented } from "~/components/ui/segmented";
 import { Textarea } from "~/components/ui/textarea";
 import {
@@ -264,6 +265,27 @@ export function SubmissionForm({
   }, [serverError, gate]);
   const logMeta = log?.meta ?? null;
   const logModelHint = logMeta?.models[0] ?? null;
+  const [modelCost, setModelCost] = useState<ModelCost | null>(null);
+
+  useEffect(() => {
+    const name = model.trim();
+    if (!name) {
+      setModelCost(null);
+      return;
+    }
+    const controller = new AbortController();
+    fetch(`/api/catalog?kind=models&find=${encodeURIComponent(name)}`, {
+      signal: controller.signal,
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((raw: unknown) => {
+        if (controller.signal.aborted) return;
+        const data = raw as { model?: { cost?: ModelCost | null } | null } | null;
+        setModelCost(data?.model?.cost ?? null);
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [model]);
 
   const dirty = isEdit
     ? Boolean(
@@ -517,7 +539,7 @@ export function SubmissionForm({
                         </Button>
                       </div>
                       <div className="mt-2.5 border-t border-border pt-2.5 pointer-events-none">
-                        <SessionLogSummary meta={logMeta} />
+                        <SessionLogSummary meta={logMeta} cost={modelCost} />
                       </div>
                     </div>
                   ) : (

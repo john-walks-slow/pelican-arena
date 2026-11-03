@@ -18,6 +18,7 @@ import {
   REPORT_TARGETS,
   SUBMISSION_STATUSES,
 } from "../lib/moderation";
+import type { ModelCost } from "~/lib/cost";
 import type { LogMeta } from "~/lib/session-log";
 
 const createdAt = () =>
@@ -82,6 +83,8 @@ export const models = sqliteTable("models", {
   releaseDate: text("release_date"),
   /** JSON array of supported effort levels; null when the source is silent. */
   reasoning: text("reasoning"),
+  /** Model pricing per 1M tokens from models.dev; null for manual entries. */
+  cost: text("cost", { mode: "json" }).$type<ModelCost>(),
   source: text("source").notNull().default("manual"),
   hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
   syncedAt: integer("synced_at", { mode: "timestamp_ms" }),

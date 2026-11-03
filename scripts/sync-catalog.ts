@@ -28,12 +28,16 @@ const quote = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const values = selected
   .map(
     (model) =>
-      `  (${quote(model.id)}, ${quote(model.name)}, ${quote(model.family ?? "")}, ${quote(model.releaseDate)}, 'models.dev')`,
+      `  (${quote(model.id)}, ${quote(model.name)}, ${quote(model.family ?? "")}, ${quote(model.releaseDate)}, ${model.cost ? quote(JSON.stringify(model.cost)) : "NULL"}, 'models.dev')`,
   )
   .join(",\n");
 
-const sql = `INSERT OR IGNORE INTO \`models\` (\`id\`, \`name\`, \`family\`, \`release_date\`, \`source\`) VALUES
-${values};
+const sql = `INSERT INTO \`models\` (\`id\`, \`name\`, \`family\`, \`release_date\`, \`cost\`, \`source\`) VALUES
+${values}
+ON CONFLICT(\`id\`) DO UPDATE SET
+  \`cost\` = excluded.\`cost\`,
+  \`family\` = excluded.\`family\`,
+  \`release_date\` = excluded.\`release_date\`;
 `;
 
 if (!apply) {

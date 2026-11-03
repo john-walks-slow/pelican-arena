@@ -24,6 +24,7 @@ import { StarScore } from "~/components/stars";
 import { isValidRating } from "~/lib/rating";
 import { ModTags } from "~/components/submission-tags";
 import { Button } from "~/components/ui/button";
+import { estimateCost, formatCost } from "~/lib/cost";
 import { formatBytes } from "~/lib/bundle";
 import { KIND_META } from "~/lib/kinds";
 import { formatCount, formatDuration, formatRelative, REASONING_LABELS } from "~/lib/format";
@@ -216,6 +217,7 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const pageUrl = submissionUrl(usercontentOrigin, s.id, kind, grant);
   const baseUrl = usercontentUrl(usercontentOrigin, s.id, "", grant);
   const log = s.logMeta;
+  const estimatedCost = log ? estimateCost(log, s.model.cost) : null;
   const isAuthor = user?.id === s.author.id;
   const editable = isAuthor;
 
@@ -433,9 +435,14 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
                 <MetaRow label="缓存读取 / 写入">
                   {formatCount(log.cacheReadTokens)} / {formatCount(log.cacheWriteTokens)}
                 </MetaRow>
+                {estimatedCost != null && (
+                  <MetaRow label="预估成本">
+                    <span className="num font-medium text-ink">{formatCost(estimatedCost)}</span>
+                  </MetaRow>
+                )}
                 <MetaRow label="用时">{log.durationMs == null ? "—" : formatDuration(log.durationMs)}</MetaRow>
                 <MetaRow label="轮数 / 工具调用">
-                  {log.turns} / {log.toolCalls}
+                  {Math.max(log.turns, 1)} / {log.toolCalls}
                 </MetaRow>
               </dl>
             </SideSection>

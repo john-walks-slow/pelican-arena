@@ -149,4 +149,20 @@ describe("selectCatalogModels", () => {
 
     expect(result.find((m) => m.name === "DeepSeek V4")?.id).toBe("deepseek-v4");
   });
+
+  it("extracts and retains model pricing rates", () => {
+    const result = selectCatalogModels(
+      catalog({
+        openai: provider([
+          model("gpt-5", "GPT-5", {
+            cost: { input: 2.5, output: 10, cache_read: 1.25, cache_write: 3.75 },
+          }),
+        ]),
+      }),
+      NOW,
+    );
+
+    const m = result.find((item) => item.name === "GPT-5");
+    expect(m?.cost).toEqual({ input: 2.5, output: 10, cache_read: 1.25, cache_write: 3.75 });
+  });
 });

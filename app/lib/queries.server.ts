@@ -107,6 +107,7 @@ export async function searchCatalog(
           id: models.id,
           name: models.name,
           reasoning: models.reasoning,
+          cost: models.cost,
           uses: count(submissions.id),
         })
         .from(models)
@@ -115,7 +116,7 @@ export async function searchCatalog(
           and(eq(submissions.modelId, models.id), eq(submissions.status, "active")),
         )
         .where(where)
-        .groupBy(models.id, models.name, models.reasoning)
+        .groupBy(models.id, models.name, models.reasoning, models.cost)
         .orderBy(
           desc(sql`coalesce(${models.releaseDate}, '')`),
           desc(count(submissions.id)),
@@ -125,7 +126,10 @@ export async function searchCatalog(
       d.select({ n: count() }).from(models).where(where),
     ]);
     return {
-      items: rows.map((row) => ({ ...row, reasoning: parseReasoning(row.reasoning) })),
+      items: rows.map((row) => ({
+        ...row,
+        reasoning: parseReasoning(row.reasoning),
+      })),
       total: total.n,
     };
   }
@@ -175,14 +179,14 @@ export async function resolveModel(rawId: string) {
   return matchModel(rawId, rows);
 }
 
-/** Reasoning metadata for one model, used when the picker changes selection. */
+/** Reasoning and pricing metadata for one model, used when the picker changes selection. */
 export async function getModelMeta(name: string) {
   const clean = name.trim().slice(0, 60);
   const id = slugify(clean);
   if (!id) return null;
 
   const [row] = await db()
-    .select({ id: models.id, name: models.name, reasoning: models.reasoning })
+    .select({ id: models.id, name: models.name, reasoning: models.reasoning, cost: models.cost })
     .from(models)
     .where(eq(models.id, id))
     .limit(1);
@@ -199,7 +203,7 @@ export async function getCatalog(): Promise<Catalog> {
     searchCatalog("mods", "", 20),
   ]);
   return {
-    models: m.items.map(({ id, name, reasoning }) => ({ id, name, reasoning })),
+    models: m.items.map(({ id, name, reasoning, cost }) => ({ id, name, reasoning, cost })),
     providers: p.items.map(({ id, name }) => ({ id, name })),
     harnesses: h.items.map(({ id, name }) => ({ id, name })),
     mods: md.items.map(({ id, name }) => ({ id, name })),
@@ -567,7 +571,7 @@ const submissionColumns = {
   totalBytes: submissions.totalBytes,
   logMeta: submissions.logMeta,
   excerpt: sql<string | null>`substr(${submissions.content}, 1, 1200)`,
-  model: { id: models.id, name: models.name },
+  model: { id: models.id, name: models.name, cost: models.cost },
   provider: { id: providers.id, name: providers.name },
   harness: { id: harnesses.id, name: harnesses.name },
   author,

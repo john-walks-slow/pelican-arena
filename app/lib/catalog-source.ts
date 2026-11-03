@@ -1,4 +1,7 @@
 import { slugify } from "./ids";
+import type { ModelCost } from "./cost";
+
+export type { ModelCost };
 
 /** The subset of models.dev/api.json that the catalog reads. */
 export interface RemoteModel {
@@ -12,6 +15,7 @@ export interface RemoteModel {
   modalities?: { output?: string[] };
   reasoning?: boolean;
   reasoning_options?: Array<{ type: string; values?: string[] }>;
+  cost?: ModelCost;
 }
 
 export interface RemoteProvider {
@@ -29,6 +33,8 @@ export interface CatalogModel {
   releaseDate: string;
   /** Effort levels the model advertises; null when the source has no answer. */
   reasoning: string[] | null;
+  /** USD pricing per 1M tokens; null when source has no pricing data. */
+  cost: ModelCost | null;
 }
 
 export const CATALOG_SOURCE_URL = "https://models.dev/api.json";
@@ -88,6 +94,18 @@ function selectReasoning(model: RemoteModel): string[] | null {
   return [...new Set(levels)].sort(
     (a, b) => REASONING_ORDER.indexOf(a) - REASONING_ORDER.indexOf(b),
   );
+}
+
+function selectCost(model: RemoteModel): ModelCost | null {
+  if (!model.cost) return null;
+  const { input, output, cache_read, cache_write } = model.cost;
+  if (input == null && output == null && cache_read == null && cache_write == null) return null;
+  return {
+    ...(typeof input === "number" ? { input } : {}),
+    ...(typeof output === "number" ? { output } : {}),
+    ...(typeof cache_read === "number" ? { cache_read } : {}),
+    ...(typeof cache_write === "number" ? { cache_write } : {}),
+  };
 }
 
 function isChatModel(model: RemoteModel) {
@@ -154,6 +172,7 @@ export function selectCatalogModels(
         family: model.family ?? null,
         releaseDate: model.release_date,
         reasoning: selectReasoning(model),
+        cost: selectCost(model),
       });
     }
   }
@@ -161,7 +180,12 @@ export function selectCatalogModels(
   const byName = new Map<string, CatalogModel>();
   for (const model of candidates) {
     const key = model.name.toLowerCase();
-    if (!byName.has(key)) byName.set(key, model);
+    const existing = byName.get(key);
+    if (!existing) {
+      byName.set(key, model);
+    } else if (!existing.cost && model.cost) {
+      byName.set(key, model);
+    }
   }
 
   const byFamily = new Map<string, CatalogModel[]>();
