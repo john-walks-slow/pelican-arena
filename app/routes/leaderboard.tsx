@@ -3,7 +3,6 @@ import { type CSSProperties, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/leaderboard";
 import { PageHeader } from "~/components/page-header";
-import { ScoreMethod } from "~/components/score-method";
 import { CompactSelect } from "~/components/ui/compact-select";
 import { KIND_META, PROMPT_KINDS, isPromptKind, type PromptKind } from "~/lib/kinds";
 import { MIN_VOTES, type LeaderboardEntry } from "~/lib/leaderboard";
@@ -279,7 +278,9 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
             )}
           </div>
 
-          {board.votes > 0 && <ScoreMethod baseline={board.baseline} className="mt-4" />}
+          <p className="mt-4 text-center text-xs text-muted">
+            本站排名仅供娱乐，无参考价值。
+          </p>
         </>
       )}
     </div>
