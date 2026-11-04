@@ -3,8 +3,10 @@ import { and, eq } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { submissionMods, submissions } from "~/db/schema";
 import {
+  assertUploadSizes,
   buildBundle,
   BUNDLE_LIMITS,
+  BundleError,
   contentTypeFor,
   describeBundle,
   readTextBundle,
@@ -17,17 +19,32 @@ import { thumbnailKey } from "./screenshot.server";
 import type { SubmissionMeta } from "./submission-input";
 import { bundleKey } from "./usercontent.server";
 
+/** The whole multipart body: bundle allowance plus thumbnail and form fields. */
+export const MAX_SUBMIT_BODY_BYTES = BUNDLE_LIMITS.totalBytes + 2 * 1024 * 1024;
+export const MAX_THUMBNAIL_BYTES = 1024 * 1024;
+
 /** Reads the parallel file/path fields the submit page sends. */
 export async function readBundleEntries(form: FormData): Promise<BundleEntry[]> {
   const files = form.getAll("file");
   const paths = form.getAll("path");
-  if (files.length !== paths.length) throw new Error("文件与路径数量不一致");
-  if (files.length > BUNDLE_LIMITS.maxFiles) throw new Error(`文件数超过 ${BUNDLE_LIMITS.maxFiles} 个`);
+  if (files.length !== paths.length) throw new BundleError("文件与路径数量不一致");
+  if (files.length > BUNDLE_LIMITS.maxFiles) {
+    throw new BundleError(`文件数超过 ${BUNDLE_LIMITS.maxFiles} 个`);
+  }
+
+  // Reject on declared sizes before copying each file into a second buffer.
+  // The multipart body is already parsed by this point, so this bounds the
+  // extra memory a bundle can pin rather than the initial request body.
+  for (const file of files) {
+    if (!(file instanceof File)) throw new BundleError("文件格式错误");
+  }
+  assertUploadSizes(files.map((file) => (file as File).size));
+
   return Promise.all(
-    files.map(async (file, i) => {
-      if (!(file instanceof File)) throw new Error("文件格式错误");
-      return { path: String(paths[i]), data: new Uint8Array(await file.arrayBuffer()) };
-    }),
+    files.map(async (file, i) => ({
+      path: String(paths[i]),
+      data: new Uint8Array(await (file as File).arrayBuffer()),
+    })),
   );
 }
 
@@ -52,25 +69,44 @@ export async function createSubmission(input: {
     Promise.all(meta.mods.map((m) => ensureCatalogEntry("mods", m))),
   ]);
 
+  if (input.thumbnail && input.thumbnail.byteLength > MAX_THUMBNAIL_BYTES) {
+    throw new BundleError("缩略图过大");
+  }
+
   const writes: Promise<unknown>[] = files.map((f) =>
     env.FILES.put(bundleKey(id, f.path), f.data, {
       httpMetadata: { contentType: contentTypeFor(f.path) },
     }),
   );
 
-  if (input.thumbnail && input.thumbnail.byteLength > 0) {
+  const thumbnailWritten = Boolean(input.thumbnail && input.thumbnail.byteLength > 0);
+  if (thumbnailWritten) {
     writes.push(
-      env.FILES.put(thumbnailKey(id), input.thumbnail, {
+      env.FILES.put(thumbnailKey(id), input.thumbnail!, {
         httpMetadata: { contentType: "image/webp" },
       }).catch((err) => console.warn("Failed to save client thumbnail to R2:", err)),
     );
   }
 
-  await Promise.all(writes);
+  const cleanupFiles = () =>
+    Promise.allSettled([
+      ...files.map((f) => env.FILES.delete(bundleKey(id, f.path))),
+      ...(thumbnailWritten ? [env.FILES.delete(thumbnailKey(id))] : []),
+    ]);
+
+  // Wait for every write to settle before cleaning up: deleting keys while a
+  // sibling PUT is still in flight would leave the object behind as an orphan.
+  const results = await Promise.allSettled(writes);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") {
+    await cleanupFiles();
+    throw failure.reason;
+  }
 
   const manifest = describeBundle(files);
+  const uniqueMods = [...new Set(modIds)];
   try {
-    await db().insert(submissions).values({
+    const insert = db().insert(submissions).values({
       id,
       promptId: input.promptId,
       kind: input.kind,
@@ -85,14 +121,28 @@ export async function createSubmission(input: {
       content,
       logMeta: meta.logMeta,
     });
-    const uniqueMods = [...new Set(modIds)];
     if (uniqueMods.length > 0) {
-      await db()
-        .insert(submissionMods)
-        .values(uniqueMods.map((modId) => ({ submissionId: id, modId })));
+      // D1 batches run in one transaction, so a failure cannot leave an answer
+      // row without its mods.
+      await db().batch([
+        insert,
+        db()
+          .insert(submissionMods)
+          .values(uniqueMods.map((modId) => ({ submissionId: id, modId }))),
+      ]);
+    } else {
+      await insert;
     }
   } catch (error) {
-    await Promise.allSettled(files.map((f) => env.FILES.delete(bundleKey(id, f.path))));
+    // If the rollback itself fails we keep the uploaded files: an orphan object
+    // is recoverable, whereas a row pointing at deleted files is not.
+    try {
+      await db().delete(submissions).where(eq(submissions.id, id));
+    } catch (rollbackError) {
+      console.error("Failed to roll back submission", id, rollbackError);
+      throw error;
+    }
+    await cleanupFiles();
     throw error;
   }
   return id;
@@ -132,12 +182,20 @@ export async function updateSubmission(input: {
     );
   if (result.meta.changes === 0) return false;
 
-  await db().delete(submissionMods).where(eq(submissionMods.submissionId, input.id));
   const uniqueMods = [...new Set(modIds)];
+  const removeMods = db()
+    .delete(submissionMods)
+    .where(eq(submissionMods.submissionId, input.id));
   if (uniqueMods.length > 0) {
-    await db()
-      .insert(submissionMods)
-      .values(uniqueMods.map((modId) => ({ submissionId: input.id, modId })));
+    // Replace the tag set atomically so a failed insert cannot drop the old one.
+    await db().batch([
+      removeMods,
+      db()
+        .insert(submissionMods)
+        .values(uniqueMods.map((modId) => ({ submissionId: input.id, modId }))),
+    ]);
+  } else {
+    await removeMods;
   }
   return true;
 }

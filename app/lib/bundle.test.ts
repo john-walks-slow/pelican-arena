@@ -1,6 +1,7 @@
 import { zipSync } from "fflate";
 import { describe, expect, it } from "vitest";
 import {
+  assertUploadSizes,
   buildBundle,
   BundleError,
   BUNDLE_LIMITS,
@@ -17,6 +18,14 @@ describe("normalizePath", () => {
     expect(normalizePath("/index.html")).toBe("index.html");
     expect(normalizePath("a/../../etc/passwd")).toBeNull();
     expect(normalizePath("")).toBeNull();
+  });
+});
+
+describe("assertUploadSizes", () => {
+  it("accepts a bundle at the limit and rejects oversized files or totals", () => {
+    expect(() => assertUploadSizes([BUNDLE_LIMITS.totalBytes])).not.toThrow();
+    expect(() => assertUploadSizes([BUNDLE_LIMITS.totalBytes + 1])).toThrow(BundleError);
+    expect(() => assertUploadSizes([6 * 1024 * 1024, 6 * 1024 * 1024])).toThrow(/总大小/);
   });
 });
 

@@ -76,7 +76,8 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
 
   // Cache strategy to maximize CDN hits and minimize Worker invocations:
   // 1. Granted URLs are private/sensitive and must never be cached publicly.
-  // 2. Gallery previews (?preview=1) are revived for five minutes and cached at the edge for an hour.
+  // 2. Gallery previews (?preview=1) keep a short shared cache, but never
+  //    use stale-while-revalidate: expired entries must revalidate.
   // 3. Static asset sub-resources (js, css, images, fonts, wasm) are immutable within a bundle
   //    and can be safely cached on edge and browser.
   // 4. Entry documents (HTML / SVG / Markdown) without preview stay `no-store` to ensure retracted
@@ -90,9 +91,9 @@ export async function serveUsercontent(request: Request, bucket: R2Bucket) {
   const cacheControl = grant
     ? "private, no-store"
     : preview
-      ? "public, max-age=300, s-maxage=3600, stale-while-revalidate=86400"
+      ? "public, max-age=300, s-maxage=3600"
       : isStaticSubResource
-        ? "public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400"
+        ? "public, max-age=86400, s-maxage=604800"
         : "no-store";
 
   const headers = new Headers({

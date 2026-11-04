@@ -146,6 +146,20 @@ export function buildBundle(entries: BundleEntry[], kind: PromptKind = "web"): B
   return files.sort((a, b) => a.path.localeCompare(b.path));
 }
 
+/** Rejects an upload from its declared sizes before any file body is copied. */
+export function assertUploadSizes(sizes: number[]) {
+  let total = 0;
+  for (const size of sizes) {
+    if (size > BUNDLE_LIMITS.totalBytes) {
+      throw new BundleError(`单个文件超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`);
+    }
+    total += size;
+  }
+  if (total > BUNDLE_LIMITS.totalBytes) {
+    throw new BundleError(`总大小超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`);
+  }
+}
+
 /** Unzips in the browser, refusing archives that would inflate past the limits. */
 export function unzipBundle(zip: Uint8Array): BundleEntry[] {
   if (zip.byteLength > BUNDLE_LIMITS.zipBytes) {

@@ -51,9 +51,9 @@ describe("visibility", () => {
     ).toBe(false);
   });
 
-  it("serves withdrawn files by direct link but never flagged ones", () => {
-    expect(isSubmissionServable("hidden", "active")).toBe(true);
+  it("serves only public files directly; withdrawn, flagged or removed require a grant", () => {
     expect(isSubmissionServable("active", "active")).toBe(true);
+    expect(isSubmissionServable("hidden", "active")).toBe(false);
     expect(isSubmissionServable("flagged", "active")).toBe(false);
     expect(isSubmissionServable("removed", "active")).toBe(false);
     expect(isSubmissionServable("active", "removed")).toBe(false);

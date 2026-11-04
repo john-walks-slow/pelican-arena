@@ -306,5 +306,5 @@ export function shouldAutoHide(
 
 /** Whether the usercontent origin may serve the files without a preview grant. */
 export function isSubmissionServable(status: SubmissionStatus, promptStatus: PromptStatus) {
-  return promptStatus === "active" && (status === "active" || status === "hidden");
+  return isSubmissionPublic(status, promptStatus);
 }

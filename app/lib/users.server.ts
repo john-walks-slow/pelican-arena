@@ -9,9 +9,13 @@ const adminUsernames = () =>
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean);
 
-/** Profile fields follow the forum on every login; role and bans stay local. */
+/** Profile fields follow the forum on every login; bans stay local. */
 export async function upsertUser(profile: LinuxDoUser) {
-  const isAdmin = adminUsernames().includes(profile.username.toLowerCase());
+  const admins = adminUsernames();
+  const isAdmin = admins.includes(profile.username.toLowerCase());
+  // An empty allowlist is more likely a config mistake than an intentional
+  // removal of every admin, so keep existing roles instead of demoting all.
+  const demotedRole = admins.length > 0 ? "user" : sql`${users.role}`;
   const values = {
     id: profile.id,
     username: profile.username,
@@ -26,7 +30,9 @@ export async function upsertUser(profile: LinuxDoUser) {
     .values({ ...values, role: isAdmin ? "admin" : "user" })
     .onConflictDoUpdate({
       target: users.id,
-      set: { ...values, role: isAdmin ? "admin" : sql`${users.role}` },
+      // Role follows ADMIN_USERNAMES in both directions, so removing someone
+      // from the list actually revokes access on their next login.
+      set: { ...values, role: isAdmin ? "admin" : demotedRole },
     })
     .returning();
   return user;

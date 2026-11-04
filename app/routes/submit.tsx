@@ -18,7 +18,12 @@ import { getCatalog, getPrompt } from "~/lib/queries.server";
 import { flashToast } from "~/lib/session.server";
 import { parseSubmissionMeta } from "~/lib/submission-input";
 import { ensureThumbnail } from "~/lib/screenshot.server";
-import { createSubmission, readBundleEntries } from "~/lib/submissions.server";
+import {
+  createSubmission,
+  MAX_SUBMIT_BODY_BYTES,
+  MAX_THUMBNAIL_BYTES,
+  readBundleEntries,
+} from "~/lib/submissions.server";
 import { useDialogClose } from "~/lib/use-dialog-close";
 
 export const meta: Route.MetaFunction = ({ loaderData }) => [
@@ -49,6 +54,12 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   const limitError = await dailyLimitError(user, "submit");
   if (limitError) return data({ error: limitError }, { status: 429 });
 
+  const declaredHeader = request.headers.get("content-length");
+  const declaredBytes = declaredHeader === null ? 0 : Number(declaredHeader);
+  if (Number.isFinite(declaredBytes) && declaredBytes > MAX_SUBMIT_BODY_BYTES) {
+    return data({ error: "上传内容过大，请检查答案包大小" }, { status: 413 });
+  }
+
   const form = await request.formData();
   const { meta, error } = parseSubmissionMeta(form);
   if (!meta) return data({ error }, { status: 400 });
@@ -56,6 +67,9 @@ export async function action({ request, params, context }: Route.ActionArgs) {
   try {
     const entries = await readBundleEntries(form);
     const thumbFile = form.get("thumbnail");
+    if (thumbFile instanceof File && thumbFile.size > MAX_THUMBNAIL_BYTES) {
+      return data({ error: "缩略图过大" }, { status: 413 });
+    }
     const thumbnail =
       thumbFile instanceof File && thumbFile.size > 0
         ? new Uint8Array(await thumbFile.arrayBuffer())

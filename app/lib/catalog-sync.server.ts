@@ -1,4 +1,4 @@
-import { and, eq, notInArray, sql } from "drizzle-orm";
+import { and, eq, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "~/db/client.server";
 import { models } from "~/db/schema";
 import {
@@ -7,8 +7,8 @@ import {
   type ModelsDevCatalog,
 } from "./catalog-source";
 
-/** Keeps each INSERT well under D1's bound-parameter limit. */
-const CHUNK = 40;
+/** D1 allows at most 100 bound parameters per statement. Each row uses 9. */
+const CHUNK = 10;
 
 /**
  * Replaces the synced part of the model catalog with what models.dev publishes.
@@ -24,6 +24,10 @@ export async function syncModelCatalog() {
   if (selected.length < 20) throw new Error("模型源返回的数据过少，已跳过同步");
 
   const syncedAt = new Date();
+
+  // Upsert first so a failed sync leaves the previous catalog visible. Marking
+  // stale entries afterwards also avoids D1's 100 bound-parameter limit on a
+  // `notInArray(selectedIds)` query.
   for (let i = 0; i < selected.length; i += CHUNK) {
     const rows = selected.slice(i, i + CHUNK).map((model) => ({
       ...model,
@@ -51,16 +55,15 @@ export async function syncModelCatalog() {
       });
   }
 
+  // Anything from an earlier sync that was not refreshed above is stale.
+  // Models are hidden rather than deleted so historical answers still resolve.
   await db()
     .update(models)
     .set({ hidden: true })
     .where(
       and(
         eq(models.source, "models.dev"),
-        notInArray(
-          models.id,
-          selected.map((model) => model.id),
-        ),
+        or(isNull(models.syncedAt), lt(models.syncedAt, syncedAt)),
       ),
     );
 

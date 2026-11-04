@@ -675,7 +675,7 @@ export function SubmissionForm({
         open={withdrawOpen}
         onOpenChange={setWithdrawOpen}
         title="撤回这份答案？"
-        description="撤回后会从题目页与统计中消失。文件与评分记录会保留，你可以在「我的」里恢复。"
+        description="撤回后会从题目页与统计中消失，答案链接立即失效。文件与评分记录会保留，你可以在「我的」里恢复。"
         confirmLabel="撤回"
         destructive
         busy={submitting}
