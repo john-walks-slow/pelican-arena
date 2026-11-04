@@ -50,30 +50,37 @@ await context.addInitScript(() => {
           width: 22px; height: 26px; pointer-events: none;
           transform: translate3d(1270px, 820px, 0);
           filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.35));
-          transition: transform 16ms linear, scale 90ms ease;
+          /* Completely static cursor - no twitch, scale or movement on click */
         }
         #__dsh_cursor svg { display: block; width: 100%; height: 100%; }
-        #__dsh_cursor.is-down { transform-origin: 2px 2px; scale: 0.92; }
 
-        /* Expanding ripple ring on click */
+        /* Elegant expanding ripple ring emerging from under cursor tip */
         .cursor-click-ripple {
-          position: fixed; z-index: 2147483646; pointer-events: none;
-          width: 38px; height: 38px; border-radius: 50%;
-          border: 2.5px solid #c2410c;
-          background: rgba(194, 65, 12, 0.18);
-          transform: translate(-50%, -50%) scale(0.2);
-          opacity: 1;
-          animation: dsh-ripple 480ms cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+          position: fixed;
+          z-index: 2147483645;
+          pointer-events: none;
+          width: 48px;
+          height: 48px;
+          border-radius: 50%;
+          border: 2px solid rgba(194, 65, 12, 0.75);
+          background: radial-gradient(circle, rgba(194, 65, 12, 0.24) 0%, rgba(194, 65, 12, 0) 70%);
+          transform: translate(-50%, -50%) scale(0.15);
+          opacity: 0.85;
+          animation: dsh-ripple 460ms cubic-bezier(0.15, 0.8, 0.35, 1) forwards;
         }
 
         @keyframes dsh-ripple {
           0% {
-            transform: translate(-50%, -50%) scale(0.25);
-            opacity: 0.95;
-            border-width: 3px;
+            transform: translate(-50%, -50%) scale(0.15);
+            opacity: 0.85;
+            border-width: 2.5px;
+          }
+          60% {
+            opacity: 0.6;
+            border-width: 1.8px;
           }
           100% {
-            transform: translate(-50%, -50%) scale(1.6);
+            transform: translate(-50%, -50%) scale(1.4);
             opacity: 0;
             border-width: 1px;
           }
@@ -101,17 +108,12 @@ await context.addInitScript(() => {
       );
 
       window.addEventListener("mousedown", (e) => {
-        document.getElementById("__dsh_cursor")?.classList.add("is-down");
         const ripple = document.createElement("div");
         ripple.className = "cursor-click-ripple";
         ripple.style.left = `${e.clientX}px`;
         ripple.style.top = `${e.clientY}px`;
         document.body.append(ripple);
-        setTimeout(() => ripple.remove(), 550);
-      });
-
-      window.addEventListener("mouseup", () => {
-        document.getElementById("__dsh_cursor")?.classList.remove("is-down");
+        setTimeout(() => ripple.remove(), 500);
       });
     } catch (error) {
       console.error("cursor overlay failed", error);
