@@ -1,6 +1,7 @@
 import { redirect } from "react-router";
 import type { Route } from "./+types/auth.callback";
 import { exchangeCode } from "~/lib/linuxdo.server";
+import { safeFrom } from "~/lib/navigation";
 import { commitSession, getSession } from "~/lib/session.server";
 import { upsertUser } from "~/lib/users.server";
 
@@ -16,7 +17,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   const profile = await exchangeCode(code);
   const user = await upsertUser(profile);
-  const returnTo = session.get("returnTo") ?? "/";
+  const returnTo = safeFrom(session.get("returnTo")) ?? "/";
   session.unset("oauthState");
   session.unset("returnTo");
   session.set("userId", user.id);

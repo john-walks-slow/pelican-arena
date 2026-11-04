@@ -3,7 +3,7 @@ import puppeteer from 'puppeteer-core';
 
 const PORT = Number(process.env.PORT || 8790);
 const TOKEN = process.env.RENDER_TOKEN;
-const ALLOWED_HOST = process.env.ALLOWED_HOST || 'elsewhere.dpdns.org';
+const ALLOWED_HOST = process.env.ALLOWED_HOST || 'pelicanarena.elsewhere.dpdns.org';
 const WIDTH = 1200;
 const HEIGHT = 630;
 const CONCURRENCY = Number(process.env.CONCURRENCY || 2);

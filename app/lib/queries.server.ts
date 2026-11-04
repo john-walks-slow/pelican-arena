@@ -20,6 +20,7 @@ import {
   providers,
   ratings,
   reports,
+  submissionDoubts,
   submissionMods,
   submissions,
   users,
@@ -577,6 +578,7 @@ const submissionColumns = {
   author,
   votes: sql<number>`(select count(*) from ${ratings} r where r.submission_id = submissions.id)`,
   starSum: sql<number>`coalesce((select sum(r.stars) from ${ratings} r where r.submission_id = submissions.id), 0)`,
+  doubtCount: sql<number>`(select count(*) from ${submissionDoubts} d where d.submission_id = submissions.id)`,
 };
 
 function submissionQuery() {
@@ -625,9 +627,14 @@ export async function listSubmissions(
   limit = SUBMISSION_PAGE_SIZE,
 ) {
   const where = submissionConditions(promptId, filters);
+  const isDoubtedSql = sql`case when (
+    ${submissionColumns.doubtCount} > 0
+    and ${submissionColumns.doubtCount} >= ${submissionColumns.votes}
+  ) then 1 else 0 end`;
   const order =
     sort === "top"
       ? [
+          asc(isDoubtedSql),
           desc(
             sql`(${submissionColumns.starSum} + ${priorStars}) * 1.0 / (${submissionColumns.votes} + ${priorVotes})`,
           ),
@@ -747,6 +754,33 @@ export async function clearRating(userId: number, submissionId: string) {
     .where(and(eq(ratings.userId, userId), eq(ratings.submissionId, submissionId)));
 }
 
+export async function getUserDoubt(userId: number, submissionId: string) {
+  const [row] = await db()
+    .select({ count: count() })
+    .from(submissionDoubts)
+    .where(and(eq(submissionDoubts.userId, userId), eq(submissionDoubts.submissionId, submissionId)));
+  return (row?.count ?? 0) > 0;
+}
+
+export async function toggleDoubt(userId: number, submissionId: string) {
+  const existing = await getUserDoubt(userId, submissionId);
+  if (existing) {
+    await db()
+      .delete(submissionDoubts)
+      .where(and(eq(submissionDoubts.userId, userId), eq(submissionDoubts.submissionId, submissionId)));
+  } else {
+    await db()
+      .insert(submissionDoubts)
+      .values({ userId, submissionId })
+      .onConflictDoNothing();
+  }
+  const [row] = await db()
+    .select({ n: count() })
+    .from(submissionDoubts)
+    .where(eq(submissionDoubts.submissionId, submissionId));
+  return { doubted: !existing, count: row?.n ?? 0 };
+}
+
 export async function siteStats() {
   const d = db();
   const [[p], [s], [r]] = await Promise.all([
@@ -767,9 +801,14 @@ export async function siteStats() {
  * it needs the individual votes rather than per-answer sums.
  */
 export async function leaderboardData(kind?: PromptKind | null) {
+  const notDoubted = sql`not (
+    (select count(*) from ${submissionDoubts} sd where sd.submission_id = ${submissions.id}) > 0
+    and (select count(*) from ${submissionDoubts} sd where sd.submission_id = ${submissions.id}) >= (select count(*) from ${ratings} r where r.submission_id = ${submissions.id})
+  )`;
+
   const active = kind
-    ? and(eq(submissions.status, "active"), eq(prompts.status, "active"), eq(prompts.kind, kind))
-    : and(eq(submissions.status, "active"), eq(prompts.status, "active"));
+    ? and(eq(submissions.status, "active"), eq(prompts.status, "active"), eq(prompts.kind, kind), notDoubted)
+    : and(eq(submissions.status, "active"), eq(prompts.status, "active"), notDoubted);
 
   const [answers, stars] = await Promise.all([
     db()
@@ -813,11 +852,16 @@ export async function leaderboardData(kind?: PromptKind | null) {
 
 /** Prompt counts per work kind, for the leaderboard's kind filter. */
 export async function answerCountsByKind() {
+  const notDoubted = sql`not (
+    (select count(*) from ${submissionDoubts} sd where sd.submission_id = ${submissions.id}) > 0
+    and (select count(*) from ${submissionDoubts} sd where sd.submission_id = ${submissions.id}) >= (select count(*) from ${ratings} r where r.submission_id = ${submissions.id})
+  )`;
+
   const rows = await db()
     .select({ kind: prompts.kind, n: count(submissions.id) })
     .from(submissions)
     .innerJoin(prompts, eq(prompts.id, submissions.promptId))
-    .where(and(eq(submissions.status, "active"), eq(prompts.status, "active")))
+    .where(and(eq(submissions.status, "active"), eq(prompts.status, "active"), notDoubted))
     .groupBy(prompts.kind);
   return rows;
 }

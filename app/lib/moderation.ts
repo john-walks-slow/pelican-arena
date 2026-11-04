@@ -31,8 +31,8 @@ export interface ReportOption {
 export const SUBMISSION_REPORT_REASONS = [
   {
     id: "metadata",
-    label: "模型与实际不符",
-    description: "实际响应的模型与标注不一致（含降智路由、偷换模型或虚假标注）",
+    label: "模型虚假或乱填",
+    description: "明显伪造、偷换模型或随意胡乱填写（疑似降智或表现存疑请使用评分处的存疑功能）",
     severe: false,
   },
   {
@@ -143,7 +143,7 @@ export const REPORT_NOTE_LIMIT = 500;
 export const MODERATION_NOTE_LIMIT = 500;
 
 export const ROUTING_REPORT_TIP =
-  "关于模型路由与退化：若 API 服务商将高阶模型静默降级（例如请求旗舰模型但实际由轻量模型响应），作品应按实际响应的模型标注。如你掌握证据（如响应特征、日志线索），请在补充说明中注明。";
+  "关于模型真实性：本项仅用于处理明显伪造、欺骗、恶意偷换模型或随意乱填模型的行为。若仅怀疑服务商静默降级或对作答水平与真实性存疑，请使用评分处的「存疑」功能，无需提交举报。";
 
 export const REJECT_REASONS = [
   { id: "unclear", label: "描述不清，无法据此作答" },

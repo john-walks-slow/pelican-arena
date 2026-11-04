@@ -191,7 +191,7 @@ function BundlePicker({
       label={`拖入或选择 ${kind === "web" ? "HTML / zip" : `.${meta.extension}`}`}
       hint={
         kind === "web"
-          ? `zip 需包含 index.html，解压后不超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`
+          ? `zip 需包含 index.html，入口不超过 ${formatBytes(BUNDLE_LIMITS.htmlBytes)}，解压后不超过 ${formatBytes(BUNDLE_LIMITS.totalBytes)}`
           : `单个文件，不超过 ${formatBytes(singleFileLimit(kind))}`
       }
       error={error}

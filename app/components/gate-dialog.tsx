@@ -69,7 +69,10 @@ export function GateDialog({
     primaryDesc ??= actionName
       ? `${actionName}需要登录 Linux DO 账号后继续。`
       : "该操作需要登录 Linux DO 账号后继续。";
-    secondaryDesc = "登录后将自动返回当前页面。";
+    secondaryDesc =
+      effectiveReturnTo === currentPath
+        ? "登录后将自动返回当前页面。"
+        : "登录后将回到你刚才要去的页面。";
   } else if (reason === "trust_level") {
     resolvedTitle ??= "信任等级不足";
     const req = requiredTrustLevel ?? (action ? TRUST[action] : 1);

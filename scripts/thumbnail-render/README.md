@@ -9,11 +9,11 @@ POST /render
 Authorization: Bearer <RENDER_TOKEN>
 Content-Type: application/json
 
-{"url": "https://elsewhere.dpdns.org/<id>/index.html"}
+{"url": "https://pelicanarena.elsewhere.dpdns.org/<id>/index.html"}
 → image/webp 1200×630
 ```
 
-- 只接受 `ALLOWED_HOST`（默认 `elsewhere.dpdns.org`）的 https 地址，避免被当成 SSRF 跳板。
+- 只接受 `ALLOWED_HOST`（默认 `pelicanarena.elsewhere.dpdns.org`）的 https 地址，避免被当成 SSRF 跳板。
 - 队列并发默认 2，浏览器常驻（首次请求冷启动）。每次先 `domcontentloaded`，然后反复截图直到画面不再接近空白（WebGL 画布无法从 JS 探针，空白帧只有几 KB）；普通页面约 3–5 秒，重资源 WebGL 页面 15–20 秒。
 - `GET /health` 返回当前并发与排队数。
 

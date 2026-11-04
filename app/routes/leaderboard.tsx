@@ -1,4 +1,4 @@
-import { Shapes, Trophy } from "lucide-react";
+import { Clock, Shapes, Trophy } from "lucide-react";
 import { type CSSProperties, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import type { Route } from "./+types/leaderboard";
@@ -10,6 +10,9 @@ import { getCachedLeaderboard } from "~/lib/leaderboard.server";
 import { cachedClientLoader } from "~/lib/route-cache";
 import { cn } from "~/lib/utils";
 
+/** 控制排名页是否处于调校维护状态 */
+export const LEADERBOARD_MAINTENANCE = false;
+
 export const meta: Route.MetaFunction = () => [
   { title: "排名 · Pelican Arena" },
   {
@@ -20,6 +23,14 @@ export const meta: Route.MetaFunction = () => [
 ];
 
 export async function loader({ request }: Route.LoaderArgs) {
+  if (LEADERBOARD_MAINTENANCE) {
+    return {
+      board: { entries: [], votes: 0, rankedCount: 0, mean: 0 },
+      kind: null,
+      kindCounts: [],
+      answers: 0,
+    };
+  }
   const params = new URL(request.url).searchParams;
   const kindParam = params.get("kind");
   const kind: PromptKind | null = isPromptKind(kindParam) ? kindParam : null;
@@ -77,8 +88,11 @@ function Score({ score, ranked }: { score: number | null; ranked: boolean }) {
 }
 
 /** Why there is no ranking yet. */
-function emptyReason(entries: number, kind: PromptKind | null) {
-  if (entries > 0) return "还没有两个模型同台作答过的题目。";
+function emptyReason(entries: number, kind: PromptKind | null, votes: number) {
+  if (votes === 0) return "还没有人打分。";
+  if (entries > 0) {
+    return "还没有足够多的同台对照：同一道题至少要有两个模型作答；同一模型还要累计 3 个不同用户打分。";
+  }
   if (kind) return `还没有${KIND_META[kind].label}类答案。`;
   return "还没有答案。";
 }
@@ -133,6 +147,23 @@ function Row({ entry, index }: { entry: LeaderboardEntry; index: number }) {
 }
 
 export default function Leaderboard({ loaderData }: Route.ComponentProps) {
+  if (LEADERBOARD_MAINTENANCE) {
+    return (
+      <div className="mx-auto max-w-[1240px]">
+        <PageHeader title="排名" />
+        <div className="reveal-tier-2 mt-6 rounded-card border border-dashed border-control px-6 py-12 text-center">
+          <Clock className="mx-auto size-5 text-control" strokeWidth={1.75} />
+          <p className="mt-3 text-sm text-muted">功能还在调校中，以后再来探索吧。</p>
+          <p className="mt-1.5 text-xs">
+            <Link to="/" prefetch="intent" className="text-accent hover:underline">
+              去题目页面看看
+            </Link>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   const { board, kind, kindCounts, answers } = loaderData;
   const [, setParams] = useSearchParams();
   const [showUnranked, setShowUnranked] = useState(false);
@@ -189,10 +220,10 @@ export default function Leaderboard({ loaderData }: Route.ComponentProps) {
       {board.rankedCount === 0 && !showUnranked ? (
         <div className="reveal-tier-2 mt-4 rounded-card border border-dashed border-control px-6 py-12 text-center">
           <Trophy className="mx-auto size-5 text-control" strokeWidth={1.75} />
-          <p className="mt-3 text-sm text-muted">{emptyReason(board.entries.length, kind)}</p>
+          <p className="mt-3 text-sm text-muted">{emptyReason(board.entries.length, kind, board.votes)}</p>
           {board.entries.length > 0 && (
             <p className="mt-1.5 text-xs text-muted">
-              已有 <span className="num">{answers}</span> 份答案，但还没有可以互相对照的组合。
+              已有 <span className="num">{answers}</span> 份答案，等评分和同台对照积累起来才会出现排名。
             </p>
           )}
           {board.entries.length > 0 && (

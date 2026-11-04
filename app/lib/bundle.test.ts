@@ -44,6 +44,18 @@ describe("buildBundle", () => {
       ]),
     ).toThrow(BundleError);
   });
+
+  it("limits the web entry file even when it arrives inside a bundle", () => {
+    expect(() =>
+      buildBundle(
+        [{ path: "index.html", data: new Uint8Array(BUNDLE_LIMITS.htmlBytes + 1) }],
+        "web",
+      ),
+    ).toThrow(/入口文件/);
+    expect(
+      buildBundle([{ path: "index.html", data: new Uint8Array(BUNDLE_LIMITS.htmlBytes) }], "web"),
+    ).toHaveLength(1);
+  });
 });
 
 describe("kind bundles", () => {
@@ -74,6 +86,13 @@ describe("kind bundles", () => {
       buildBundle(
         [{ path: "index.md", data: new Uint8Array(BUNDLE_LIMITS.markdownBytes + 1) }],
         "markdown",
+      ),
+    ).toThrow(/超过/);
+
+    expect(() =>
+      buildBundle(
+        [{ path: "index.svg", data: new Uint8Array(BUNDLE_LIMITS.svgBytes + 1) }],
+        "svg",
       ),
     ).toThrow(/超过/);
   });

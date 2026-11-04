@@ -1,4 +1,17 @@
-/** Only internal paths are accepted as a return target. */
+/**
+ * Single-fetch data requests are served at `<path>.data` (index routes at `/_.data`) and
+ * carry a `_routes` query. Returning to one would render the raw turbo-stream payload, so
+ * every return target is reduced to the document path it represents.
+ */
+function documentTarget(target: string): string {
+  const url = new URL(target, "http://localhost");
+  if (!url.pathname.endsWith(".data")) return target;
+  url.pathname = url.pathname === "/_.data" ? "/" : url.pathname.replace(/\.data$/, "");
+  url.searchParams.delete("_routes");
+  return `${url.pathname}${url.search}${url.hash}`;
+}
+
+/** Only internal document paths are accepted as a return target. */
 export function safeFrom(value: string | null | undefined): string | null {
   if (!value) return null;
   if (!value.startsWith("/") || value.startsWith("//") || value.startsWith("/\\")) return null;
@@ -6,7 +19,7 @@ export function safeFrom(value: string | null | undefined): string | null {
     const dummy = "http://localhost";
     const parsed = new URL(value, dummy);
     if (parsed.origin !== dummy) return null;
-    return value;
+    return documentTarget(value);
   } catch {
     return null;
   }

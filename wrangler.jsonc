@@ -11,7 +11,7 @@
 	"main": "./workers/app.ts",
 	"vars": {
 		"APP_ORIGIN": "https://pelicanarena.dpdns.org",
-		"USERCONTENT_ORIGIN": "https://elsewhere.dpdns.org",
+		"USERCONTENT_ORIGIN": "https://pelicanarena.elsewhere.dpdns.org",
 		"LINUXDO_CLIENT_ID": "WEeAp0GneHGJhKT3jWhtSnMPAFhs7BH4",
 		"ADMIN_USERNAMES": "JohnnRen",
 		// New prompts publish immediately; set to "true" to review them first.
@@ -20,7 +20,7 @@
 	},
 	"routes": [
 		{ "pattern": "pelicanarena.dpdns.org", "custom_domain": true },
-		{ "pattern": "elsewhere.dpdns.org", "custom_domain": true }
+		{ "pattern": "pelicanarena.elsewhere.dpdns.org", "custom_domain": true }
 	],
 	"r2_buckets": [
 		{

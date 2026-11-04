@@ -334,17 +334,20 @@ body {
 
 /* Directional entrances for the title rail and the content cascade. The
    whole screen is remounted per destination, so the new screen plays these
-   while the browser's own scroll restoration stays out of the way. */
-.route-stage[data-motion="forward"] .page-header {
+   while the browser's own scroll restoration stays out of the way. Animate
+   the header's content, never the header itself: an animated ancestor with
+   opacity < 1 becomes the backdrop root, so the frosted sheet behind the
+   bar would drop its blur and read as flat translucency for the duration. */
+.route-stage[data-motion="forward"] .page-header-inner {
   animation: stage-forward 260ms var(--ease-spatial);
 }
-.route-stage[data-motion="back"] .page-header {
+.route-stage[data-motion="back"] .page-header-inner {
   animation: stage-back 250ms var(--ease-spatial);
 }
-.route-stage[data-motion="lateral-down"] .page-header {
+.route-stage[data-motion="lateral-down"] .page-header-inner {
   animation: stage-down 240ms var(--ease-spatial);
 }
-.route-stage[data-motion="lateral-up"] .page-header {
+.route-stage[data-motion="lateral-up"] .page-header-inner {
   animation: stage-up 240ms var(--ease-spatial);
 }
 .route-stage:not([data-motion="steady"]) .reveal-tier-1 {
@@ -755,13 +758,15 @@ html[data-booting="true"] .boot-screen {
   will-change: transform, opacity;
 }
 
-.page-header[data-compact="true"] .page-header-back-label,
-.page-header[data-compact="true"] .page-header-back-btn {
-  pointer-events: none;
+/* Compact: the label has already faded out, so drop it from the layout. The
+   link then only spans the glyph — nothing covers the collapsed title rail —
+   and stays a plain hit target (disabling the link itself and re-enabling a
+   child breaks touch hit-testing in mobile browsers). */
+.page-header[data-compact="true"] .page-header-back-label {
+  display: none;
 }
 
 .page-header[data-compact="true"] .page-header-back-icon {
-  pointer-events: auto;
   background: color-mix(in srgb, var(--color-raised) 80%, transparent);
   color: var(--color-ink);
 }
@@ -770,6 +775,25 @@ html[data-booting="true"] .boot-screen {
   .page-header[data-compact="true"] .page-header-back-icon:hover {
     background: var(--color-active);
   }
+}
+
+.page-header-back-btn {
+  position: relative;
+  touch-action: manipulation;
+}
+
+/* The glyph is 28px; give fingers a full-size target around it. The right
+   padding stays clear of the collapsed title, which starts just past it. */
+@media (pointer: coarse) {
+  .page-header-back-btn::after {
+    content: "";
+    position: absolute;
+    inset: -9px -6px;
+  }
+}
+
+.page-header-back-btn:active .page-header-back-icon {
+  background: var(--color-active);
 }
 
 .page-header-actions {
@@ -795,6 +819,7 @@ html[data-booting="true"] .boot-screen {
 
 @media (prefers-reduced-motion: reduce) {
   .nav-progress-bar,
+  .page-header-inner,
   .route-stage,
   .reveal-tier-1,
   .reveal-tier-2,
@@ -972,3 +997,188 @@ html[data-booting="true"] .boot-screen {
 html[data-menu-open] {
   overflow: hidden;
 }
+
+/* =========================================================================
+   Pelican Arena · Entrance Morph & Rhythmic Typography
+   ========================================================================= */
+
+/* Crisp Organic Phrase Lift (No Slop Blur) */
+.title-word-reveal {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(14px) scale(0.98);
+  animation: crisp-lift 520ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+  will-change: transform, opacity;
+}
+
+.phrase-cadence-unit {
+  display: inline-flex;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.phrase-char-reveal {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(8px);
+  animation: crisp-char-lift 420ms cubic-bezier(0.2, 0.9, 0.2, 1) forwards;
+  animation-delay: var(--delay, 0ms);
+  will-change: transform, opacity;
+}
+
+.welcome-btn-lift {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: crisp-lift 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation-delay: 1100ms;
+}
+
+@keyframes crisp-lift {
+  to {
+    opacity: 1;
+    transform: translateY(0px) scale(1);
+  }
+}
+
+@keyframes crisp-char-lift {
+  to {
+    opacity: 1;
+    transform: translateY(0px);
+  }
+}
+
+.char-space {
+  display: inline-block;
+  width: 0.36em;
+}
+
+.intro-grid-backdrop {
+  background-size: 32px 32px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-rule) 60%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-rule) 60%, transparent) 1px, transparent 1px);
+}
+
+.intro-road-slide {
+  animation: boot-road 240ms linear infinite;
+}
+
+.intro-wheel-draw {
+  stroke-dasharray: 40;
+  stroke-dashoffset: 40;
+  animation: intro-dash-draw 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.intro-path-trace {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: intro-dash-draw 1100ms cubic-bezier(0.2, 0.8, 0.2, 1) 200ms forwards;
+}
+
+.intro-bolt-strike {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: intro-dash-draw 600ms cubic-bezier(0.1, 0.9, 0.1, 1) forwards;
+}
+
+@keyframes intro-dash-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.intro-spin-fast {
+  animation: intro-spin 600ms linear infinite;
+}
+
+.intro-spin-medium {
+  animation: intro-spin 1000ms linear infinite;
+}
+
+.intro-spin-slow {
+  animation: intro-spin 1600ms linear infinite;
+}
+
+@keyframes intro-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.intro-dust-a {
+  animation: boot-dust 500ms linear infinite;
+}
+.intro-dust-b {
+  animation: boot-dust 500ms linear -250ms infinite;
+}
+
+/* Variant 2: Dual Collision Dynamics */
+.intro-bracket-left {
+  animation: intro-collide-left 700ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+.intro-bracket-right {
+  animation: intro-collide-right 700ms cubic-bezier(0.5, 0, 0.75, 0) forwards;
+}
+
+@keyframes intro-collide-left {
+  0% { transform: translateX(-30px); opacity: 0; }
+  30% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(45px) scale(0.6); opacity: 0; }
+}
+
+@keyframes intro-collide-right {
+  0% { transform: translateX(30px); opacity: 0; }
+  30% { transform: translateX(0); opacity: 1; }
+  100% { transform: translateX(-45px) scale(0.6); opacity: 0; }
+}
+
+.intro-burst-expand {
+  animation: intro-burst 600ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: 16px 23px;
+}
+
+@keyframes intro-burst {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.08);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Variant 3: Radar Sweep & Gauge Snap */
+.intro-radar-sweep {
+  background: conic-gradient(
+    from 0deg at 50% 50%,
+    transparent 0deg,
+    transparent 280deg,
+    color-mix(in srgb, var(--color-accent) 25%, transparent) 360deg
+  );
+  animation: intro-radar-spin 1400ms linear infinite;
+}
+
+@keyframes intro-radar-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.intro-gauge-snap {
+  animation: intro-gauge-pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes intro-gauge-pop {
+  0% { transform: scale(0.85); opacity: 0.2; }
+  70% { transform: scale(1.03); opacity: 0.9; }
+  100% { transform: scale(1); opacity: 1; }
+}
+

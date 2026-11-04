@@ -192,6 +192,24 @@ export default function Home({ loaderData }: Route.ComponentProps) {
   const filtered = Boolean(q || kind || sort !== DEFAULT_SORT);
   const loading = fetcher.state !== "idle";
 
+  const [welcomed, setWelcomed] = useState(() => {
+    if (typeof window !== "undefined") {
+      return Boolean(localStorage.getItem("pelican_welcomed"));
+    }
+    return true;
+  });
+
+  useEffect(() => {
+    // 首次进入全站时，引导用户体验纯粹的欢迎仪式
+    if (!welcomed) {
+      navigate("/welcome", { replace: true });
+    }
+  }, [welcomed, navigate]);
+
+  if (!welcomed) {
+    return null;
+  }
+
   return (
     <div className="mx-auto max-w-[1240px]">
       <PageHeader

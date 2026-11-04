@@ -20,8 +20,19 @@ export function formatDuration(ms: number) {
 
 const rtf = new Intl.RelativeTimeFormat("zh-CN", { numeric: "auto" });
 
-export function formatRelative(date: Date | string | number, now = Date.now()) {
-  const t = new Date(date).getTime();
+/**
+ * Relative time for a timestamp that may be missing.
+ *
+ * Callers feed this from loader data, JSON continuations and optimistic updates;
+ * a row that lost its date would otherwise render the literal "Invalid Date".
+ * A missing or unparseable value, or an epoch-zero placeholder, shows a dash.
+ */
+export function formatRelative(
+  date: Date | string | number | null | undefined,
+  now = Date.now(),
+) {
+  const t = date == null || date === "" ? NaN : new Date(date).getTime();
+  if (!Number.isFinite(t) || t <= 0) return "—";
   const diff = (t - now) / 1000;
   const abs = Math.abs(diff);
   if (abs < 60) return "刚刚";

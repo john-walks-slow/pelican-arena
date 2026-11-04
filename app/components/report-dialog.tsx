@@ -172,7 +172,7 @@ export function ReportDialog({
                 rows={3}
                 placeholder={
                   target === "submission" && reason === "metadata"
-                    ? "请说明判断实际模型的线索或证据（如响应特征、日志疑点等）"
+                    ? "请说明判断模型明显伪造、偷换或乱填的线索或证据"
                     : reason === "other"
                       ? "请详细写明违规情况"
                       : copy.placeholder

@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { createCookieSessionStorage, redirect } from "react-router";
 import { db } from "~/db/client.server";
 import { users, type User } from "~/db/schema";
+import { safeFrom } from "~/lib/navigation";
 
 export interface FlashToast {
   id: number;
@@ -56,7 +57,8 @@ export async function requireUser(request: Request): Promise<User> {
   const user = await getUser(request);
   if (!user) {
     const url = new URL(request.url);
-    throw redirect(`/auth/login?returnTo=${encodeURIComponent(url.pathname + url.search)}`);
+    const returnTo = safeFrom(url.pathname + url.search) ?? "/";
+    throw redirect(`/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
   }
   return user;
 }

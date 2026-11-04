@@ -10,6 +10,13 @@ describe("navigation return targets", () => {
     expect(safeFrom("")).toBeNull();
   });
 
+  it("reduces single-fetch data requests to their document path", () => {
+    expect(safeFrom("/prompts/new.data")).toBe("/prompts/new");
+    expect(safeFrom("/prompts/new.data?_routes=routes%2Fprompts.new")).toBe("/prompts/new");
+    expect(safeFrom("/p/1.data?sort=new&_routes=routes%2Fp")).toBe("/p/1?sort=new");
+    expect(safeFrom("/_.data")).toBe("/");
+  });
+
   it("keeps an existing query string when adding from", () => {
     expect(withFrom("/p/1/edit", "/me?tab=prompts")).toBe(
       "/p/1/edit?from=%2Fme%3Ftab%3Dprompts",

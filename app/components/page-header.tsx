@@ -223,7 +223,7 @@ export function PageHeader({ title, subtitle, back, actions, className }: PageHe
         {/* Full-bleed tonal glass surface spanning the main column */}
         <div aria-hidden="true" className="page-header-backdrop pointer-events-none" />
 
-        <div ref={innerRef} className="relative z-10 pt-6 pb-3 lg:pt-8 lg:pb-3.5">
+        <div ref={innerRef} className="page-header-inner relative z-10 pt-6 pb-3 lg:pt-8 lg:pb-3.5">
           {back && (
             <div
               ref={backRowRef}

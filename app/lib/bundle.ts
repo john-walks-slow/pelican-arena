@@ -13,7 +13,7 @@ export interface BundleEntry {
 }
 
 export const BUNDLE_LIMITS = {
-  htmlBytes: 2 * 1024 * 1024,
+  htmlBytes: 4 * 1024 * 1024,
   totalBytes: 10 * 1024 * 1024,
   maxFiles: 200,
   zipBytes: 10 * 1024 * 1024,
@@ -23,6 +23,7 @@ export const BUNDLE_LIMITS = {
 
 export function singleFileLimit(kind: PromptKind) {
   if (kind === "markdown") return BUNDLE_LIMITS.markdownBytes;
+  if (kind === "svg") return BUNDLE_LIMITS.svgBytes;
   return BUNDLE_LIMITS.htmlBytes;
 }
 
@@ -119,10 +120,14 @@ export function buildBundle(entries: BundleEntry[], kind: PromptKind = "web"): B
   }));
 
   const entry = KIND_META[kind].entry;
-  if (!files.some((f) => f.path === entry)) {
+  const entryFile = files.find((f) => f.path === entry);
+  if (!entryFile) {
     throw new BundleError(`缺少入口文件 ${entry}`);
   }
   if (kind === "web") {
+    if (entryFile.data.byteLength > BUNDLE_LIMITS.htmlBytes) {
+      throw new BundleError(`入口文件超过 ${formatBytes(BUNDLE_LIMITS.htmlBytes)}`);
+    }
     if (files.length > BUNDLE_LIMITS.maxFiles) {
       throw new BundleError(`文件数超过 ${BUNDLE_LIMITS.maxFiles} 个`);
     }

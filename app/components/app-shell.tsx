@@ -1,11 +1,14 @@
 import { LayoutGrid, LogOut, PenLine, ShieldCheck, Trophy, UserRound } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Form, Link, NavLink, useLocation, useNavigation } from "react-router";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { Form, Link, NavLink, useLocation, useNavigate, useNavigation } from "react-router";
 import { Avatar } from "./avatar";
+import { useGate } from "./gate-dialog";
 import { PelicanRide } from "./pelican-ride";
 import { ThemeMenu } from "./theme-menu";
 import { Button } from "./ui/button";
+import { GitHubIcon } from "./ui/github-icon";
 import { LinuxDoIcon } from "./ui/linuxdo-icon";
+import { cn } from "~/lib/utils";
 
 export interface ShellUser {
   id: number;
@@ -29,13 +32,44 @@ export { baseScreenKey };
 
 function Brand() {
   const { pathname } = useLocation();
+  const isHome = pathname === "/";
+  const to = isHome ? "/welcome" : "/";
+  const title = isHome ? "关于 Pelican Arena · 重温欢迎仪式" : "返回首页";
 
   return (
-    <Link to="/" prefetch="intent" className="flex items-center gap-2 px-1.5">
+    <Link
+      to={to}
+      prefetch="intent"
+      className="flex items-center gap-2 px-1.5 transition-opacity hover:opacity-85"
+      title={title}
+    >
       {/* Remount per screen so the ride replays on every page switch. */}
       <PelicanRide key={pathname} className="brand-mark size-6 text-accent" />
       <span className="text-[15px] font-semibold tracking-tight">Pelican Arena</span>
     </Link>
+  );
+}
+
+const REPO_URL = "https://github.com/john-walks-slow/pelican-arena";
+
+function GitHubLink({ className }: { className?: string }) {
+  return (
+    <Button
+      asChild
+      variant="ghost"
+      size="icon"
+      className={cn("text-ink hover:bg-raised", className)}
+    >
+      <a
+        href={REPO_URL}
+        target="_blank"
+        rel="noreferrer"
+        aria-label="GitHub 仓库"
+        title="GitHub 仓库"
+      >
+        <GitHubIcon className="size-[17px]" />
+      </a>
+    </Button>
   );
 }
 
@@ -51,6 +85,8 @@ function NavItems({
   slidingPill?: boolean;
 }) {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const gate = useGate();
   const items = [
     ...NAV,
     ...(user ? [{ to: "/me", label: "我的", icon: UserRound, end: false }] : []),
@@ -59,6 +95,16 @@ function NavItems({
   const activeIndex = items.findIndex(({ to, end }) =>
     end ? pathname === to : pathname === to || pathname.startsWith(`${to}/`),
   );
+
+  // `/prompts/new` is permission-gated, so route it through the shared gate instead of
+  // letting a plain link bounce unauthenticated visitors through the login redirect.
+  const handleClick = (event: MouseEvent<HTMLAnchorElement>, to: string) => {
+    onNavigate?.();
+    if (to !== "/prompts/new") return;
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    gate.guard("createPrompt", () => navigate(to), { returnTo: to });
+  };
 
   return (
     <nav className="relative flex flex-col gap-0.5">
@@ -78,7 +124,7 @@ function NavItems({
           to={to}
           end={end}
           prefetch="intent"
-          onClick={onNavigate}
+          onClick={(event) => handleClick(event, to)}
           className={({ isActive }) =>
             `relative z-10 flex h-9 items-center gap-2.5 rounded-control px-2.5 text-sm transition-colors duration-150 ${
               isActive
@@ -286,7 +332,10 @@ export function AppShell({
         <div className="space-y-5">
           <div className="flex items-center justify-between">
             <Brand />
-            <ThemeMenu />
+            <div className="flex items-center gap-1">
+              <GitHubLink className="size-7" />
+              <ThemeMenu className="size-7" />
+            </div>
           </div>
           <NavItems user={user} reviewCount={reviewCount} />
         </div>
@@ -300,6 +349,7 @@ export function AppShell({
       >
         <Brand />
         <div className="flex items-center">
+          <GitHubLink className="size-10" />
           <ThemeMenu className="size-10" />
           <MenuButton open={menuOpen} onToggle={() => setMenuOpen((v) => !v)} />
         </div>

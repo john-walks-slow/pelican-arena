@@ -19,7 +19,7 @@ export type LimitedAction = "createPrompt" | "submit" | "rate" | "report";
 export const DAILY_LIMITS: Record<LimitedAction, number> = {
   createPrompt: 5,
   submit: 20,
-  rate: 30,
+  rate: 50,
   report: 20,
 };
 

@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   Code2,
   Download,
   ExternalLink,
@@ -8,9 +9,23 @@ import {
   Undo2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { data, Link, Outlet, redirect, useLocation, useNavigation, useSearchParams, useSubmit } from "react-router";
+import {
+  data,
+  Link,
+  Outlet,
+  redirect,
+  useFetcher,
+  useLocation,
+  useNavigation,
+  useSearchParams,
+  useSubmit,
+} from "react-router";
+import { toast } from "sonner";
+import { Popover, PopoverContent, PopoverTrigger } from "~/components/ui/popover";
+import { cn } from "~/lib/utils";
 import type { Route } from "./+types/submission";
 import { Avatar } from "~/components/avatar";
+import { useGate } from "~/components/gate-dialog";
 import { Markdown } from "~/components/markdown";
 import { ModerationActions } from "~/components/moderation-actions";
 import { PageHeader } from "~/components/page-header";
@@ -38,8 +53,10 @@ import {
   countOtherRatings,
   getPrompt,
   getSubmission,
+  getUserDoubt,
   getUserRating,
   setRating,
+  toggleDoubt,
 } from "~/lib/queries.server";
 import { cachedClientLoader, clearRouteCache, primeRouteCache } from "~/lib/route-cache";
 import { submissionUrl, thumbnailUrl, usercontentUrl } from "~/lib/sandbox";
@@ -88,8 +105,9 @@ export async function loader({ params, request }: Route.LoaderArgs) {
   }
 
   const isAuthor = user?.id === submission.author.id;
-  const [myRating, otherRatings, reported, grant] = await Promise.all([
+  const [myRating, myDoubt, otherRatings, reported, grant] = await Promise.all([
     user ? getUserRating(user.id, submission.id) : null,
+    user ? getUserDoubt(user.id, submission.id) : false,
     user?.id === submission.authorId
       ? countOtherRatings(submission.id, submission.authorId)
       : 0,
@@ -106,6 +124,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
       status: prompt.status,
     },
     myRating,
+    myDoubt,
     otherRatings,
     reported,
     grant,
@@ -138,6 +157,18 @@ export async function action({ params, request }: Route.ActionArgs) {
     return redirect(from ?? `/p/${submission.promptId}`, {
       headers: { "Set-Cookie": await flashToast(request, "答案已撤回") },
     });
+  }
+
+  if (form.get("intent") === "doubt") {
+    const user = await requirePermission(request, "rate");
+    const submission = await getSubmission(params.submissionId);
+    if (!submission || submission.status !== "active") throw data("Not Found", { status: 404 });
+    const prompt = await getPrompt(submission.promptId);
+    if (!prompt || prompt.status !== "active") throw data("Not Found", { status: 404 });
+    if (submission.authorId === user.id) throw data("不能对自己的答案标记存疑", { status: 403 });
+
+    const result = await toggleDoubt(user.id, submission.id);
+    return result;
   }
 
   const user = await requirePermission(request, "rate");
@@ -194,11 +225,88 @@ async function downloadZip(baseUrl: string, paths: string[], name: string) {
   URL.revokeObjectURL(url);
 }
 
+function DoubtButton({
+  submissionId,
+  initialDoubted,
+  initialCount,
+  isAuthor,
+  disabledReason,
+}: {
+  submissionId: string;
+  initialDoubted: boolean;
+  initialCount: number;
+  isAuthor: boolean;
+  disabledReason?: string | null;
+}) {
+  const gate = useGate();
+  const fetcher = useFetcher<{ doubted: boolean; count: number }>();
+
+  const isSubmitting = fetcher.state !== "idle" && fetcher.formData?.get("intent") === "doubt";
+  const doubted = isSubmitting
+    ? !initialDoubted
+    : (fetcher.data?.doubted ?? initialDoubted);
+  const count = isSubmitting
+    ? (initialDoubted ? Math.max(0, initialCount - 1) : initialCount + 1)
+    : (fetcher.data?.count ?? initialCount);
+
+  const handleClick = () => {
+    if (isAuthor) {
+      toast.error("不能对自己的答案标记存疑");
+      return;
+    }
+    gate.guard("rate", () => {
+      fetcher.submit({ intent: "doubt" }, { method: "post" });
+    });
+  };
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={handleClick}
+        disabled={isAuthor || !!disabledReason}
+        className={cn(
+          "inline-flex items-center gap-1 rounded-control border px-2.5 py-1 text-xs font-medium transition-colors",
+          doubted
+            ? "border-negative/40 bg-negative/10 text-negative font-semibold hover:bg-negative/15"
+            : "border-control bg-surface text-muted hover:bg-raised hover:text-ink",
+          (isAuthor || disabledReason) && "cursor-not-allowed opacity-50",
+        )}
+        title={isAuthor ? "不能对自己的答案标记存疑" : (disabledReason ?? undefined)}
+      >
+        存疑 ({count})
+      </button>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            aria-label="存疑说明"
+            className="rounded-full p-1 text-muted transition-colors hover:bg-raised hover:text-ink"
+          >
+            <CircleHelp className="size-3.5" strokeWidth={1.75} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="top"
+          align="start"
+          className="w-72 p-3 text-xs leading-relaxed text-muted"
+        >
+          <p className="mb-1 font-medium text-ink">存疑说明</p>
+          <p>
+            这个代表本答案的真实性和模型可靠性存疑。存疑率一定以上的答案不计入排名。（已标记降智的模型不显示此按钮）（另外在答案页本身的排序里面按评分排序也会变成排到最后）
+          </p>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
   const {
     submission: s,
     prompt,
     myRating,
+    myDoubt,
     otherRatings,
     reported,
     grant,
@@ -405,6 +513,17 @@ export default function SubmissionPage({ loaderData }: Route.ComponentProps) {
               <StarScore starSum={s.starSum} votes={s.votes} />
             </div>
             <StarRating current={myRating} disabledReason={ratingBlock} />
+            {!s.model.name.includes("降智") && (
+              <div className="mt-3 flex items-center justify-between border-t border-rule pt-2.5">
+                <DoubtButton
+                  submissionId={s.id}
+                  initialDoubted={myDoubt}
+                  initialCount={s.doubtCount ?? 0}
+                  isAuthor={isAuthor}
+                  disabledReason={!live ? "该答案暂不可评价" : undefined}
+                />
+              </div>
+            )}
           </SideSection>
 
           <SideSection title="生成信息">

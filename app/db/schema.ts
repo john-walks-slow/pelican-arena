@@ -199,6 +199,25 @@ export const ratings = sqliteTable(
   ],
 );
 
+/** Doubts cast on an answer's veracity or model authenticity. */
+export const submissionDoubts = sqliteTable(
+  "submission_doubts",
+  {
+    userId: integer("user_id")
+      .notNull()
+      .references(() => users.id),
+    submissionId: text("submission_id")
+      .notNull()
+      .references(() => submissions.id),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.userId, t.submissionId] }),
+    index("submission_doubts_submission_idx").on(t.submissionId),
+    index("submission_doubts_user_idx").on(t.userId, t.createdAt),
+  ],
+);
+
 /** Reports on either a prompt or an answer; the target decides what is checked. */
 export const reports = sqliteTable(
   "reports",
@@ -258,3 +277,4 @@ export const moderationLog = sqliteTable(
 export type User = typeof users.$inferSelect;
 export type Prompt = typeof prompts.$inferSelect;
 export type Submission = typeof submissions.$inferSelect;
+export type SubmissionDoubt = typeof submissionDoubts.$inferSelect;
