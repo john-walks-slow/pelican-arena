@@ -68,3 +68,7 @@ npm run typecheck
 ## 许可
 
 MIT
+
+## 特别感谢
+
+感谢 [LINUX DO](https://linux.do/) 社区提供的讨论环境。
